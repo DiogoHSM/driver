@@ -1,0 +1,26 @@
+{
+  "name": "@driver/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "driver": "./bin/driver"
+  },
+  "scripts": {
+    "build": "tsup",
+    "pretest": "npm run build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "schema:json": "tsx scripts/gen-json-schema.ts"
+  },
+  "dependencies": {
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "tsup": "^9.0.0",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "driver",
+  "version": "0.1.0",
+  "description": "Enforces the DRIVER method (Discover, Route, Implement, Validate, Evolve, Release) on any project with a block-graph plan, gates and a living diagram.",
+  "author": {
+    "name": "Diogo Martins"
+  },
+  "license": "MIT",
+  "keywords": [
+    "driver",
+    "workflow",
+    "planning",
+    "gates",
+    "methodology"
+  ]
+}

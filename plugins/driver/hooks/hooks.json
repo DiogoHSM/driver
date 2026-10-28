@@ -1,0 +1,25 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Agent|Task|Workflow",
+        "hooks": [
+          { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/gate-check.sh\"", "timeout": 10 }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit|Bash",
+        "hooks": [
+          { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/dist/cli.js\" hook protect-plan", "timeout": 10 }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/dist/cli.js\" hook subagent-stop", "timeout": 10 }
+        ]
+      }
+    ]
+  }
+}

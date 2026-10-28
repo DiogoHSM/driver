@@ -1,0 +1,701 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "type": "number",
+      "const": 1
+    },
+    "project": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "packs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        }
+      },
+      "required": [
+        "name",
+        "packs",
+        "createdAt"
+      ],
+      "additionalProperties": {}
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "baseline": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+    },
+    "currentPhase": {
+      "type": "string",
+      "enum": [
+        "discover",
+        "route",
+        "implement",
+        "validate",
+        "evolve",
+        "release"
+      ]
+    },
+    "nextId": {
+      "type": "object",
+      "properties": {
+        "R": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "B": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "D": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "REL": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "R",
+        "B",
+        "D",
+        "REL"
+      ],
+      "additionalProperties": {}
+    },
+    "gates": {
+      "type": "object",
+      "properties": {
+        "route": {
+          "type": "object",
+          "properties": {
+            "approved": {
+              "type": "boolean"
+            },
+            "approvedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+            },
+            "approvedBy": {
+              "type": "string"
+            },
+            "atBaseline": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "revokedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+            },
+            "revokedReason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "approved"
+          ],
+          "additionalProperties": {}
+        },
+        "release": {
+          "type": "object",
+          "properties": {
+            "approved": {
+              "type": "boolean"
+            },
+            "approvedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+            },
+            "approvedBy": {
+              "type": "string"
+            },
+            "atBaseline": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "revokedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+            },
+            "revokedReason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "approved"
+          ],
+          "additionalProperties": {}
+        }
+      },
+      "required": [
+        "route",
+        "release"
+      ],
+      "additionalProperties": {}
+    },
+    "requirements": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^R-\\d{3,}$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "functional",
+              "nonfunctional",
+              "constraint",
+              "non-goal"
+            ]
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "user",
+              "assumed"
+            ]
+          },
+          "ref": {
+            "type": "string"
+          },
+          "retired": {
+            "type": "object",
+            "properties": {
+              "at": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+              },
+              "decision": {
+                "type": "string",
+                "pattern": "^D-\\d{3,}$"
+              },
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "at",
+              "decision",
+              "reason"
+            ],
+            "additionalProperties": {}
+          },
+          "ext": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "title",
+          "kind",
+          "source"
+        ],
+        "additionalProperties": {}
+      }
+    },
+    "blocks": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^B-\\d{3,}$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "phase": {
+            "type": "string",
+            "enum": [
+              "discover",
+              "route",
+              "implement",
+              "validate",
+              "evolve",
+              "release"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "not_started",
+              "in_progress",
+              "blocked",
+              "in_review",
+              "done",
+              "needs_rework"
+            ]
+          },
+          "statusSince": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "statusBy": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "model",
+                  "user",
+                  "hook"
+                ]
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "kind",
+              "id"
+            ],
+            "additionalProperties": {}
+          },
+          "statusReason": {
+            "type": "string"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "dependsOn": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^B-\\d{3,}$"
+            }
+          },
+          "requirements": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^R-\\d{3,}$"
+            }
+          },
+          "provider": {
+            "type": "object",
+            "properties": {
+              "capability": {
+                "type": "string",
+                "minLength": 1
+              },
+              "provider": {
+                "type": "string",
+                "minLength": 1
+              },
+              "access": {
+                "type": "string",
+                "enum": [
+                  "cli",
+                  "mcp",
+                  "api"
+                ]
+              },
+              "credentials": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9_]*$"
+                }
+              }
+            },
+            "required": [
+              "capability",
+              "provider",
+              "access"
+            ],
+            "additionalProperties": {}
+          },
+          "artifacts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tests": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "layer": {
+                  "type": "string",
+                  "enum": [
+                    "unit",
+                    "integration",
+                    "e2e",
+                    "visual",
+                    "perf",
+                    "security",
+                    "acceptance",
+                    "manual"
+                  ]
+                },
+                "result": {
+                  "type": "string",
+                  "enum": [
+                    "pass",
+                    "fail",
+                    "unknown"
+                  ]
+                },
+                "at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                },
+                "commit": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "ref",
+                "layer",
+                "result"
+              ],
+              "additionalProperties": {}
+            }
+          },
+          "verification": {
+            "type": "object",
+            "properties": {
+              "passes": {
+                "type": "boolean"
+              },
+              "at": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+              },
+              "by": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "model",
+                      "user",
+                      "hook"
+                    ]
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "kind",
+                  "id"
+                ],
+                "additionalProperties": {}
+              },
+              "commit": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "passes",
+              "at",
+              "by"
+            ],
+            "additionalProperties": {}
+          },
+          "risk": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          },
+          "retired": {
+            "type": "object",
+            "properties": {
+              "at": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+              },
+              "decision": {
+                "type": "string",
+                "pattern": "^D-\\d{3,}$"
+              },
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "at",
+              "decision",
+              "reason"
+            ],
+            "additionalProperties": {}
+          },
+          "ext": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "title",
+          "phase",
+          "status",
+          "statusSince",
+          "statusBy",
+          "dependsOn",
+          "requirements",
+          "artifacts",
+          "tests"
+        ],
+        "additionalProperties": {}
+      }
+    },
+    "decisions": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^D-\\d{3,}$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "by": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "model",
+                  "user",
+                  "hook"
+                ]
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "kind",
+              "id"
+            ],
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "title",
+          "at",
+          "by"
+        ],
+        "additionalProperties": {}
+      }
+    },
+    "baselines": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "n": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "decision": {
+            "type": "string",
+            "pattern": "^D-\\d{3,}$"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "added": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^B-\\d{3,}$"
+            }
+          },
+          "retired": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^B-\\d{3,}$"
+            }
+          },
+          "changed": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^B-\\d{3,}$"
+            }
+          },
+          "reqAdded": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^R-\\d{3,}$"
+            }
+          },
+          "reqRetired": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^R-\\d{3,}$"
+            }
+          }
+        },
+        "required": [
+          "n",
+          "at",
+          "decision",
+          "reason",
+          "added",
+          "retired",
+          "changed",
+          "reqAdded",
+          "reqRetired"
+        ],
+        "additionalProperties": {}
+      }
+    },
+    "releases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^REL-\\d+$"
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "baseline": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "commit": {
+            "type": "string"
+          },
+          "blocks": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^B-\\d{3,}$"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "at",
+          "baseline",
+          "commit",
+          "blocks"
+        ],
+        "additionalProperties": {}
+      }
+    },
+    "ext": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {}
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "project",
+    "revision",
+    "baseline",
+    "updatedAt",
+    "currentPhase",
+    "nextId",
+    "gates",
+    "requirements",
+    "blocks",
+    "baselines",
+    "releases"
+  ],
+  "additionalProperties": {}
+}

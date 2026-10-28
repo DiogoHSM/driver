@@ -1,0 +1,34 @@
+{"seq":1,"ts":"2026-10-20T09:00:00Z","revision":1,"actor":{"kind":"model","id":"orchestrator"},"type":"req.add","data":{"id":"R-001","title":"Visitors can join the waitlist with an email"}}
+{"seq":2,"ts":"2026-10-20T09:00:00Z","revision":2,"actor":{"kind":"model","id":"orchestrator"},"type":"req.add","data":{"id":"R-002","title":"Confirmation email is sent after signup"}}
+{"seq":3,"ts":"2026-10-20T09:00:00Z","revision":3,"actor":{"kind":"model","id":"orchestrator"},"type":"req.add","data":{"id":"R-003","title":"Signup flow works end to end on mobile"}}
+{"seq":4,"ts":"2026-10-20T09:00:00Z","revision":4,"actor":{"kind":"model","id":"orchestrator"},"type":"block.add","block":"B-001","data":{"phase":"discover","title":"Discovery interview"}}
+{"seq":5,"ts":"2026-10-20T09:00:00Z","revision":5,"actor":{"kind":"model","id":"orchestrator"},"type":"block.add","block":"B-002","data":{"phase":"route","title":"Plan and gate 1"}}
+{"seq":6,"ts":"2026-10-20T09:00:00Z","revision":6,"actor":{"kind":"model","id":"orchestrator"},"type":"block.add","block":"B-003","data":{"phase":"implement","title":"Landing page UI"}}
+{"seq":7,"ts":"2026-10-20T09:00:00Z","revision":7,"actor":{"kind":"model","id":"orchestrator"},"type":"block.add","block":"B-004","data":{"phase":"implement","title":"Signup API"}}
+{"seq":8,"ts":"2026-10-20T09:00:00Z","revision":8,"actor":{"kind":"model","id":"orchestrator"},"type":"block.add","block":"B-005","data":{"phase":"implement","title":"Confirmation email"}}
+{"seq":9,"ts":"2026-10-20T09:00:00Z","revision":9,"actor":{"kind":"model","id":"orchestrator"},"type":"block.add","block":"B-006","data":{"phase":"validate","title":"E2E signup check"}}
+{"seq":10,"ts":"2026-10-20T09:00:00Z","revision":10,"actor":{"kind":"model","id":"orchestrator"},"type":"block.add","block":"B-007","data":{"phase":"evolve","title":"Evolve review"}}
+{"seq":11,"ts":"2026-10-20T09:00:00Z","revision":11,"actor":{"kind":"model","id":"orchestrator"},"type":"block.add","block":"B-008","data":{"phase":"release","title":"Deploy to Vercel"}}
+{"seq":12,"ts":"2026-10-20T10:00:00Z","revision":12,"actor":{"kind":"model","id":"orchestrator"},"type":"block.status","block":"B-001","from":"not_started","to":"in_progress"}
+{"seq":13,"ts":"2026-10-20T10:00:00Z","revision":13,"actor":{"kind":"model","id":"orchestrator"},"type":"block.set","block":"B-001","data":{"fields":["artifacts"]}}
+{"seq":14,"ts":"2026-10-20T10:00:00Z","revision":14,"actor":{"kind":"model","id":"orchestrator"},"type":"block.status","block":"B-001","from":"in_progress","to":"in_review"}
+{"seq":15,"ts":"2026-10-20T10:00:00Z","revision":15,"actor":{"kind":"user","id":"diogo"},"type":"block.set","block":"B-001","data":{"fields":["verification"]}}
+{"seq":16,"ts":"2026-10-20T10:00:00Z","revision":16,"actor":{"kind":"model","id":"orchestrator"},"type":"block.status","block":"B-001","from":"in_review","to":"done"}
+{"seq":17,"ts":"2026-10-21T10:00:00Z","revision":17,"actor":{"kind":"user","id":"diogo"},"type":"gate.approve","data":{"baseline":1,"decision":"D-001","gate":"route"}}
+{"seq":18,"ts":"2026-10-21T10:00:00Z","revision":18,"actor":{"kind":"model","id":"orchestrator"},"type":"phase.change","from":"discover","to":"route"}
+{"seq":19,"ts":"2026-10-21T10:00:00Z","revision":19,"actor":{"kind":"model","id":"orchestrator"},"type":"block.status","block":"B-002","from":"not_started","to":"in_progress"}
+{"seq":20,"ts":"2026-10-21T10:00:00Z","revision":20,"actor":{"kind":"model","id":"orchestrator"},"type":"block.set","block":"B-002","data":{"fields":["artifacts"]}}
+{"seq":21,"ts":"2026-10-21T10:00:00Z","revision":21,"actor":{"kind":"model","id":"orchestrator"},"type":"block.status","block":"B-002","from":"in_progress","to":"in_review"}
+{"seq":22,"ts":"2026-10-21T10:00:00Z","revision":22,"actor":{"kind":"user","id":"diogo"},"type":"block.set","block":"B-002","data":{"fields":["verification"]}}
+{"seq":23,"ts":"2026-10-21T10:00:00Z","revision":23,"actor":{"kind":"model","id":"orchestrator"},"type":"block.status","block":"B-002","from":"in_review","to":"done"}
+{"seq":24,"ts":"2026-10-21T10:00:00Z","revision":24,"actor":{"kind":"model","id":"orchestrator"},"type":"phase.change","from":"route","to":"implement"}
+{"seq":25,"ts":"2026-10-22T09:00:00Z","revision":25,"actor":{"kind":"model","id":"orchestrator"},"type":"block.status","block":"B-003","from":"not_started","to":"in_progress"}
+{"seq":26,"ts":"2026-10-22T09:00:00Z","revision":26,"actor":{"kind":"model","id":"orchestrator"},"type":"block.set","block":"B-003","data":{"fields":["artifacts","tests"]}}
+{"seq":27,"ts":"2026-10-22T09:00:00Z","revision":27,"actor":{"kind":"model","id":"orchestrator"},"type":"block.status","block":"B-003","from":"in_progress","to":"in_review"}
+{"seq":28,"ts":"2026-10-22T09:00:00Z","revision":28,"actor":{"kind":"user","id":"diogo"},"type":"block.set","block":"B-003","data":{"fields":["verification"]}}
+{"seq":29,"ts":"2026-10-22T09:00:00Z","revision":29,"actor":{"kind":"model","id":"orchestrator"},"type":"block.status","block":"B-003","from":"in_review","to":"done"}
+{"seq":30,"ts":"2026-10-23T09:00:00Z","revision":30,"actor":{"kind":"model","id":"orchestrator"},"type":"block.status","block":"B-004","from":"not_started","to":"in_progress"}
+{"seq":31,"ts":"2026-10-23T09:00:00Z","revision":31,"actor":{"kind":"model","id":"orchestrator"},"type":"block.set","block":"B-004","data":{"fields":["artifacts","tests"]}}
+{"seq":32,"ts":"2026-10-23T09:00:00Z","revision":32,"actor":{"kind":"model","id":"orchestrator"},"type":"block.status","block":"B-004","from":"in_progress","to":"in_review"}
+{"seq":33,"ts":"2026-10-23T09:00:00Z","revision":33,"actor":{"kind":"model","id":"orchestrator"},"type":"block.status","block":"B-005","from":"not_started","to":"in_progress"}
+{"seq":34,"ts":"2026-10-23T09:00:00Z","revision":34,"actor":{"kind":"model","id":"orchestrator"},"type":"block.status","block":"B-005","from":"in_progress","to":"blocked","reason":"Waiting for RESEND_API_KEY (Resend domain verification pending)"}

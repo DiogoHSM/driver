@@ -1,0 +1,28 @@
+flowchart LR
+  subgraph discover["Discover"]
+    B-001["B-001 Creative brief"]
+  end
+  subgraph route["Route"]
+    B-002["B-002 Storyboard"]
+  end
+  subgraph implement["Implement"]
+    B-003["B-003 Scene composition"]
+    B-004["B-004 Narration voiceover"]
+  end
+  subgraph validate["Validate"]
+    B-005["B-005 Render check"]
+  end
+  B-001 --> B-002
+  B-002 --> B-003
+  B-002 --> B-004
+  B-003 --> B-005
+  B-004 --> B-005
+  classDef not_started fill:#e5e7eb,stroke:#6b7280,color:#111827
+  classDef in_progress fill:#bfdbfe,stroke:#2563eb,color:#111827
+  classDef blocked fill:#fecaca,stroke:#dc2626,color:#111827
+  classDef in_review fill:#fef08a,stroke:#ca8a04,color:#111827
+  classDef done fill:#bbf7d0,stroke:#16a34a,color:#111827
+  classDef needs_rework fill:#fed7aa,stroke:#ea580c,color:#111827
+  class B-003,B-004,B-005 not_started
+  class B-002 in_progress
+  class B-001 done

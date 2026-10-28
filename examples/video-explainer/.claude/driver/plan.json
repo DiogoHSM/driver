@@ -1,0 +1,185 @@
+{
+  "baseline": 1,
+  "baselines": [
+    {
+      "added": [
+        "B-001",
+        "B-002",
+        "B-003",
+        "B-004",
+        "B-005"
+      ],
+      "at": "2026-10-24T11:00:00Z",
+      "changed": [],
+      "decision": "D-001",
+      "n": 1,
+      "reason": "Gate 1: route approved",
+      "reqAdded": [
+        "R-001",
+        "R-002"
+      ],
+      "reqRetired": [],
+      "retired": []
+    }
+  ],
+  "blocks": {
+    "B-001": {
+      "artifacts": [
+        ".claude/driver/discover/brief.md"
+      ],
+      "dependsOn": [],
+      "phase": "discover",
+      "requirements": [],
+      "status": "done",
+      "statusBy": {
+        "id": "orchestrator",
+        "kind": "model"
+      },
+      "statusSince": "2026-10-24T10:00:00Z",
+      "tests": [],
+      "title": "Creative brief",
+      "verification": {
+        "at": "2026-10-24T10:00:00Z",
+        "by": {
+          "id": "diogo",
+          "kind": "user"
+        },
+        "passes": true
+      }
+    },
+    "B-002": {
+      "artifacts": [],
+      "dependsOn": [
+        "B-001"
+      ],
+      "owner": "orchestrator",
+      "phase": "route",
+      "requirements": [],
+      "status": "in_progress",
+      "statusBy": {
+        "id": "orchestrator",
+        "kind": "model"
+      },
+      "statusSince": "2026-10-24T11:00:00Z",
+      "tests": [],
+      "title": "Storyboard"
+    },
+    "B-003": {
+      "artifacts": [],
+      "dependsOn": [
+        "B-002"
+      ],
+      "phase": "implement",
+      "provider": {
+        "access": "cli",
+        "capability": "video-composition",
+        "provider": "hyperframes"
+      },
+      "requirements": [
+        "R-001"
+      ],
+      "status": "not_started",
+      "statusBy": {
+        "id": "orchestrator",
+        "kind": "model"
+      },
+      "statusSince": "2026-10-24T09:00:00Z",
+      "tests": [],
+      "title": "Scene composition"
+    },
+    "B-004": {
+      "artifacts": [],
+      "dependsOn": [
+        "B-002"
+      ],
+      "phase": "implement",
+      "provider": {
+        "access": "api",
+        "capability": "text-to-speech",
+        "credentials": [
+          "ELEVENLABS_API_KEY"
+        ],
+        "provider": "elevenlabs"
+      },
+      "requirements": [
+        "R-002"
+      ],
+      "status": "not_started",
+      "statusBy": {
+        "id": "orchestrator",
+        "kind": "model"
+      },
+      "statusSince": "2026-10-24T09:00:00Z",
+      "tests": [],
+      "title": "Narration voiceover"
+    },
+    "B-005": {
+      "artifacts": [],
+      "dependsOn": [
+        "B-003",
+        "B-004"
+      ],
+      "phase": "validate",
+      "requirements": [],
+      "status": "not_started",
+      "statusBy": {
+        "id": "orchestrator",
+        "kind": "model"
+      },
+      "statusSince": "2026-10-24T09:00:00Z",
+      "tests": [],
+      "title": "Render check"
+    }
+  },
+  "currentPhase": "route",
+  "decisions": {
+    "D-001": {
+      "at": "2026-10-24T11:00:00Z",
+      "by": {
+        "id": "diogo",
+        "kind": "user"
+      },
+      "title": "Gate 1: route approved"
+    }
+  },
+  "gates": {
+    "release": {
+      "approved": false
+    },
+    "route": {
+      "approved": true,
+      "approvedAt": "2026-10-24T11:00:00Z",
+      "approvedBy": "diogo",
+      "atBaseline": 1
+    }
+  },
+  "nextId": {
+    "B": 6,
+    "D": 2,
+    "R": 3,
+    "REL": 1
+  },
+  "project": {
+    "createdAt": "2026-10-24T09:00:00Z",
+    "name": "video-explainer",
+    "packs": [
+      "driver-video"
+    ]
+  },
+  "releases": [],
+  "requirements": {
+    "R-001": {
+      "kind": "functional",
+      "source": "user",
+      "title": "Video explains the product in under 90 seconds"
+    },
+    "R-002": {
+      "kind": "functional",
+      "source": "user",
+      "title": "Narration is voiced and captioned"
+    }
+  },
+  "revision": 15,
+  "schemaVersion": 1,
+  "updatedAt": "2026-10-24T11:00:00Z"
+}

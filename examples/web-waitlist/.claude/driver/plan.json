@@ -1,0 +1,296 @@
+{
+  "baseline": 1,
+  "baselines": [
+    {
+      "added": [
+        "B-001",
+        "B-002",
+        "B-003",
+        "B-004",
+        "B-005",
+        "B-006",
+        "B-007",
+        "B-008"
+      ],
+      "at": "2026-10-21T10:00:00Z",
+      "changed": [],
+      "decision": "D-001",
+      "n": 1,
+      "reason": "Gate 1: route approved",
+      "reqAdded": [
+        "R-001",
+        "R-002",
+        "R-003"
+      ],
+      "reqRetired": [],
+      "retired": []
+    }
+  ],
+  "blocks": {
+    "B-001": {
+      "artifacts": [
+        ".claude/driver/discover/interview.md"
+      ],
+      "dependsOn": [],
+      "phase": "discover",
+      "requirements": [],
+      "status": "done",
+      "statusBy": {
+        "id": "orchestrator",
+        "kind": "model"
+      },
+      "statusSince": "2026-10-20T10:00:00Z",
+      "tests": [],
+      "title": "Discovery interview",
+      "verification": {
+        "at": "2026-10-20T10:00:00Z",
+        "by": {
+          "id": "diogo",
+          "kind": "user"
+        },
+        "passes": true
+      }
+    },
+    "B-002": {
+      "artifacts": [
+        ".claude/driver/plan.json"
+      ],
+      "dependsOn": [
+        "B-001"
+      ],
+      "phase": "route",
+      "requirements": [],
+      "status": "done",
+      "statusBy": {
+        "id": "orchestrator",
+        "kind": "model"
+      },
+      "statusSince": "2026-10-21T10:00:00Z",
+      "tests": [],
+      "title": "Plan and gate 1",
+      "verification": {
+        "at": "2026-10-21T10:00:00Z",
+        "by": {
+          "id": "diogo",
+          "kind": "user"
+        },
+        "passes": true
+      }
+    },
+    "B-003": {
+      "artifacts": [
+        "src/app/page.tsx"
+      ],
+      "dependsOn": [
+        "B-002"
+      ],
+      "phase": "implement",
+      "requirements": [
+        "R-001"
+      ],
+      "status": "done",
+      "statusBy": {
+        "id": "orchestrator",
+        "kind": "model"
+      },
+      "statusSince": "2026-10-22T09:00:00Z",
+      "tests": [
+        {
+          "at": "2026-10-22T09:00:00Z",
+          "layer": "unit",
+          "ref": "test/landing.test.ts",
+          "result": "pass"
+        }
+      ],
+      "title": "Landing page UI",
+      "verification": {
+        "at": "2026-10-22T09:00:00Z",
+        "by": {
+          "id": "diogo",
+          "kind": "user"
+        },
+        "passes": true
+      }
+    },
+    "B-004": {
+      "artifacts": [
+        "supabase/migrations/001_waitlist.sql,src/app/api/signup/route.ts"
+      ],
+      "dependsOn": [
+        "B-003"
+      ],
+      "phase": "implement",
+      "provider": {
+        "access": "cli",
+        "capability": "database",
+        "credentials": [
+          "SUPABASE_URL",
+          "SUPABASE_SERVICE_ROLE_KEY"
+        ],
+        "provider": "supabase"
+      },
+      "requirements": [
+        "R-001"
+      ],
+      "risk": "medium",
+      "status": "in_review",
+      "statusBy": {
+        "id": "orchestrator",
+        "kind": "model"
+      },
+      "statusSince": "2026-10-23T09:00:00Z",
+      "tests": [
+        {
+          "at": "2026-10-23T09:00:00Z",
+          "layer": "integration",
+          "ref": "test/signup.test.ts",
+          "result": "pass"
+        }
+      ],
+      "title": "Signup API"
+    },
+    "B-005": {
+      "artifacts": [],
+      "dependsOn": [
+        "B-003"
+      ],
+      "phase": "implement",
+      "provider": {
+        "access": "api",
+        "capability": "transactional-email",
+        "credentials": [
+          "RESEND_API_KEY"
+        ],
+        "provider": "resend"
+      },
+      "requirements": [
+        "R-002"
+      ],
+      "status": "blocked",
+      "statusBy": {
+        "id": "orchestrator",
+        "kind": "model"
+      },
+      "statusReason": "Waiting for RESEND_API_KEY (Resend domain verification pending)",
+      "statusSince": "2026-10-23T09:00:00Z",
+      "tests": [],
+      "title": "Confirmation email"
+    },
+    "B-006": {
+      "artifacts": [],
+      "dependsOn": [
+        "B-004",
+        "B-005"
+      ],
+      "phase": "validate",
+      "requirements": [
+        "R-003"
+      ],
+      "status": "not_started",
+      "statusBy": {
+        "id": "orchestrator",
+        "kind": "model"
+      },
+      "statusSince": "2026-10-20T09:00:00Z",
+      "tests": [],
+      "title": "E2E signup check"
+    },
+    "B-007": {
+      "artifacts": [],
+      "dependsOn": [
+        "B-006"
+      ],
+      "phase": "evolve",
+      "requirements": [],
+      "status": "not_started",
+      "statusBy": {
+        "id": "orchestrator",
+        "kind": "model"
+      },
+      "statusSince": "2026-10-20T09:00:00Z",
+      "tests": [],
+      "title": "Evolve review"
+    },
+    "B-008": {
+      "artifacts": [],
+      "dependsOn": [
+        "B-007"
+      ],
+      "phase": "release",
+      "provider": {
+        "access": "cli",
+        "capability": "hosting",
+        "credentials": [
+          "VERCEL_TOKEN"
+        ],
+        "provider": "vercel"
+      },
+      "requirements": [],
+      "status": "not_started",
+      "statusBy": {
+        "id": "orchestrator",
+        "kind": "model"
+      },
+      "statusSince": "2026-10-20T09:00:00Z",
+      "tests": [],
+      "title": "Deploy to Vercel"
+    }
+  },
+  "currentPhase": "implement",
+  "decisions": {
+    "D-001": {
+      "at": "2026-10-21T10:00:00Z",
+      "by": {
+        "id": "diogo",
+        "kind": "user"
+      },
+      "title": "Gate 1: route approved"
+    }
+  },
+  "gates": {
+    "release": {
+      "approved": false
+    },
+    "route": {
+      "approved": true,
+      "approvedAt": "2026-10-21T10:00:00Z",
+      "approvedBy": "diogo",
+      "atBaseline": 1
+    }
+  },
+  "nextId": {
+    "B": 9,
+    "D": 2,
+    "R": 4,
+    "REL": 1
+  },
+  "project": {
+    "createdAt": "2026-10-20T09:00:00Z",
+    "name": "web-waitlist",
+    "packs": [
+      "driver-web"
+    ]
+  },
+  "releases": [],
+  "requirements": {
+    "R-001": {
+      "kind": "functional",
+      "source": "user",
+      "title": "Visitors can join the waitlist with an email"
+    },
+    "R-002": {
+      "kind": "functional",
+      "source": "user",
+      "title": "Confirmation email is sent after signup"
+    },
+    "R-003": {
+      "kind": "nonfunctional",
+      "ref": "discover/assumptions.md",
+      "source": "assumed",
+      "title": "Signup flow works end to end on mobile"
+    }
+  },
+  "revision": 34,
+  "schemaVersion": 1,
+  "updatedAt": "2026-10-23T09:00:00Z"
+}

@@ -1,0 +1,12 @@
+{
+  "name": "driver",
+  "owner": { "name": "Diogo Martins" },
+  "metadata": { "description": "Marketplace for the DRIVER method plugin for Claude Code." },
+  "plugins": [
+    {
+      "name": "driver",
+      "source": "./plugins/driver",
+      "description": "Enforces the DRIVER method (Discover, Route, Implement, Validate, Evolve, Release) with a block-graph plan and gates."
+    }
+  ]
+}

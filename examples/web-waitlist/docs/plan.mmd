@@ -1,0 +1,39 @@
+flowchart LR
+  subgraph discover["Discover"]
+    B-001["B-001 Discovery interview"]
+  end
+  subgraph route["Route"]
+    B-002["B-002 Plan and gate 1"]
+  end
+  subgraph implement["Implement"]
+    B-003["B-003 Landing page UI"]
+    B-004["B-004 Signup API"]
+    B-005["B-005 Confirmation email"]
+  end
+  subgraph validate["Validate"]
+    B-006["B-006 E2E signup check"]
+  end
+  subgraph evolve["Evolve"]
+    B-007["B-007 Evolve review"]
+  end
+  subgraph release["Release"]
+    B-008["B-008 Deploy to Vercel"]
+  end
+  B-001 --> B-002
+  B-002 --> B-003
+  B-003 --> B-004
+  B-003 --> B-005
+  B-004 --> B-006
+  B-005 --> B-006
+  B-006 --> B-007
+  B-007 --> B-008
+  classDef not_started fill:#e5e7eb,stroke:#6b7280,color:#111827
+  classDef in_progress fill:#bfdbfe,stroke:#2563eb,color:#111827
+  classDef blocked fill:#fecaca,stroke:#dc2626,color:#111827
+  classDef in_review fill:#fef08a,stroke:#ca8a04,color:#111827
+  classDef done fill:#bbf7d0,stroke:#16a34a,color:#111827
+  classDef needs_rework fill:#fed7aa,stroke:#ea580c,color:#111827
+  class B-006,B-007,B-008 not_started
+  class B-005 blocked
+  class B-004 in_review
+  class B-001,B-002,B-003 done

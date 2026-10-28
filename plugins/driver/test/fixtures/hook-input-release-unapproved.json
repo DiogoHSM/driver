@@ -1,0 +1,7 @@
+{
+  "session_id": "fixture",
+  "cwd": "test/fixtures/hook-project",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Agent",
+  "tool_input": { "description": "Deploy", "prompt": "DRIVER-BLOCK: B-007\nDeploy the site." }
+}

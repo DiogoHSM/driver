@@ -1,0 +1,15 @@
+{"seq":1,"ts":"2026-10-24T09:00:00Z","revision":1,"actor":{"kind":"model","id":"orchestrator"},"type":"req.add","data":{"id":"R-001","title":"Video explains the product in under 90 seconds"}}
+{"seq":2,"ts":"2026-10-24T09:00:00Z","revision":2,"actor":{"kind":"model","id":"orchestrator"},"type":"req.add","data":{"id":"R-002","title":"Narration is voiced and captioned"}}
+{"seq":3,"ts":"2026-10-24T09:00:00Z","revision":3,"actor":{"kind":"model","id":"orchestrator"},"type":"block.add","block":"B-001","data":{"phase":"discover","title":"Creative brief"}}
+{"seq":4,"ts":"2026-10-24T09:00:00Z","revision":4,"actor":{"kind":"model","id":"orchestrator"},"type":"block.add","block":"B-002","data":{"phase":"route","title":"Storyboard"}}
+{"seq":5,"ts":"2026-10-24T09:00:00Z","revision":5,"actor":{"kind":"model","id":"orchestrator"},"type":"block.add","block":"B-003","data":{"phase":"implement","title":"Scene composition"}}
+{"seq":6,"ts":"2026-10-24T09:00:00Z","revision":6,"actor":{"kind":"model","id":"orchestrator"},"type":"block.add","block":"B-004","data":{"phase":"implement","title":"Narration voiceover"}}
+{"seq":7,"ts":"2026-10-24T09:00:00Z","revision":7,"actor":{"kind":"model","id":"orchestrator"},"type":"block.add","block":"B-005","data":{"phase":"validate","title":"Render check"}}
+{"seq":8,"ts":"2026-10-24T10:00:00Z","revision":8,"actor":{"kind":"model","id":"orchestrator"},"type":"block.status","block":"B-001","from":"not_started","to":"in_progress"}
+{"seq":9,"ts":"2026-10-24T10:00:00Z","revision":9,"actor":{"kind":"model","id":"orchestrator"},"type":"block.set","block":"B-001","data":{"fields":["artifacts"]}}
+{"seq":10,"ts":"2026-10-24T10:00:00Z","revision":10,"actor":{"kind":"model","id":"orchestrator"},"type":"block.status","block":"B-001","from":"in_progress","to":"in_review"}
+{"seq":11,"ts":"2026-10-24T10:00:00Z","revision":11,"actor":{"kind":"user","id":"diogo"},"type":"block.set","block":"B-001","data":{"fields":["verification"]}}
+{"seq":12,"ts":"2026-10-24T10:00:00Z","revision":12,"actor":{"kind":"model","id":"orchestrator"},"type":"block.status","block":"B-001","from":"in_review","to":"done"}
+{"seq":13,"ts":"2026-10-24T11:00:00Z","revision":13,"actor":{"kind":"user","id":"diogo"},"type":"gate.approve","data":{"baseline":1,"decision":"D-001","gate":"route"}}
+{"seq":14,"ts":"2026-10-24T11:00:00Z","revision":14,"actor":{"kind":"model","id":"orchestrator"},"type":"phase.change","from":"discover","to":"route"}
+{"seq":15,"ts":"2026-10-24T11:00:00Z","revision":15,"actor":{"kind":"model","id":"orchestrator"},"type":"block.status","block":"B-002","from":"not_started","to":"in_progress"}
