@@ -10,8 +10,10 @@
     "build": "tsup",
     "pretest": "npm run build",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit",
-    "schema:json": "tsx scripts/gen-json-schema.ts"
+    "typecheck": "tsc -p tsconfig.node.json && (if [ -d .claude-plugin/types ]; then tsc -p .; else echo \"WARNING: mod typecheck skipped: load the plugin once (or run npm run types:fetch)\"; fi)",
+    "schema:json": "tsx scripts/gen-json-schema.ts",
+    "typecheck:mod": "tsc -p .",
+    "types:fetch": "bash scripts/fetch-types.sh"
   },
   "dependencies": {
     "zod": "^4.6.7"

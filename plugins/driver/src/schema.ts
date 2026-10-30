@@ -1,19 +1,13 @@
 import { z } from 'zod';
+import { BLOCK_STATUSES, PHASES, TEST_LAYERS, comparePhase, phaseIndex } from './shared/phases.js';
 
 export const PLAN_SCHEMA_URL = './schema/plan.v1.schema.json';
 
-export const PHASES = ['discover', 'route', 'implement', 'validate', 'evolve', 'release'] as const;
+export { BLOCK_STATUSES, PHASES, TEST_LAYERS, comparePhase, phaseIndex };
+
 export const PhaseId = z.enum(PHASES);
 export type PhaseId = z.infer<typeof PhaseId>;
 
-export const BLOCK_STATUSES = [
-  'not_started',
-  'in_progress',
-  'blocked',
-  'in_review',
-  'done',
-  'needs_rework',
-] as const;
 export const BlockStatus = z.enum(BLOCK_STATUSES);
 export type BlockStatus = z.infer<typeof BlockStatus>;
 
@@ -36,6 +30,8 @@ export const GateSchema = z.looseObject({
   approvedAt: Timestamp.optional(),
   approvedBy: z.string().optional(),
   atBaseline: z.number().int().nonnegative().optional(),
+  approvedVia: z.enum(['tty', 'mod']).optional(),
+  approvedTicket: z.string().optional(),
   revokedAt: Timestamp.optional(),
   revokedReason: z.string().optional(),
 });
@@ -57,17 +53,6 @@ export const RequirementSchema = z.looseObject({
   ext: Ext,
 });
 export type Requirement = z.infer<typeof RequirementSchema>;
-
-export const TEST_LAYERS = [
-  'unit',
-  'integration',
-  'e2e',
-  'visual',
-  'perf',
-  'security',
-  'acceptance',
-  'manual',
-] as const;
 
 export const TestRefSchema = z.looseObject({
   ref: z.string().min(1),
@@ -168,14 +153,6 @@ export const PlanV1Schema = z.looseObject({
   ext: Ext,
 });
 export type PlanV1 = z.infer<typeof PlanV1Schema>;
-
-export function phaseIndex(p: PhaseId): number {
-  return PHASES.indexOf(p);
-}
-
-export function comparePhase(a: PhaseId, b: PhaseId): number {
-  return phaseIndex(a) - phaseIndex(b);
-}
 
 export function emptyPlan(name: string, packs: string[], now: string): PlanV1 {
   return {

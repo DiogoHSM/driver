@@ -8,13 +8,14 @@
 - zod 4: schema do `plan.json`, fonte única de verdade dos tipos. `z.toJSONSchema` gera `schema/plan.v1.schema.json` para autocomplete em editores e ferramentas não TS.
 
 ## Build e testes
-- tsup: bundle único ESM `dist/cli.js` com shebang, commitado (hooks não dependem de build).
-- vitest: testes unitários, fixtures por invariante em `test/fixtures/{valid,invalid}/`, testes de concorrência em dois processos.
+- tsup: bundle único ESM `dist/cli.js` com shebang, commitado (hooks não dependem de build). O mod é carregado como fonte pelo engine, sem bundle.
+- vitest (`test/**/*.spec.ts`): código node e `src/shared` (golden SVG, layout, invariantes, concorrência em dois processos). `tsconfig.node.json`.
+- `claude plugin test plugins/driver` (`mod/test/*.test.tsx`): hooks e desenho do mod nas superfícies terminal e desktop, com stand-ins do engine. `tsconfig.json` raiz estende `.claude-plugin/types/tsconfig.json` (gerado pelo engine no primeiro load; gitignored) com `types: []`, o que proíbe `node:*` em `src/shared`.
 - npm workspaces: raiz privada com `plugins/*`.
 
 ## Plataforma
 - Claude Code CLI ≥ 2.1.287: plugins, hooks (33 eventos), mods (API early access; rechecar `claude-code.d.ts` a cada release), `dependencies` semver em `plugin.json`, `claude plugin tag`.
-- Mod (futuro): elementos `Box/Text/Button/Select/Markdown` em todo lugar; `Svg` só Desktop e VS Code; `Raster` no terminal. Sem `fs.watch`: polling com `$.clock`.
+- Mod: elementos `Box/Text/Button/Select/Input/Markdown` em todo lugar; `Svg` só Desktop, VS Code e mobile; `Raster` no terminal. Sem `fs.watch`: polling com `$.clock`. Sem Node nem DOM: escrita só via `$.process.run` da CLI. `claude-code.d.ts` fixado na 2.1.312.
 
 ## Ferramentas de linha de comando usadas pelos hooks
 - `jq` 1.7: checagem de gate em uma expressão, fail closed se o arquivo for ilegível.

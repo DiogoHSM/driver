@@ -255,6 +255,7 @@
       "approved": true,
       "approvedAt": "2026-10-21T10:00:00Z",
       "approvedBy": "diogo",
+      "approvedVia": "tty",
       "atBaseline": 1
     }
   },

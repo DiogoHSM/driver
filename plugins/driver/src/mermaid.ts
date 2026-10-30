@@ -1,13 +1,9 @@
-import { PHASES, type BlockStatus, type PlanV1 } from './schema.js';
+import { PHASES, type PlanV1 } from './schema.js';
+import { STATUS_COLORS } from './shared/palette.js';
 
-const STATUS_STYLE: Record<BlockStatus, string> = {
-  not_started: 'fill:#e5e7eb,stroke:#6b7280,color:#111827',
-  in_progress: 'fill:#bfdbfe,stroke:#2563eb,color:#111827',
-  blocked: 'fill:#fecaca,stroke:#dc2626,color:#111827',
-  in_review: 'fill:#fef08a,stroke:#ca8a04,color:#111827',
-  done: 'fill:#bbf7d0,stroke:#16a34a,color:#111827',
-  needs_rework: 'fill:#fed7aa,stroke:#ea580c,color:#111827',
-};
+const STATUS_STYLE = Object.entries(STATUS_COLORS).map(
+  ([status, c]) => [status, `fill:${c.fill},stroke:${c.stroke},color:${c.text}`] as const,
+);
 
 const ENTITIES: Record<string, string> = {
   '#': '#35;',
@@ -40,8 +36,8 @@ export function toMermaid(plan: PlanV1): string {
   for (const id of ids)
     for (const dep of plan.blocks[id]!.dependsOn) if (active.has(dep)) lines.push(`  ${dep} --> ${id}`);
 
-  for (const [status, style] of Object.entries(STATUS_STYLE)) lines.push(`  classDef ${status} ${style}`);
-  for (const status of Object.keys(STATUS_STYLE)) {
+  for (const [status, style] of STATUS_STYLE) lines.push(`  classDef ${status} ${style}`);
+  for (const [status] of STATUS_STYLE) {
     const members = ids.filter((id) => plan.blocks[id]!.status === status);
     if (members.length > 0) lines.push(`  class ${members.join(',')} ${status}`);
   }

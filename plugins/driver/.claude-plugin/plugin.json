@@ -12,5 +12,15 @@
     "planning",
     "gates",
     "methodology"
-  ]
+  ],
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "nodePath": {
+      "type": "string",
+      "title": "Node path",
+      "description": "Absolute path of the node binary used to run the DRIVER CLI when node is not on the app PATH. Leave empty to auto-detect.",
+      "required": false,
+      "default": ""
+    }
+  }
 }

@@ -7,9 +7,10 @@ DRIVER é um marketplace de plugins de Claude Code. O core `driver` impõe o mé
 
 ### No repositório do DRIVER
 - **`driver-core` (`plugins/driver/src/`)**: biblioteca TypeScript com o schema zod (`schema.ts`), validador de invariantes (`validate.ts`), reducer puro de mutações (`reducer.ts`), máquina de estados e revogação de gates (`state-machine.ts`), adaptador de I/O com lock e rename atômico (`store.ts`), alocação de ids (`ids.ts`) e exportador Mermaid (`mermaid.ts`).
-- **CLI `driver` (`src/cli.ts` → `dist/cli.js`)**: única porta de escrita do `plan.json` na v1. Comandos: `init · validate · block add|set · req add · gate approve|revoke · phase advance|back · rebaseline · export mermaid · renumber`. Bundle único commitado para os hooks não dependerem de build.
+- **CLI `driver` (`src/cli.ts` → `dist/cli.js`)**: única porta de escrita do `plan.json`. Comandos: `init · where · status · validate [--replay] · apply (lote atômico via stdin) · block add|set|status|owner|retire · req add|retire · decision add · gate approve|revoke · phase advance|back · rebaseline · release add · export mermaid · renumber`. `gate approve`, `rebaseline` e `--force` exigem TTY ou, via mod, `--via-mod` com ticket. Bundle único commitado para os hooks não dependerem de build.
 - **Hooks (`plugins/driver/hooks/`)**: `PreToolUse` em `Agent|Task|Workflow` (gate por fase, via `jq`), `PreToolUse` em `Edit|Write|Bash` (protege `plan.json` e bloqueia `driver approve` vindo do modelo), `SubagentStop` (bloco órfão vira `blocked`).
-- **Mod (futuro, `plugins/driver/mods/`)**: painel ao lado do chat que espelha `plan.json` em `$.state` e desenha SVG (Desktop/VS Code) ou Box/Text (terminal). Registra `mcp__driver__set_block_state` e `mcp__driver__plan_ops`, que chamam o mesmo `driver-core`.
+- **Código compartilhado sem dependências (`src/shared/`)**: fases, paleta, projeção `PlanView`, veredito de gate, regras de proteção, layout em swimlanes, SVG e linhas do terminal. É a única parte do core que o mod pode importar (o mod não tem Node nem zod); o código node importa daqui também, então hook shell e mod aplicam as mesmas regras (ADR-011).
+- **Mod (`plugins/driver/mod/`)**: painel ao lado do chat que lê `plan.json` por polling (`$.fs`, 1 s), projeta em `$.state` e desenha SVG vertical na largura do painel (Desktop/VS Code, `mod/render-svg.tsx`), quadro de cartões (mobile, `mod/render-board.tsx`) ou linhas Box/Text (terminal, `mod/render-terminal.tsx`); seleção de bloco por `Select`/`Input` na barra, porque cliques no SVG não chegam ao plugin. Registra as tools `mcp__driver__set_block_state`, `plan_ops` e `plan_status` e o comando `/driver`. Escreve sempre pela CLI (`$.process.run`). Hooks: `agent.spawn` (gate + claim de owner, inclusive agentes de Workflow), `classic.SubagentStop`, guard `tool.call`. `/driver approve <gate>` só com origem `composer` (ou botão do painel) e ticket one-shot com hash: o canal de aprovação à prova de modelo.
 - **Skills de fase (futuro, `plugins/driver/skills/`)**: Discover, Route, Implement, Validate, Evolve, Release. Compõem skills externas pinadas (ADR-003) e escrevem no plano via tool ou CLI.
 - **Packs (futuro, `plugins/driver-*/`)**: plugins separados no mesmo marketplace, dependentes do core. Dados extras em `ext['driver-<pack>']`.
 
@@ -19,8 +20,8 @@ DRIVER é um marketplace de plugins de Claude Code. O core `driver` impõe o mé
 ## Fluxo de dados
 
 ```
-usuário ──/driver approve──▶ CLI ─┐
-skill de fase ──tool/CLI────────▶ │ driver-core: lock → ler → reducer → validar → .tmp+rename → evento
+usuário ──/driver approve (composer + ticket)──▶ mod ──▶ CLI ─┐
+skill de fase ──tools mcp__driver__* / CLI─────────────────▶ │ driver-core: lock → ler → reducer → validar → .tmp+rename → evento
 subagent (resultado) ─▶ orquestrador ─▶ │
                                    └──▶ .claude/driver/plan.json + events.jsonl
                                               │              │
@@ -43,7 +44,8 @@ flowchart LR
     core[driver-core]
     cli[CLI driver]
     hooks[Hooks]
-    mod[Mod · futuro]
+    shared[src/shared · sem deps]
+    mod[Mod: pane, tools, /driver]
     skills[Skills de fase · futuro]
     packs[Packs · futuro]
   end
@@ -55,7 +57,10 @@ flowchart LR
   skills --> cli
   skills --> mod
   cli --> core
-  mod --> core
+  mod -- $.process.run --> cli
+  mod --> shared
+  core --> shared
+  hooks --> shared
   core --> plan
   core --> events
   hooks -. jq .-> plan

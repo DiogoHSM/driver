@@ -23,7 +23,9 @@ Plugin de Claude Code que impõe um processo estruturado, rastreável e iterativ
 ## Status
 - 2026-10-26: definição inicial; pesquisa de landscape concluída (`docs/research/skills-landscape.md`).
 - 2026-10-27: formato do `plan.json` v1 decidido (ADR-010) e implementado em `plugins/driver`: schema zod + JSON Schema, validador, reducer e máquina de estados, store com lock e ledger, CLI `driver`, hooks de gate e proteção, exportador Mermaid, dois exemplos (`examples/`). Revisão adversarial em `docs/research/04-review-plan-json-v1.md`. Plano em `.claude/plans/2026-10-27-plan-json-v1.md`; issue PER-611. Nada commitado ainda.
-- Próximos: mod do diagrama, skills Discover e Route.
+- 2026-10-28: commit inicial `6dfb08a`. Mod do diagrama vivo implementado (ADR-011, issue PER-618): `src/shared` sem deps, CLI de apoio, `mod/` (pane SVG/terminal, tools `mcp__driver__*`, `/driver`, hooks `agent.spawn`), 563 testes vitest + 29 no `claude plugin test`; revisão adversarial em `docs/research/06-review-mod.md`. Dogfooding iniciado: plano do próprio DRIVER em `.claude/driver/` (fase discover, gate route pendente). Mod carregado no Desktop desta sessão: tools `mcp__driver__*` operando (escrita via `$.process.run` confirmada). Pendente: checagem visual do painel, `/driver approve route` pelo Diogo e commit.
+- 2026-10-29: painel refeito após três tentativas ilegíveis ou pobres (SVG horizontal sem escala, lista de texto, quadro de cartões): SVG vertical dimensionado em pixels com `isInteractive`, barra de uma linha com `Select` de bloco, detalhe nativo; mobile mantém o quadro de cartões. ADR-011 item 3 atualizado. Checagem visual no Desktop aprovada pelo Diogo; dogfooding do painel começa. 606 testes vitest + 44 no `claude plugin test`. Falso positivo do guard em heredocs registrado em PER-619. Nada commitado desde `6dfb08a`.
+- Próximos: skills Discover e Route.
 
 ## Stakeholders
 - Diogo Martins (autor, único usuário por enquanto)

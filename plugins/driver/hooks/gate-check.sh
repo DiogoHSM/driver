@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# DRIVER gate check (PreToolUse on Agent|Task|Workflow). Pure bash + jq: no node needed.
+# DRIVER gate check (PreToolUse on Agent|Task|Workflow|SendMessage). Pure bash + jq: no node needed.
 # No plan.json -> allow (project does not use DRIVER). Plan present but unreadable -> deny.
 # Same semantics as `driver hook gate-check` (src/hooks.ts).
 set -u
@@ -40,7 +40,7 @@ done
 printf '%s' "$input" | jq -e 'type == "object"' >/dev/null 2>&1 ||
   deny "DRIVER: hook input is not valid JSON; refusing (fail closed)."
 
-prompt=$(printf '%s' "$input" | jq -r '(.tool_input.prompt // .tool_input.description // "") | tostring')
+prompt=$(printf '%s' "$input" | jq -r '(.tool_input.prompt // .tool_input.description // .tool_input.message // "") | tostring')
 block=""
 if [[ $prompt =~ DRIVER-BLOCK:[[:space:]]*(B-[0-9]+) ]]; then block=${BASH_REMATCH[1]}; fi
 

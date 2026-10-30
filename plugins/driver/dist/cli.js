@@ -7,42 +7,10 @@ var __export = (target, all) => {
 
 // src/cli.ts
 import { execFileSync as execFileSync2 } from "child_process";
-import { closeSync as closeSync2, existsSync as existsSync3, mkdirSync as mkdirSync2, openSync as openSync2, readFileSync as readFileSync3, readSync as readSync2, writeFileSync as writeFileSync2, writeSync as writeSync2 } from "fs";
+import { createHash, timingSafeEqual } from "crypto";
+import { closeSync as closeSync2, existsSync as existsSync3, mkdirSync as mkdirSync2, openSync as openSync2, readFileSync as readFileSync3, readSync as readSync2, rmSync as rmSync2, writeFileSync as writeFileSync2, writeSync as writeSync2 } from "fs";
 import path3 from "path";
 import { parseArgs } from "util";
-
-// src/hooks.ts
-import { existsSync as existsSync2, readFileSync as readFileSync2 } from "fs";
-import path2 from "path";
-
-// src/store.ts
-import { execFileSync } from "child_process";
-import {
-  appendFileSync,
-  closeSync,
-  existsSync,
-  fsyncSync,
-  mkdirSync,
-  openSync,
-  readdirSync,
-  readFileSync,
-  readSync,
-  renameSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-  writeSync
-} from "fs";
-import path from "path";
-
-// src/ids.ts
-function formatId(kind, n) {
-  return kind === "REL" ? `REL-${n}` : `${kind}-${String(n).padStart(3, "0")}`;
-}
-function nextId(plan, kind) {
-  const n = plan.nextId[kind];
-  return { id: formatId(kind, n), plan: { ...plan, nextId: { ...plan.nextId, [kind]: n + 1 } } };
-}
 
 // ../../node_modules/zod/v4/classic/external.js
 var external_exports = {};
@@ -879,14 +847,14 @@ function promiseAllObject(promisesObj) {
 }
 function randomString(length = 10) {
   const chars = "abcdefghijklmnopqrstuvwxyz";
-  let str = "";
+  let str2 = "";
   for (let i = 0; i < length; i++) {
-    str += chars[Math.floor(Math.random() * chars.length)];
+    str2 += chars[Math.floor(Math.random() * chars.length)];
   }
-  return str;
+  return str2;
 }
-function esc(str) {
-  return JSON.stringify(str);
+function esc(str2) {
+  return JSON.stringify(str2);
 }
 function slugify(input2) {
   return input2.toLowerCase().trim().replace(/[^\w\s-]/g, "").replace(/[\s_-]+/g, "-").replace(/^-+|-+$/g, "");
@@ -1000,8 +968,8 @@ var primitiveTypes = /* @__PURE__ */ new Set([
   "symbol",
   "undefined"
 ]);
-function escapeRegex(str) {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function escapeRegex(str2) {
+  return str2.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 function clone(inst, def, params) {
   const cl = new inst._zod.constr(def ?? inst._zod.def);
@@ -1267,13 +1235,13 @@ function getSizableOrigin(input2) {
   return "unknown";
 }
 var highSurrogate = /[\uD800-\uDBFF]/;
-function codePointLength(str) {
-  const units = str.length;
-  if (!highSurrogate.test(str))
+function codePointLength(str2) {
+  const units = str2.length;
+  if (!highSurrogate.test(str2))
     return units;
   let count = units;
   for (let i = 0; i < units - 1; i++) {
-    if ((str.charCodeAt(i) & 64512) === 55296 && (str.charCodeAt(i + 1) & 64512) === 56320) {
+    if ((str2.charCodeAt(i) & 64512) === 55296 && (str2.charCodeAt(i + 1) & 64512) === 56320) {
       count--;
       i++;
     }
@@ -19761,17 +19729,19 @@ function date4(params) {
   return _coercedDate(ZodDate, params);
 }
 
-// src/schema.ts
+// src/shared/phases.ts
 var PHASES = ["discover", "route", "implement", "validate", "evolve", "release"];
+var BLOCK_STATUSES = ["not_started", "in_progress", "blocked", "in_review", "done", "needs_rework"];
+var TEST_LAYERS = ["unit", "integration", "e2e", "visual", "perf", "security", "acceptance", "manual"];
+function phaseIndex(p) {
+  return PHASES.indexOf(p);
+}
+function comparePhase(a, b) {
+  return phaseIndex(a) - phaseIndex(b);
+}
+
+// src/schema.ts
 var PhaseId = external_exports.enum(PHASES);
-var BLOCK_STATUSES = [
-  "not_started",
-  "in_progress",
-  "blocked",
-  "in_review",
-  "done",
-  "needs_rework"
-];
 var BlockStatus = external_exports.enum(BLOCK_STATUSES);
 var RequirementIdSchema = external_exports.string().regex(/^R-\d{3,}$/);
 var BlockIdSchema = external_exports.string().regex(/^B-\d{3,}$/);
@@ -19788,6 +19758,8 @@ var GateSchema = external_exports.looseObject({
   approvedAt: Timestamp.optional(),
   approvedBy: external_exports.string().optional(),
   atBaseline: external_exports.number().int().nonnegative().optional(),
+  approvedVia: external_exports.enum(["tty", "mod"]).optional(),
+  approvedTicket: external_exports.string().optional(),
   revokedAt: Timestamp.optional(),
   revokedReason: external_exports.string().optional()
 });
@@ -19804,16 +19776,6 @@ var RequirementSchema = external_exports.looseObject({
   retired: RetirementSchema.optional(),
   ext: Ext
 });
-var TEST_LAYERS = [
-  "unit",
-  "integration",
-  "e2e",
-  "visual",
-  "perf",
-  "security",
-  "acceptance",
-  "manual"
-];
 var TestRefSchema = external_exports.looseObject({
   ref: external_exports.string().min(1),
   layer: external_exports.enum(TEST_LAYERS),
@@ -19898,12 +19860,6 @@ var PlanV1Schema = external_exports.looseObject({
   releases: external_exports.array(ReleaseSchema),
   ext: Ext
 });
-function phaseIndex(p) {
-  return PHASES.indexOf(p);
-}
-function comparePhase(a, b) {
-  return phaseIndex(a) - phaseIndex(b);
-}
 function emptyPlan(name, packs, now) {
   return {
     schemaVersion: 1,
@@ -19920,6 +19876,372 @@ function emptyPlan(name, packs, now) {
     baselines: [],
     releases: []
   };
+}
+
+// src/apply.ts
+var str = external_exports.string();
+var strs = external_exports.array(external_exports.string());
+var Patch = external_exports.strictObject({
+  title: str.optional(),
+  dependsOn: strs.optional(),
+  requirements: strs.optional(),
+  provider: ProviderSchema.optional(),
+  artifacts: strs.optional(),
+  addArtifacts: strs.optional(),
+  tests: external_exports.array(TestRefSchema).optional(),
+  addTests: external_exports.array(TestRefSchema).optional(),
+  risk: external_exports.enum(["low", "medium", "high"]).optional(),
+  verification: VerificationSchema.optional()
+});
+var ApplyOpSchema = external_exports.discriminatedUnion("op", [
+  external_exports.strictObject({
+    op: external_exports.literal("block.add"),
+    title: str.min(1),
+    phase: PhaseId,
+    dependsOn: strs.optional(),
+    requirements: strs.optional(),
+    provider: ProviderSchema.optional(),
+    risk: external_exports.enum(["low", "medium", "high"]).optional()
+  }),
+  external_exports.strictObject({ op: external_exports.literal("block.set"), id: str, patch: Patch }),
+  external_exports.strictObject({ op: external_exports.literal("block.status"), id: str, to: BlockStatus, reason: str.optional(), owner: str.optional() }),
+  external_exports.strictObject({
+    op: external_exports.literal("req.add"),
+    title: str.min(1),
+    kind: external_exports.enum(["functional", "nonfunctional", "constraint", "non-goal"]),
+    source: external_exports.enum(["user", "assumed"]),
+    ref: str.optional()
+  }),
+  external_exports.strictObject({ op: external_exports.literal("decision.add"), title: str.min(1), reason: str.optional() }),
+  external_exports.strictObject({ op: external_exports.literal("block.retire"), id: str, decision: str, reason: str }),
+  external_exports.strictObject({ op: external_exports.literal("req.retire"), id: str, decision: str, reason: str }),
+  external_exports.strictObject({ op: external_exports.literal("phase.advance") }),
+  external_exports.strictObject({ op: external_exports.literal("phase.back"), to: PhaseId, reason: str })
+]);
+var ApplyBodySchema = external_exports.object({
+  ops: external_exports.array(external_exports.unknown()).min(1).max(100),
+  expectedRevision: external_exports.number().int().nonnegative().optional()
+});
+var ApplyInputError = class extends Error {
+  constructor(message, failedOp) {
+    super(message);
+    this.failedOp = failedOp;
+    this.name = "ApplyInputError";
+  }
+  failedOp;
+};
+function parseApplyBody(text) {
+  let raw;
+  try {
+    raw = JSON.parse(text);
+  } catch (e) {
+    throw new ApplyInputError(`stdin is not valid JSON: ${e.message}`);
+  }
+  const body = ApplyBodySchema.safeParse(raw);
+  if (!body.success) throw new ApplyInputError(`invalid body: ${body.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`);
+  const ops = body.data.ops.map((o, index) => {
+    const r = ApplyOpSchema.safeParse(o);
+    if (!r.success) {
+      const name = typeof o?.op === "string" ? o.op : "(missing)";
+      throw new ApplyInputError(
+        `op ${name} is not allowed or malformed: ${r.error.issues.map((i) => `${i.path.join(".") || "op"}: ${i.message}`).join("; ")}`,
+        index
+      );
+    }
+    return toReducerOp(r.data);
+  });
+  return { ops, ...body.data.expectedRevision !== void 0 ? { expectedRevision: body.data.expectedRevision } : {} };
+}
+function toReducerOp(o) {
+  switch (o.op) {
+    case "block.add": {
+      const { op: _op, ...rest } = o;
+      return { type: "block.add", ...rest };
+    }
+    case "block.set":
+      return { type: "block.set", id: o.id, patch: o.patch };
+    case "block.status": {
+      const { op: _op, ...rest } = o;
+      return { type: "block.status", ...rest };
+    }
+    case "req.add": {
+      const { op: _op, ...rest } = o;
+      return { type: "req.add", ...rest };
+    }
+    case "decision.add": {
+      const { op: _op, ...rest } = o;
+      return { type: "decision.add", ...rest };
+    }
+    case "block.retire":
+      return { type: "block.retire", id: o.id, decision: o.decision, reason: o.reason };
+    case "req.retire":
+      return { type: "req.retire", id: o.id, decision: o.decision, reason: o.reason };
+    case "phase.advance":
+      return { type: "phase.advance" };
+    case "phase.back":
+      return { type: "phase.back", to: o.to, reason: o.reason };
+  }
+}
+
+// src/hooks.ts
+import { existsSync as existsSync2, readFileSync as readFileSync2, realpathSync } from "fs";
+import path2 from "path";
+
+// src/shared/gate.ts
+var MARKER = /DRIVER-BLOCK:\s*(B-\d+)/;
+function blockMarker(text) {
+  return MARKER.exec(text ?? "")?.[1];
+}
+function gateVerdict(plan, text) {
+  const blockId = blockMarker(text);
+  const block = blockId ? plan.blocks?.[blockId] : void 0;
+  const phase = block && typeof block === "object" ? block.phase ?? null : plan.currentPhase ?? null;
+  const where = block ? `block ${blockId} (${phase})` : `current phase (${phase})`;
+  if (phase !== "discover" && plan.gates?.route?.approved !== true)
+    return {
+      allow: false,
+      reason: `DRIVER: gate route is not approved; ${where} cannot run agents. Ask the user to run, in their own terminal: driver gate approve route`
+    };
+  if (phase === "release" && plan.gates?.release?.approved !== true)
+    return {
+      allow: false,
+      reason: `DRIVER: gate release is not approved; ${where} cannot run agents. Ask the user to run, in their own terminal: driver gate approve release`
+    };
+  return { allow: true };
+}
+
+// src/shared/protect.ts
+var MSG_FILES = 'DRIVER: plan.json, events.jsonl, log/*.jsonl and .mod/* are written only by the driver CLI. Use "driver block|req|phase ..." instead of editing them.';
+var MSG_PTY = "DRIVER: pseudo-terminal wrappers are not allowed; user-only actions must be run by the user in their own terminal";
+var MSG_GIT = "DRIVER: this git command can rewrite .claude/driver; use the driver CLI or ask the user.";
+var MSG_USER_ONLY = "DRIVER: gate approval, rebaseline and --force are user-only. Ask the user to run them in their own terminal.";
+var PROTECTED_REL = /^(plan\.json|events\.jsonl|log\/.*|\.mod\/.*)$/;
+var PROTECTED_ABS = /(^|\/)\.claude\/driver\/(plan\.json|events\.jsonl|log\/.*|\.mod\/.*)$/;
+function normalizePath(p) {
+  const s = p.replace(/\\/g, "/");
+  const abs = s.startsWith("/");
+  const out = [];
+  for (const seg of s.split("/")) {
+    if (seg === "" || seg === ".") continue;
+    if (seg === "..") {
+      if (out.length > 0 && out[out.length - 1] !== "..") out.pop();
+      else if (!abs) out.push("..");
+    } else out.push(seg);
+  }
+  return (abs ? "/" : "") + out.join("/");
+}
+function protectPath(filePath, opts = {}) {
+  if (!filePath) return null;
+  if (PROTECTED_ABS.test(normalizePath(filePath).toLowerCase())) return MSG_FILES;
+  if (opts.realPath && opts.driverDir) {
+    const real = normalizePath(opts.realPath).toLowerCase();
+    const dir = normalizePath(opts.driverDir).toLowerCase().replace(/\/+$/, "");
+    if (real.startsWith(`${dir}/`) && PROTECTED_REL.test(real.slice(dir.length + 1))) return MSG_FILES;
+  }
+  return null;
+}
+function normalizeCommand(cmd) {
+  return cmd.replace(/['"\\]/g, "").replace(/\s+/g, " ").replace(/\/(?:\.\/)+/g, "/").replace(/\/{2,}/g, "/").trim();
+}
+var baseName = (w) => w.slice(w.lastIndexOf("/") + 1);
+var WRAPPERS = ["sudo", "command", "env", "exec", "nohup", "time", "nice", "stdbuf"];
+var LAUNCHERS = /* @__PURE__ */ new Set(["node", "nodejs", "bun", "deno", "npx", "pnpm", "yarn", "npm", "sh", "bash", "zsh", "dash", "ksh", "xargs", "eval", "tsx"]);
+var PTY_COMMANDS = /* @__PURE__ */ new Set(["script", "expect", "unbuffer", "socat"]);
+var INLINE_INTERPRETER = {
+  node: ["-e", "--eval", "-p", "--print"],
+  python: ["-c"],
+  python3: ["-c"],
+  perl: ["-e"],
+  ruby: ["-e"]
+};
+var XARGS_WITH_VALUE = /* @__PURE__ */ new Set(["-I", "-n", "-P", "-L", "-d", "-s", "-E", "-a", "-J", "--max-args", "--max-procs", "--delimiter", "--arg-file"]);
+var GIT_WRITES = /* @__PURE__ */ new Set(["reset", "checkout", "restore", "stash", "clean", "mv", "rm", "apply", "am", "merge", "rebase", "cherry-pick", "pull", "switch"]);
+var PROTECTED_NAMES = [".claude", "driver", ".mod", "plan.json", "events.jsonl", "ticket.json", "rel-1.jsonl", "log"];
+var PROTECTED_MENTION = /plan\.json|events\.jsonl|ticket\.json|rel-\d+\.jsonl|\.mod(\/|$|\s)|\.claude\/driver(\/|$|\s)/i;
+function commandWords(norm) {
+  return norm.split(/&&|\|\||[;&|\n]/).map((seg) => seg.trim().split(" ").filter(Boolean)).map((w) => {
+    let i = 0;
+    for (; ; ) {
+      while (i < w.length && (/^\w+=/.test(w[i]) || WRAPPERS.includes(w[i]))) i++;
+      if (baseName(w[i] ?? "") !== "xargs") break;
+      i++;
+      while (i < w.length && w[i].startsWith("-")) i += XARGS_WITH_VALUE.has(w[i]) ? 2 : 1;
+    }
+    return w.slice(i);
+  }).filter((w) => w.length > 0);
+}
+function usesPty(command) {
+  const norm = normalizeCommand(command);
+  if (/\bpty\.spawn\b|\bos\.openpty\b|\bforkpty\b/.test(norm)) return true;
+  return commandWords(norm).some((w) => PTY_COMMANDS.has(baseName(w[0])));
+}
+var hasGlob = (t) => /[*?[]/.test(t);
+function globToRegExp(seg) {
+  let re = "";
+  for (let i = 0; i < seg.length; i++) {
+    const c = seg[i];
+    if (c === "*") re += ".*";
+    else if (c === "?") re += ".";
+    else if (c === "[") {
+      const end = seg.indexOf("]", i + 1);
+      if (end < 0) re += "\\[";
+      else {
+        re += `[${seg.slice(i + 1, end).replace(/^!/, "^").replace(/\\/g, "")}]`;
+        i = end;
+      }
+    } else re += c.replace(/[.+^${}()|\\]/g, "\\$&");
+  }
+  return new RegExp(`^${re}$`, "i");
+}
+var isProtectedBase = (b) => b === "plan.json" || b === "events.jsonl" || b === "ticket.json" || /^rel-\d+\.jsonl$/.test(b);
+function isProtectedToken(raw, ctx) {
+  const eq = /^(?:--?[\w-]+|[a-z]+)=(.*)$/i.exec(raw);
+  const tok = normalizePath(eq ? eq[1] : raw).toLowerCase();
+  if (!tok) return false;
+  const segs = tok.split("/").filter(Boolean);
+  if (segs.length === 0) return false;
+  if (segs.includes(".mod") || isProtectedBase(segs[segs.length - 1])) return true;
+  for (let i = 0; i < segs.length; i++) {
+    if (segs[i] !== ".claude") continue;
+    if (i === segs.length - 1) return true;
+    if (segs[i + 1] === "driver") {
+      const rest = segs.slice(i + 2);
+      if (rest.length === 0 || rest[0] === "log") return true;
+    }
+  }
+  if (hasGlob(tok) && ctx.globRisk) {
+    return segs.some((seg) => {
+      if (!hasGlob(seg)) return false;
+      if (/^\*+$/.test(seg)) return ctx.cdProtected || segs.some((x) => x === ".claude" || x === "driver");
+      const re = globToRegExp(seg);
+      return PROTECTED_NAMES.some((n) => re.test(n));
+    });
+  }
+  return false;
+}
+var unaryFlag = (a) => a.startsWith("-");
+function writesProtected(w, ctx) {
+  const cmd = baseName(w[0]);
+  const args = w.slice(1);
+  const prot = (t) => isProtectedToken(t, ctx);
+  const files = args.filter((a) => !unaryFlag(a));
+  const noOperand = files.every((a) => a === "." || a === ".." || hasGlob(a));
+  const anyProt = args.some(prot);
+  const inline = INLINE_INTERPRETER[cmd];
+  if (inline?.some((f) => args.includes(f)) && (PROTECTED_MENTION.test(w.join(" ")) || ctx.cdProtected)) return true;
+  if (["rm", "tee", "truncate", "sponge", "shred", "unlink", "dd", "patch", "install"].includes(cmd))
+    return anyProt || ctx.cdProtected && (cmd === "rm" || cmd === "patch") && noOperand;
+  if (cmd === "cp" || cmd === "rsync" || cmd === "ln" || cmd === "mv") {
+    const dest = files[files.length - 1] ?? "";
+    return prot(dest) || cmd === "mv" && files.slice(0, -1).some(prot) || ctx.cdProtected && noOperand;
+  }
+  if (cmd === "unzip") return anyProt || ctx.cdProtected && !args.includes("-l");
+  if (cmd === "tar") {
+    const extract = args.some((a) => /^-?[a-zA-Z]*x[a-zA-Z]*$/.test(a) && !a.startsWith("--")) || args.includes("--extract");
+    return extract && (anyProt || ctx.cdProtected);
+  }
+  if (cmd === "sed") return args.some((a) => a === "--in-place" || /^-[A-Za-z]*i/.test(a)) && (anyProt || ctx.cdProtected);
+  if (cmd === "perl" || cmd === "ruby") return args.some((a) => /^-[A-Za-z]*i/.test(a)) && (anyProt || ctx.cdProtected);
+  if (cmd === "awk" || cmd === "gawk") return args.includes("inplace") && (anyProt || ctx.cdProtected);
+  if (cmd === "find") return args.some((a) => ["-delete", "-exec", "-execdir", "-ok"].includes(a)) && (anyProt || ctx.cdProtected);
+  if (cmd === "git") {
+    const sub = files[0];
+    return sub !== void 0 && GIT_WRITES.has(sub) && (anyProt || ctx.cdProtected && noOperand);
+  }
+  return false;
+}
+function redirectTargets(norm) {
+  const clean = norm.replace(/\d*>&\d+/g, "").replace(/\d*>>?\s*\/dev\/null/g, "");
+  return [...clean.matchAll(/\d*>>?\|?\s*([^\s<>|&;()]+)/g)].map((m) => m[1]);
+}
+function writesDriverDir(norm) {
+  const words = commandWords(norm);
+  const globRisk = /\.claude/i.test(norm) || words.some((w) => baseName(w[0]) === "cd");
+  const ctx = { globRisk, cdProtected: false };
+  ctx.cdProtected = words.some((w) => baseName(w[0]) === "cd" && w.slice(1).some((a) => !unaryFlag(a) && isProtectedToken(a, { ...ctx, cdProtected: true })));
+  for (const seg of norm.split(/&&|\|\||[;&|\n]/)) {
+    if (redirectTargets(seg).some((t) => isProtectedToken(t, ctx))) return true;
+  }
+  return words.some((w) => writesProtected(w, ctx));
+}
+var isCliJs = (t) => {
+  if (baseName(t) !== "cli.js") return false;
+  return !t.includes("/") || /(^|\/)dist\/cli\.js$/.test(t) || /driver/.test(t);
+};
+var isDriverToken = (t) => baseName(t) === "driver" || isCliJs(t);
+function isDriverInvocation(w) {
+  const first = baseName(w[0]);
+  if (first === "driver" || isCliJs(w[0])) return true;
+  if (/[$`(]/.test(w[0])) return true;
+  return LAUNCHERS.has(first) && w.slice(1).some(isDriverToken);
+}
+function userOnlyAction(w) {
+  const toks = new Set(w.map((t) => t.startsWith("--") && t.includes("=") ? t.slice(0, t.indexOf("=")) : t));
+  if (toks.has("rebaseline") || toks.has("via-mod") || toks.has("--via-mod") || toks.has("--force") || toks.has("-f")) return true;
+  if (toks.has("gate") && toks.has("approve")) return true;
+  for (let i = 0; i < w.length; i++) {
+    const t = w[i];
+    if (t === "--actor" && /^user:/i.test(w[i + 1] ?? "")) return true;
+    if (/^--actor=user:/i.test(t)) return true;
+  }
+  return false;
+}
+var STASH_READS = /* @__PURE__ */ new Set(["list", "show"]);
+function rewritesWorkingTree(norm) {
+  for (const w of commandWords(norm)) {
+    if (baseName(w[0]) !== "git") continue;
+    const rest = w.slice(1);
+    let at = 0;
+    while (at < rest.length && rest[at].startsWith("-")) at += ["-C", "-c", "--git-dir", "--work-tree"].includes(rest[at]) ? 2 : 1;
+    const sub = rest[at];
+    const after = rest.slice(at + 1);
+    if (sub === "reset" && after.includes("--hard")) return true;
+    if (sub === "checkout-index" || sub === "update-index" || sub === "read-tree") return true;
+    if (sub === "stash" && !STASH_READS.has(after.find((a) => !a.startsWith("-")) ?? "")) return true;
+  }
+  return false;
+}
+function protectCommand(command) {
+  const norm = normalizeCommand(command);
+  if (/via-mod/i.test(norm)) return MSG_USER_ONLY;
+  for (const w of commandWords(norm)) {
+    if (!isDriverInvocation(w)) continue;
+    if (userOnlyAction(w)) return MSG_USER_ONLY;
+    if (/[$`]/.test(w.join(" "))) return MSG_USER_ONLY;
+  }
+  if (usesPty(norm)) return MSG_PTY;
+  if (writesDriverDir(norm)) return MSG_FILES;
+  if (rewritesWorkingTree(norm)) return MSG_GIT;
+  return null;
+}
+
+// src/store.ts
+import { execFileSync } from "child_process";
+import {
+  appendFileSync,
+  closeSync,
+  existsSync,
+  fsyncSync,
+  mkdirSync,
+  openSync,
+  readdirSync,
+  readFileSync,
+  readSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+  writeSync
+} from "fs";
+import path from "path";
+
+// src/ids.ts
+function formatId(kind, n) {
+  return kind === "REL" ? `REL-${n}` : `${kind}-${String(n).padStart(3, "0")}`;
+}
+function nextId(plan, kind) {
+  const n = plan.nextId[kind];
+  return { id: formatId(kind, n), plan: { ...plan, nextId: { ...plan.nextId, [kind]: n + 1 } } };
 }
 
 // src/state-machine.ts
@@ -20327,6 +20649,15 @@ function handle(d, op) {
         emit(d, { type: "orphan", data: { owner: op.owner, blocks: hit } });
       return;
     }
+    case "block.owner": {
+      const b = getBlock(d, op.id);
+      if (b.status !== "in_progress") return refuse(`${op.id} is ${b.status}, not in_progress`);
+      if (b.owner !== op.from) return refuse(`${op.id} is owned by ${b.owner ?? "(nobody)"}, not ${op.from}`);
+      b.owner = op.owner;
+      b.statusBy = ctx.actor;
+      emit(d, { type: "owner", block: op.id, from: op.from, to: op.owner });
+      return;
+    }
     case "decision.add": {
       const id = alloc(d, "D");
       registerDecision(d, id, op.title, op.reason);
@@ -20363,11 +20694,13 @@ function handle(d, op) {
         approved: true,
         approvedAt: ctx.now,
         approvedBy: ctx.actor.id,
-        atBaseline: d.plan.baseline
+        atBaseline: d.plan.baseline,
+        // How the approval arrived is always recorded, so a hand-written one stands out. Tamper evidence, not proof.
+        ...op.via ? { approvedVia: op.via, ...op.ticket ? { approvedTicket: op.ticket } : {} } : {}
       };
       emit(d, {
         type: "gate.approve",
-        data: { gate: op.gate, baseline: d.plan.baseline, ...decision ? { decision } : {} }
+        data: { gate: op.gate, baseline: d.plan.baseline, ...decision ? { decision } : {}, ...op.via ? { via: op.via } : {}, ...op.ticket ? { ticket: op.ticket } : {} }
       });
       return;
     }
@@ -20466,7 +20799,8 @@ function handle(d, op) {
 }
 function revoke(d, gate, reason) {
   const g = d.plan.gates[gate];
-  d.plan.gates[gate] = { ...g, approved: false, revokedAt: d.ctx.now, revokedReason: reason };
+  const { approvedVia: _v, approvedTicket: _t, ...kept } = g;
+  d.plan.gates[gate] = { ...kept, approved: false, revokedAt: d.ctx.now, revokedReason: reason };
   emit(d, { type: "gate.revoke", reason, data: { gate } });
 }
 function applyOp(input2, op, ctx) {
@@ -20493,8 +20827,12 @@ var LockTimeoutError = class extends Error {
 var RevisionConflictError = class extends Error {
   constructor(expected, actual) {
     super(`expected revision ${expected} but plan is at ${actual}`);
+    this.expected = expected;
+    this.actual = actual;
     this.name = "RevisionConflictError";
   }
+  expected;
+  actual;
 };
 var NotInitializedError = class extends Error {
   constructor(driverDir) {
@@ -20788,14 +21126,74 @@ function mutate(driverDir, op, ctx, opts = {}) {
     return { plan, events, ...r.created ? { created: r.created } : {} };
   });
 }
+var BatchError = class extends Error {
+  constructor(index, cause) {
+    super(`op ${index}: ${cause.message}`);
+    this.index = index;
+    this.cause = cause;
+    this.name = "BatchError";
+  }
+  index;
+  cause;
+};
+var REF = /^\$(\d+)$/;
+function resolveRefs(v, created) {
+  if (typeof v === "string") {
+    const m = REF.exec(v);
+    if (!m) return v;
+    const id = created[Number(m[1])];
+    if (id === void 0) throw new OpRefusedError(`reference ${v} points at an id not created yet (${created.length} created so far)`);
+    return id;
+  }
+  if (Array.isArray(v)) return v.map((x) => resolveRefs(x, created));
+  if (v !== null && typeof v === "object")
+    return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, resolveRefs(x, created)]));
+  return v;
+}
+function mutateMany(driverDir, ops, ctx, opts = {}) {
+  return withLock(driverDir, () => {
+    const current = readPlan(driverDir);
+    if (opts.expectedRevision !== void 0 && current.revision !== opts.expectedRevision)
+      throw new RevisionConflictError(opts.expectedRevision, current.revision);
+    let working = current;
+    const created = [];
+    const events = [];
+    const docs = [];
+    ops.forEach((raw, index) => {
+      try {
+        const op = resolveRefs(raw, created);
+        if (op.type === "release.add" || op.type === "renumber") throw new OpRefusedError(`${op.type} cannot run in a batch`, true);
+        if (op.type === "block.status" && op.to === "in_review" && working.blocks[op.id]?.status === "in_progress" && !(op.force && ctx.actor.kind === "user"))
+          checkHandoff(driverDir, op.id);
+        const r = applyOp(working, op, ctx);
+        working = r.plan;
+        events.push(...r.events);
+        if (r.created) {
+          created.push(r.created);
+          docs.push({ op, id: r.created });
+        }
+      } catch (e) {
+        throw new BatchError(index, e);
+      }
+    });
+    const plan = { ...working, revision: current.revision + 1 };
+    for (const d of docs) writeDocs(driverDir, d.op, d.id, plan, opts);
+    writePlan(driverDir, plan);
+    const written = appendEvents(
+      driverDir,
+      events.map((e) => ({ ...e, revision: plan.revision }))
+    );
+    return { plan, events: written, created };
+  });
+}
 function initDriverDir(driverDir, name, packs, now) {
   if (existsSync(path.join(driverDir, "plan.json"))) throw new Error(`${driverDir}/plan.json already exists`);
-  for (const d of ["blocks", "requirements", "decisions", "discover", "exports", "log"]) {
+  for (const d of ["blocks", "requirements", "decisions", "discover", "exports", "log", ".mod"]) {
     mkdirSync(path.join(driverDir, d), { recursive: true });
-    if (d !== "exports") writeNew(path.join(driverDir, d, ".gitkeep"), "");
+    if (d !== "exports" && d !== ".mod") writeNew(path.join(driverDir, d, ".gitkeep"), "");
   }
   const plan = emptyPlan(name, packs, now);
-  writeNew(path.join(driverDir, ".gitignore"), "exports/\n.lock/\n.tmp/\n");
+  writeNew(path.join(driverDir, ".gitignore"), "exports/\n.lock/\n.tmp/\n.mod/\n");
   writeNew(path.join(driverDir, ".gitattributes"), "events.jsonl merge=union\n");
   writeNew(path.join(driverDir, "events.jsonl"), "");
   writePlan(driverDir, plan);
@@ -20825,7 +21223,6 @@ function findPlanFile(cwd) {
   return roots.map((r) => path2.join(driverDirOf(r), "plan.json")).find((f) => existsSync2(f));
 }
 var firstPresent = (...vs) => vs.find((v) => v !== null && v !== void 0 && v !== false);
-var MARKER = /DRIVER-BLOCK:\s*(B-\d+)/;
 function gateCheck(input2) {
   const cwd = path2.resolve(input2?.cwd ?? process.cwd());
   const file2 = findPlanFile(cwd);
@@ -20838,98 +21235,60 @@ function gateCheck(input2) {
     return "DRIVER: plan.json is unreadable; refusing to run agents (fail closed).";
   }
   if (!input2) return "DRIVER: hook input is not valid JSON; refusing (fail closed).";
-  const text = String(firstPresent(input2.tool_input?.prompt, input2.tool_input?.description) ?? "");
-  const blockId = MARKER.exec(text)?.[1];
-  const block = blockId ? plan.blocks?.[blockId] : void 0;
-  const phase = block && typeof block === "object" ? block.phase ?? null : plan.currentPhase ?? null;
-  const where = block ? `block ${blockId} (${phase})` : `current phase (${phase})`;
-  if (phase !== "discover" && plan.gates?.route?.approved !== true)
-    return `DRIVER: gate route is not approved; ${where} cannot run agents. Ask the user to run, in their own terminal: driver gate approve route`;
-  if (phase === "release" && plan.gates?.release?.approved !== true)
-    return `DRIVER: gate release is not approved; ${where} cannot run agents. Ask the user to run, in their own terminal: driver gate approve release`;
-  return null;
+  const text = String(firstPresent(input2.tool_input?.prompt, input2.tool_input?.description, input2.tool_input?.message) ?? "");
+  const v = gateVerdict(plan, text);
+  return v.allow ? null : v.reason;
 }
-var PROTECTED_FILE = /(^|\/)\.claude\/driver\/(plan\.json|events\.jsonl|log\/[^/]+\.jsonl)$/;
 var FILE_TOOLS = /* @__PURE__ */ new Set(["Write", "Edit", "MultiEdit"]);
-var MSG_FILES = 'DRIVER: plan.json, events.jsonl and log/*.jsonl are written only by the driver CLI. Use "driver block|req|phase ..." instead of editing them.';
-var MSG_PTY = "DRIVER: pseudo-terminal wrappers are not allowed; user-only actions must be run by the user in their own terminal";
-var MSG_USER_ONLY = "DRIVER: gate approval, rebaseline and --force are user-only. Ask the user to run them in their own terminal.";
-var DRIVER_TOKEN = /(?:^|[\s;&|(])driver\b|cli\.js/;
-var PROTECTED_DIR = /\.claude\/driver/;
-var INLINE_INTERPRETER = {
-  node: ["-e", "--eval", "-p", "--print"],
-  python: ["-c"],
-  python3: ["-c"],
-  perl: ["-e"],
-  ruby: ["-e"]
-};
-var WRITE_VERBS = /* @__PURE__ */ new Set(["rm", "tee", "truncate", "dd", "sponge"]);
-function normalizeCommand(cmd) {
-  return cmd.replace(/['"\\]/g, "").replace(/\s+/g, " ").replace(/\/(?:\.\/)+/g, "/").replace(/\/{2,}/g, "/").trim();
-}
-var PTY_COMMANDS = /* @__PURE__ */ new Set(["script", "expect", "unbuffer", "socat"]);
-function usesPty(norm) {
-  if (/\bpty\.spawn\b|\bos\.openpty\b|\bforkpty\b/.test(norm)) return true;
-  return commandWords(norm).some((w) => PTY_COMMANDS.has(baseName(w[0])));
-}
-function commandWords(norm) {
-  return norm.split(/&&|\|\||[;&|\n]/).map((seg) => seg.trim().split(" ").filter(Boolean)).map((w) => {
-    let i = 0;
-    while (i < w.length && (/^\w+=/.test(w[i]) || ["sudo", "command", "env", "exec", "nohup", "time", "nice", "stdbuf"].includes(w[i]))) i++;
-    return w.slice(i);
-  }).filter((w) => w.length > 0);
-}
-var baseName = (w) => w.slice(w.lastIndexOf("/") + 1);
-function writesDriverDir(norm) {
-  const globRef = /\.claude\/[^\s/]*[*?[]|\.cl[^\s/]*[*?[][^\s/]*\/dr/.test(norm);
-  if (!PROTECTED_DIR.test(norm) && !globRef) return false;
-  const redirects = norm.replace(/\d*>&\d+/g, "").replace(/\d*>>?\s*\/dev\/null/g, "");
-  if (redirects.includes(">")) return true;
-  for (const w of commandWords(norm)) {
-    const cmd = baseName(w[0]);
-    const args = w.slice(1);
-    if (WRITE_VERBS.has(cmd)) return true;
-    if (cmd === "sed" && args.some((a) => a === "--in-place" || /^-[A-Za-z]*i/.test(a))) return true;
-    if (cmd === "git" && args.some((a) => a === "checkout" || a === "restore")) return true;
-    if (INLINE_INTERPRETER[cmd]?.some((f) => args.includes(f))) return true;
-    if (cmd === "mv" || cmd === "cp" || cmd === "ln" || cmd === "rsync") {
-      const paths = args.filter((a) => !a.startsWith("-"));
-      const last = paths[paths.length - 1] ?? "";
-      if (globRef || PROTECTED_DIR.test(last) || /^(plan\.json|events\.jsonl|REL-\d+\.jsonl)$/.test(baseName(last))) return true;
+function resolveReal(p) {
+  let cur = p;
+  const tail = [];
+  for (; ; ) {
+    try {
+      return path2.join(realpathSync(cur), ...tail.reverse());
+    } catch {
+      const parent = path2.dirname(cur);
+      if (parent === cur) return p;
+      tail.push(path2.basename(cur));
+      cur = parent;
     }
   }
-  return false;
 }
 function protectPlan(input2) {
   if (!input2) return null;
+  if (!findPlanFile(path2.resolve(input2.cwd ?? process.cwd()))) return null;
   const tool = input2.tool_name ?? "";
   const ti = input2.tool_input ?? {};
-  if (FILE_TOOLS.has(tool)) {
-    const file2 = typeof ti.file_path === "string" ? path2.posix.normalize(ti.file_path.replace(/\\/g, "/")) : "";
-    if (PROTECTED_FILE.test(file2)) return MSG_FILES;
-  }
-  if (tool === "Bash") {
-    const norm = normalizeCommand(typeof ti.command === "string" ? ti.command : "");
-    if (DRIVER_TOKEN.test(norm)) {
-      if (/(?:(?:^|[\s;&|(])driver\b|cli\.js)[^]*(?:\bgate approve\b|\brebaseline\b|\s--force\b)/.test(norm))
-        return MSG_USER_ONLY;
-      if (/[$`]/.test(norm)) return MSG_USER_ONLY;
+  if (FILE_TOOLS.has(tool) && typeof ti.file_path === "string") {
+    const cwd = path2.resolve(input2.cwd ?? process.cwd());
+    const abs = path2.resolve(cwd, ti.file_path);
+    const direct = protectPath(abs);
+    if (direct) return direct;
+    const real = resolveReal(abs);
+    const roots = [process.env.DRIVER_ROOT, resolveProjectRoot(cwd), cwd].filter((r) => !!r);
+    for (const r of roots) {
+      const reason = protectPath(abs, { realPath: real, driverDir: resolveReal(driverDirOf(r)) });
+      if (reason) return reason;
     }
-    if (usesPty(norm)) return MSG_PTY;
-    if (writesDriverDir(norm)) return MSG_FILES;
   }
+  if (tool === "Bash") return protectCommand(typeof ti.command === "string" ? ti.command : "");
   return null;
 }
 
-// src/mermaid.ts
-var STATUS_STYLE = {
-  not_started: "fill:#e5e7eb,stroke:#6b7280,color:#111827",
-  in_progress: "fill:#bfdbfe,stroke:#2563eb,color:#111827",
-  blocked: "fill:#fecaca,stroke:#dc2626,color:#111827",
-  in_review: "fill:#fef08a,stroke:#ca8a04,color:#111827",
-  done: "fill:#bbf7d0,stroke:#16a34a,color:#111827",
-  needs_rework: "fill:#fed7aa,stroke:#ea580c,color:#111827"
+// src/shared/palette.ts
+var STATUS_COLORS = {
+  not_started: { fill: "#e5e7eb", stroke: "#6b7280", text: "#111827", strokeWidth: 1 },
+  in_progress: { fill: "#bfdbfe", stroke: "#2563eb", text: "#111827", strokeWidth: 2.5 },
+  blocked: { fill: "#fecaca", stroke: "#dc2626", text: "#111827", strokeWidth: 2.5 },
+  in_review: { fill: "#fef08a", stroke: "#ca8a04", text: "#111827", strokeWidth: 2 },
+  done: { fill: "#bbf7d0", stroke: "#16a34a", text: "#111827", strokeWidth: 1.5 },
+  needs_rework: { fill: "#fed7aa", stroke: "#ea580c", text: "#111827", strokeWidth: 2.5, dashed: true }
 };
+
+// src/mermaid.ts
+var STATUS_STYLE = Object.entries(STATUS_COLORS).map(
+  ([status, c]) => [status, `fill:${c.fill},stroke:${c.stroke},color:${c.text}`]
+);
 var ENTITIES = {
   "#": "#35;",
   '"': "#quot;",
@@ -20954,8 +21313,8 @@ function toMermaid(plan) {
   }
   for (const id of ids)
     for (const dep of plan.blocks[id].dependsOn) if (active.has(dep)) lines.push(`  ${dep} --> ${id}`);
-  for (const [status, style] of Object.entries(STATUS_STYLE)) lines.push(`  classDef ${status} ${style}`);
-  for (const status of Object.keys(STATUS_STYLE)) {
+  for (const [status, style] of STATUS_STYLE) lines.push(`  classDef ${status} ${style}`);
+  for (const [status] of STATUS_STYLE) {
     const members2 = ids.filter((id) => plan.blocks[id].status === status);
     if (members2.length > 0) lines.push(`  class ${members2.join(",")} ${status}`);
   }
@@ -20989,6 +21348,72 @@ function replayIssues(plan, events) {
   return issues;
 }
 
+// src/shared/view.ts
+function compareIds(a, b) {
+  const na = Number(a.slice(a.indexOf("-") + 1));
+  const nb = Number(b.slice(b.indexOf("-") + 1));
+  if (Number.isFinite(na) && Number.isFinite(nb) && na !== nb) return na - nb;
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+function gateView(g) {
+  return {
+    approved: g?.approved === true,
+    ...g?.approvedBy ? { by: g.approvedBy } : {},
+    ...g?.approvedAt ? { at: g.approvedAt } : {},
+    ...g?.approvedVia ? { via: g.approvedVia } : {},
+    ...g?.approvedTicket ? { ticket: g.approvedTicket } : {}
+  };
+}
+function project(plan) {
+  const blocks = Object.keys(plan.blocks).sort(compareIds).map((id) => {
+    const b = plan.blocks[id];
+    const tests = { pass: 0, fail: 0, unknown: 0 };
+    for (const t of b.tests ?? []) if (t.result in tests) tests[t.result]++;
+    return {
+      id,
+      title: b.title,
+      phase: b.phase,
+      status: b.status,
+      ...b.owner ? { owner: b.owner } : {},
+      ...b.statusReason ? { reason: b.statusReason } : {},
+      deps: [...b.dependsOn ?? []].sort(compareIds),
+      reqs: (b.requirements ?? []).length,
+      tests,
+      ...b.verification ? { verified: b.verification.passes === true } : {},
+      ...b.risk ? { risk: b.risk } : {},
+      retired: !!b.retired,
+      since: b.statusSince
+    };
+  });
+  return {
+    project: plan.project?.name ?? "",
+    revision: plan.revision,
+    baseline: plan.baseline,
+    currentPhase: plan.currentPhase,
+    gates: { route: gateView(plan.gates?.route), release: gateView(plan.gates?.release) },
+    blocks
+  };
+}
+function summarize(view) {
+  const counts = Object.fromEntries(BLOCK_STATUSES.map((s) => [s, 0]));
+  const byId = new Map(view.blocks.map((b) => [b.id, b]));
+  const active = view.blocks.filter((b) => !b.retired);
+  for (const b of active) counts[b.status]++;
+  const cur = phaseIndex(view.currentPhase);
+  const depMet = (id) => {
+    const d = byId.get(id);
+    return !!d && (d.retired || d.status === "done");
+  };
+  const nextGate = !view.gates.route.approved ? "route" : !view.gates.release.approved ? "release" : void 0;
+  return {
+    counts,
+    ready: active.filter((b) => b.status === "not_started" && phaseIndex(b.phase) <= cur && b.deps.every(depMet)).map((b) => b.id),
+    inProgress: active.filter((b) => b.status === "in_progress").map((b) => ({ id: b.id, ...b.owner ? { owner: b.owner } : {} })),
+    blocked: active.filter((b) => b.status === "blocked").map((b) => ({ id: b.id, ...b.reason ? { reason: b.reason } : {} })),
+    ...nextGate ? { nextGate } : {}
+  };
+}
+
 // src/cli.ts
 var UsageError = class extends Error {
 };
@@ -20997,15 +21422,18 @@ var HELP = `driver <command> [options]
   init <name> [--packs a,b]
   validate [dir] [--replay]
   status [dir]
+  where
+  apply                                      (ops JSON on stdin: {"ops":[{"op":"block.add",...}],"expectedRevision":N}; "$0" refers to the first created id)
   block add <title> --phase <p> [--depends B-001,..] [--req R-001,..] [--provider cap:provider:access] [--credentials A,B] [--risk low|medium|high]
   block set <id> [--title] [--depends] [--req] [--artifacts a,b] [--add-artifact p] [--test ref:layer:result] [--verified true|false] [--provider] [--credentials] [--risk]
   block status <id> <to> [--reason ..] [--owner <platform agent id>] [--force]
   block retire <id> --decision D-001 --reason ..
   block orphan --owner <agentId>
+  block owner <id> <agentId> --from <prev>
   decision add --title .. [--reason ..]
   req add <title> --kind functional|nonfunctional|constraint|non-goal --source user|assumed [--ref ..] [--doc]
   req retire <id> --decision D-001 --reason ..
-  gate approve <route|release> | gate revoke <route|release> --reason ..
+  gate approve <route|release> [--via-mod] | gate revoke <route|release> --reason ..
   phase advance | phase back <phase> --reason ..
   rebaseline --reason .. [--changed B-001,..] [--decision D-001]
   release add --version V --commit SHA [--blocks B-001,..]
@@ -21014,7 +21442,9 @@ var HELP = `driver <command> [options]
   hook gate-check | protect-plan | subagent-stop     (reads hook JSON on stdin)
 
 gate approve, rebaseline and --force ask for a typed "yes" on /dev/tty (user terminal only).
-global: --cwd <dir>  --root <dir>  --actor <kind:id>  --json  --now <iso>
+gate approve --via-mod reads a one-shot nonce on stdin and checks .claude/driver/.mod/ticket.json (written by the mod).
+values that start with "-" go as --reason=<v> / --owner=<v>.
+global: --cwd <dir>  --root <dir>  --actor <kind:id>  --json  --now <iso>  --expect-revision <n>
 exit codes: 0 ok, 1 validation or transition refused, 2 usage or forbidden`;
 var OPTIONS = {
   cwd: { type: "string" },
@@ -21049,6 +21479,9 @@ var OPTIONS = {
   stdout: { type: "boolean" },
   replay: { type: "boolean" },
   doc: { type: "boolean" },
+  from: { type: "string" },
+  "via-mod": { type: "boolean" },
+  "expect-revision": { type: "string" },
   help: { type: "boolean" }
 };
 var list = (s) => s === void 0 ? void 0 : s.split(",").map((x) => x.trim()).filter(Boolean);
@@ -21121,6 +21554,9 @@ Type "yes" to confirm: `);
   } finally {
     closeSync2(fd);
   }
+  return asUser(env);
+}
+function asUser(env) {
   const given = env.flags.actor?.slice(env.flags.actor.indexOf(":") + 1);
   let id = given || void 0;
   if (!id) {
@@ -21131,13 +21567,49 @@ Type "yes" to confirm: `);
   }
   return { ...env, actor: { kind: "user", id: id || process.env.USER || "user" } };
 }
+var TICKET_MAX_AGE_MS = 2e4;
+function consumeTicket(driverDir, gate, nonce) {
+  const file2 = path3.join(driverDir, ".mod", "ticket.json");
+  let raw;
+  try {
+    raw = readFileSync3(file2, "utf8");
+  } catch {
+    throw new OpRefusedError('no approval ticket (approve through the mod, or run "driver gate approve" in your terminal)', true);
+  }
+  rmSync2(file2, { force: true });
+  let t;
+  try {
+    t = JSON.parse(raw);
+  } catch {
+    throw new OpRefusedError("approval ticket is malformed", true);
+  }
+  const now = Date.now();
+  if (typeof t.exp !== "number" || t.exp < now) throw new OpRefusedError("approval ticket expired", true);
+  if (t.exp - now > TICKET_MAX_AGE_MS) throw new OpRefusedError("approval ticket expires too far ahead", true);
+  if (typeof t.iat !== "number" || t.iat > now + 2e3 || now - t.iat > TICKET_MAX_AGE_MS)
+    throw new OpRefusedError("approval ticket is not fresh", true);
+  if (t.gate !== gate) throw new OpRefusedError(`approval ticket is for gate ${String(t.gate)}, not ${gate}`, true);
+  const plan = readPlan(driverDir);
+  if (typeof t.revision !== "number" || plan.revision !== t.revision)
+    throw new OpRefusedError(`plan changed since the ticket was issued (ticket revision ${String(t.revision)}, plan revision ${plan.revision})`, true);
+  const want = typeof t.sha256 === "string" && /^[0-9a-f]{64}$/i.test(t.sha256) ? Buffer.from(t.sha256, "hex") : void 0;
+  const got = createHash("sha256").update(nonce, "utf8").digest();
+  if (!want || !timingSafeEqual(want, got)) throw new OpRefusedError("approval code does not match the ticket", true);
+  return { revision: t.revision, sha256: String(t.sha256).toLowerCase() };
+}
 function write(env, o) {
   const s = env.json ? JSON.stringify(o.json ?? { ok: true }) : o.text;
   if (s) process.stdout.write(s.endsWith("\n") ? s : `${s}
 `);
 }
+function expectedRevision(env) {
+  const v = env.flags["expect-revision"];
+  if (v === void 0) return void 0;
+  if (!/^\d+$/.test(v)) throw new UsageError("--expect-revision must be a non-negative integer");
+  return Number(v);
+}
 function commit(env, driverDir, op, opts = {}) {
-  const r = mutate(driverDir, op, { actor: env.actor, now: env.now }, opts);
+  const r = mutate(driverDir, op, { actor: env.actor, now: env.now }, { expectedRevision: expectedRevision(env), ...opts });
   return {
     text: r.created ?? `ok (revision ${r.plan.revision})`,
     json: { ok: true, revision: r.plan.revision, created: r.created, events: r.events.length }
@@ -21184,8 +21656,10 @@ function validateResult(issues) {
 }
 function statusCmd(env, dirArg) {
   const plan = readPlan(locateDriverDir(env, dirArg));
-  const active = Object.values(plan.blocks).filter((b) => !b.retired);
-  const counts = Object.fromEntries(BLOCK_STATUSES.map((s) => [s, active.filter((b) => b.status === s).length]));
+  const view = project(plan);
+  const sum = summarize(view);
+  const active = view.blocks.filter((b) => !b.retired);
+  const counts = sum.counts;
   const gate = (name) => {
     const g = plan.gates[name];
     return g.approved ? `${name} approved (${g.approvedBy ?? "?"}, baseline ${g.atBaseline ?? "?"})` : `${name} not approved`;
@@ -21199,13 +21673,39 @@ function statusCmd(env, dirArg) {
   return {
     text,
     json: {
-      project: plan.project.name,
-      phase: plan.currentPhase,
-      baseline: plan.baseline,
-      revision: plan.revision,
-      gates: { route: plan.gates.route.approved, release: plan.gates.release.approved },
-      blocks: counts
+      project: view.project,
+      currentPhase: view.currentPhase,
+      baseline: view.baseline,
+      revision: view.revision,
+      gates: view.gates,
+      counts,
+      ready: sum.ready,
+      inProgress: sum.inProgress,
+      blocked: sum.blocked
     }
+  };
+}
+function whereCmd(env) {
+  const driverDir = locateDriverDir(env);
+  const root = path3.dirname(path3.dirname(driverDir));
+  const planExists = existsSync3(path3.join(driverDir, "plan.json"));
+  return { text: root, json: { root, driverDir, planExists } };
+}
+function applyCmd(env, driverDir) {
+  let body;
+  try {
+    body = parseApplyBody(readStdin());
+  } catch (e) {
+    if (e instanceof ApplyInputError && e.failedOp === void 0) throw new UsageError(e.message);
+    throw e;
+  }
+  const ops = body.ops.map(
+    (o) => o.type === "block.set" && o.patch.verification ? { ...o, patch: { ...o.patch, verification: { ...o.patch.verification, at: env.now, by: env.actor } } } : o
+  );
+  const r = mutateMany(driverDir, ops, { actor: env.actor, now: env.now }, { expectedRevision: body.expectedRevision ?? expectedRevision(env) });
+  return {
+    text: `ok (revision ${r.plan.revision})${r.created.length ? `; created ${r.created.join(", ")}` : ""}`,
+    json: { ok: true, revision: r.plan.revision, created: r.created }
   };
 }
 function blockSet(env, driverDir, id) {
@@ -21244,6 +21744,10 @@ function runCommand(env0, pos) {
       return validateCmd(env, sub);
     case "status":
       return statusCmd(env, sub);
+    case "where":
+      return whereCmd(env);
+    case "apply":
+      return applyCmd(env, dir());
     case "block": {
       switch (sub) {
         case "add":
@@ -21279,6 +21783,13 @@ function runCommand(env0, pos) {
           });
         case "orphan":
           return commit(env, dir(), { type: "block.orphan", owner: need(f.owner, "owner") });
+        case "owner":
+          return commit(env, dir(), {
+            type: "block.owner",
+            id: need(arg, "block id"),
+            owner: need(pos[3], "agent id (block owner <id> <agentId> --from <prev>)"),
+            from: need(f.from, "from")
+          });
       }
       break;
     }
@@ -21307,9 +21818,15 @@ function runCommand(env0, pos) {
     }
     case "gate": {
       const gate = oneOf(need(arg, "gate"), ["route", "release"], "gate");
+      if (sub === "approve" && f["via-mod"]) {
+        const driverDir = dir();
+        const ticket = consumeTicket(driverDir, gate, readStdin().trim());
+        env = asUser(env);
+        return commit(env, driverDir, { type: "gate.approve", gate, decision: f.decision, via: "mod", ticket: ticket.sha256 }, { expectedRevision: ticket.revision });
+      }
       if (sub === "approve") {
         env = confirmAsUser(env, `approve gate ${gate} in ${env.cwd}`);
-        return commit(env, dir(), { type: "gate.approve", gate, decision: f.decision });
+        return commit(env, dir(), { type: "gate.approve", gate, decision: f.decision, via: "tty" });
       }
       if (sub === "revoke") return commit(env, dir(), { type: "gate.revoke", gate, reason: need(f.reason, "reason") });
       break;
@@ -21355,7 +21872,7 @@ function runCommand(env0, pos) {
     case "renumber": {
       const driverDir = dir();
       const before = readPlan(driverDir).nextId;
-      const r = mutate(driverDir, { type: "renumber" }, { actor: env.actor, now: env.now });
+      const r = mutate(driverDir, { type: "renumber" }, { actor: env.actor, now: env.now }, { expectedRevision: expectedRevision(env) });
       const changed = Object.keys(before).filter((k) => before[k] !== r.plan.nextId[k]);
       return {
         text: changed.length ? changed.map((k) => `nextId.${k}: ${before[k]} -> ${r.plan.nextId[k]}`).join("\n") : "nothing to renumber",
@@ -21396,16 +21913,28 @@ function runHook(name) {
 `);
   }
 }
+var GLOBAL_OPTIONS = /* @__PURE__ */ new Set(["cwd", "root", "actor", "json", "now", "expect-revision"]);
+function checkWordOrder(tokens) {
+  const at = tokens.findIndex((t) => t.kind === "positional");
+  if (at < 0) return;
+  const cmd = tokens[at].value;
+  if (!["gate", "rebaseline", "block", "apply"].includes(cmd ?? "")) return;
+  for (const t of tokens.slice(0, at))
+    if (t.kind === "option" && !GLOBAL_OPTIONS.has(t.name ?? "")) throw new UsageError(`${cmd}: option --${t.name} must come after the subcommand words`);
+  const next = tokens[at + 1];
+  if ((cmd === "gate" || cmd === "block") && next && next.kind !== "positional")
+    throw new UsageError(`${cmd}: the subcommand words must come right after "${cmd}", options after them`);
+}
 function main(argv) {
   let parsed;
   try {
-    parsed = parseArgs({ args: argv, options: OPTIONS, allowPositionals: true });
+    parsed = parseArgs({ args: argv, options: OPTIONS, allowPositionals: true, tokens: true });
   } catch (e) {
     process.stderr.write(`driver: ${e.message}
 `);
     return 2;
   }
-  const { values, positionals } = parsed;
+  const { values, positionals, tokens } = parsed;
   if (positionals[0] === "hook") {
     runHook(positionals[1]);
     return 0;
@@ -21417,6 +21946,7 @@ function main(argv) {
   }
   const json2 = values.json === true;
   try {
+    checkWordOrder(tokens ?? []);
     const env = {
       cwd: path3.resolve(values.cwd ?? process.cwd()),
       actor: parseActor(values.actor ?? process.env.DRIVER_ACTOR ?? "model:main"),
@@ -21429,6 +21959,16 @@ function main(argv) {
     return out.exit ?? 0;
   } catch (e) {
     const err = e;
+    const fail = (message2, extra) => {
+      if (json2) process.stdout.write(`${JSON.stringify({ ok: false, error: message2, ...extra })}
+`);
+      process.stderr.write(`driver: ${message2}
+`);
+      return 1;
+    };
+    if (err instanceof BatchError) return fail(err.cause.message, { failedOp: err.index });
+    if (err instanceof ApplyInputError) return fail(err.message, err.failedOp === void 0 ? {} : { failedOp: err.failedOp });
+    if (err instanceof RevisionConflictError) return fail("revision conflict", { current: err.actual, expected: err.expected });
     const code = err instanceof UsageError || err instanceof OpRefusedError && err.forbidden ? 2 : 1;
     const known = code === 2 || err instanceof OpRefusedError || err instanceof PlanInvariantError || err instanceof LockTimeoutError || err instanceof RevisionConflictError || err instanceof NotInitializedError;
     const message = known ? err.message : `unexpected: ${err.stack ?? err.message}`;

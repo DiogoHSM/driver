@@ -39,8 +39,10 @@ export type Op =
   | { type: 'block.status'; id: string; to: BlockStatus; reason?: string; force?: boolean; owner?: string }
   | { type: 'block.retire'; id: string; decision: string; reason: string }
   | { type: 'block.orphan'; owner: string }
+  /** CAS on the owner of an in_progress block. */
+  | { type: 'block.owner'; id: string; owner: string; from: string }
   | { type: 'decision.add'; title: string; reason?: string }
-  | { type: 'gate.approve'; gate: GateName; decision?: string }
+  | { type: 'gate.approve'; gate: GateName; decision?: string; via?: 'mod' | 'tty'; ticket?: string }
   | { type: 'gate.revoke'; gate: GateName; reason: string }
   | { type: 'phase.advance' }
   | { type: 'phase.back'; to: PhaseId; reason: string }
@@ -60,7 +62,8 @@ export type EventType =
   | 'release'
   | 'retire'
   | 'decision.add'
-  | 'orphan';
+  | 'orphan'
+  | 'owner';
 
 export interface Event {
   seq?: number;
@@ -285,6 +288,15 @@ function handle(d: Draft, op: Op): void {
         emit(d, { type: 'orphan', data: { owner: op.owner, blocks: hit } });
       return;
     }
+    case 'block.owner': {
+      const b = getBlock(d, op.id);
+      if (b.status !== 'in_progress') return refuse(`${op.id} is ${b.status}, not in_progress`);
+      if (b.owner !== op.from) return refuse(`${op.id} is owned by ${b.owner ?? '(nobody)'}, not ${op.from}`);
+      b.owner = op.owner;
+      b.statusBy = ctx.actor;
+      emit(d, { type: 'owner', block: op.id, from: op.from, to: op.owner });
+      return;
+    }
     case 'decision.add': {
       const id = alloc(d, 'D');
       registerDecision(d, id, op.title, op.reason);
@@ -322,10 +334,12 @@ function handle(d: Draft, op: Op): void {
         approvedAt: ctx.now,
         approvedBy: ctx.actor.id,
         atBaseline: d.plan.baseline,
+        // How the approval arrived is always recorded, so a hand-written one stands out. Tamper evidence, not proof.
+        ...(op.via ? { approvedVia: op.via, ...(op.ticket ? { approvedTicket: op.ticket } : {}) } : {}),
       };
       emit(d, {
         type: 'gate.approve',
-        data: { gate: op.gate, baseline: d.plan.baseline, ...(decision ? { decision } : {}) },
+        data: { gate: op.gate, baseline: d.plan.baseline, ...(decision ? { decision } : {}), ...(op.via ? { via: op.via } : {}), ...(op.ticket ? { ticket: op.ticket } : {}) },
       });
       return;
     }
@@ -426,7 +440,8 @@ function handle(d: Draft, op: Op): void {
 
 function revoke(d: Draft, gate: GateName, reason: string): void {
   const g = d.plan.gates[gate];
-  d.plan.gates[gate] = { ...g, approved: false, revokedAt: d.ctx.now, revokedReason: reason };
+  const { approvedVia: _v, approvedTicket: _t, ...kept } = g;
+  d.plan.gates[gate] = { ...kept, approved: false, revokedAt: d.ctx.now, revokedReason: reason };
   emit(d, { type: 'gate.revoke', reason, data: { gate } });
 }
 

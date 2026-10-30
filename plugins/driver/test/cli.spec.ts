@@ -102,7 +102,7 @@ describe('status and export', () => {
       ].join('\n'),
     );
     const j = JSON.parse(runCli(['status', path.join(EXAMPLES, 'video-explainer'), '--json']).stdout);
-    expect(j).toMatchObject({ phase: 'route', baseline: 1, gates: { route: true, release: false } });
+    expect(j).toMatchObject({ currentPhase: 'route', baseline: 1, gates: { route: { approved: true }, release: { approved: false } } });
   });
 
   it.each(examples)('export mermaid --stdout matches the committed docs/plan.mmd for %s', (name) => {
@@ -178,7 +178,7 @@ describe('commands and exit codes', () => {
     expect(cli('phase', 'advance').status).toBe(0);
     expect(cli('phase', 'back', 'discover', '--reason', 'again').status).toBe(0);
     const s = JSON.parse(cli('status', '--json').stdout);
-    expect(s).toMatchObject({ phase: 'discover', gates: { route: false } });
+    expect(s).toMatchObject({ currentPhase: 'discover', gates: { route: { approved: false } } });
   });
 
   const hasScript = existsSync('/usr/bin/script');
@@ -248,6 +248,18 @@ describe('hook gate-check (bash script and node implementation agree)', () => {
   describe.each(Object.entries(impls))('%s', (_name, run) => {
     it('no plan -> allow', () => {
       expect(decision(run(input(tmp())))).toBe('allow');
+    });
+
+    it('SendMessage is gated like a spawn, by the message', () => {
+      const d = tmp();
+      const plan = loadFixture('valid', 'mid-implement');
+      plan.gates.route.approved = false;
+      writePlanFile(d, plan);
+      const msg = JSON.stringify({ cwd: d, tool_name: 'SendMessage', tool_input: { to: 'a1', message: 'DRIVER-BLOCK: B-003 continue' } });
+      expect(decision(run(msg))).toBe('deny');
+      plan.gates.route.approved = true;
+      writePlanFile(d, plan);
+      expect(decision(run(msg))).toBe('allow');
     });
 
     it('release unapproved, block in release phase -> deny', () => {
@@ -323,6 +335,8 @@ describe('hook gate-check (bash script and node implementation agree)', () => {
   it('the static fixture from the plan denies when run from the package root', () => {
     const r = spawnSync('bash', [path.join(PKG_ROOT, 'hooks', 'gate-check.sh')], {
       cwd: PKG_ROOT,
+      // the repository's own plan (dogfooding) would win over the fixture's otherwise
+      env: { ...process.env, DRIVER_ROOT: path.join(PKG_ROOT, 'test', 'fixtures', 'hook-project') },
       input: readFileSync(path.join(PKG_ROOT, 'test', 'fixtures', 'hook-input-release-unapproved.json'), 'utf8'),
       encoding: 'utf8',
     });
@@ -332,8 +346,17 @@ describe('hook gate-check (bash script and node implementation agree)', () => {
 });
 
 describe('hook protect-plan', () => {
-  const run = (tool_name: string, tool_input: object) =>
-    runCli(['hook', 'protect-plan'], { input: JSON.stringify({ tool_name, tool_input, cwd: '/x' }) });
+  // the guard only applies where a plan exists
+  const proj = tmp();
+  writePlanFile(proj, loadFixture('valid', 'mid-implement'));
+  const run = (tool_name: string, tool_input: object, cwd = proj) =>
+    runCli(['hook', 'protect-plan'], { input: JSON.stringify({ tool_name, tool_input, cwd }) });
+
+  it('no plan -> allow everything, pty wrappers included', () => {
+    const none = tmp();
+    expect(run('Bash', { command: 'socat TCP-LISTEN:1 TCP:localhost:2' }, none).stdout.trim()).toBe('');
+    expect(run('Write', { file_path: '/p/.claude/driver/plan.json' }, none).stdout.trim()).toBe('');
+  });
   const denied = (r: ReturnType<typeof run>) => {
     expect(r.status).toBe(0);
     return r.stdout.trim() !== '' && JSON.parse(r.stdout).hookSpecificOutput.permissionDecision === 'deny';
@@ -468,7 +491,6 @@ describe('hook protect-plan', () => {
     'driver block set B-001 --add-artifact .claude/driver/plan.json',
     'node plugins/driver/dist/cli.js validate --replay 2>&1',
     'node plugins/driver/dist/cli.js block add "T" --phase discover',
-    'echo hi > /tmp/plan.json',
     'node build.js',
   ])('Bash read-only %s -> allow', (command) => {
     expect(denied(run('Bash', { command }))).toBe(false);

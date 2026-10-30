@@ -1,7 +1,9 @@
 import { execFileSync } from 'node:child_process';
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, writeFileSync, writeSync } from 'node:fs';
+import { createHash, timingSafeEqual } from 'node:crypto';
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, rmSync, writeFileSync, writeSync } from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
+import { ApplyInputError, parseApplyBody } from './apply.js';
 import { denyOutput, findPlanFile, gateCheck, parseHookInput, protectPlan } from './hooks.js';
 import { toMermaid } from './mermaid.js';
 import { OpRefusedError, PlanInvariantError, type Op } from './reducer.js';
@@ -19,16 +21,19 @@ import {
   type TestRef,
 } from './schema.js';
 import {
+  BatchError,
   LockTimeoutError,
   NotInitializedError,
   RevisionConflictError,
   driverDirOf,
   initDriverDir,
   mutate,
+  mutateMany,
   readAllEvents,
   readPlan,
   resolveProjectRoot,
 } from './store.js';
+import { project, summarize } from './shared/view.js';
 import { hasErrors, validatePlan, type Issue } from './validate.js';
 
 class UsageError extends Error {}
@@ -38,15 +43,18 @@ const HELP = `driver <command> [options]
   init <name> [--packs a,b]
   validate [dir] [--replay]
   status [dir]
+  where
+  apply                                      (ops JSON on stdin: {"ops":[{"op":"block.add",...}],"expectedRevision":N}; "$0" refers to the first created id)
   block add <title> --phase <p> [--depends B-001,..] [--req R-001,..] [--provider cap:provider:access] [--credentials A,B] [--risk low|medium|high]
   block set <id> [--title] [--depends] [--req] [--artifacts a,b] [--add-artifact p] [--test ref:layer:result] [--verified true|false] [--provider] [--credentials] [--risk]
   block status <id> <to> [--reason ..] [--owner <platform agent id>] [--force]
   block retire <id> --decision D-001 --reason ..
   block orphan --owner <agentId>
+  block owner <id> <agentId> --from <prev>
   decision add --title .. [--reason ..]
   req add <title> --kind functional|nonfunctional|constraint|non-goal --source user|assumed [--ref ..] [--doc]
   req retire <id> --decision D-001 --reason ..
-  gate approve <route|release> | gate revoke <route|release> --reason ..
+  gate approve <route|release> [--via-mod] | gate revoke <route|release> --reason ..
   phase advance | phase back <phase> --reason ..
   rebaseline --reason .. [--changed B-001,..] [--decision D-001]
   release add --version V --commit SHA [--blocks B-001,..]
@@ -55,7 +63,9 @@ const HELP = `driver <command> [options]
   hook gate-check | protect-plan | subagent-stop     (reads hook JSON on stdin)
 
 gate approve, rebaseline and --force ask for a typed "yes" on /dev/tty (user terminal only).
-global: --cwd <dir>  --root <dir>  --actor <kind:id>  --json  --now <iso>
+gate approve --via-mod reads a one-shot nonce on stdin and checks .claude/driver/.mod/ticket.json (written by the mod).
+values that start with "-" go as --reason=<v> / --owner=<v>.
+global: --cwd <dir>  --root <dir>  --actor <kind:id>  --json  --now <iso>  --expect-revision <n>
 exit codes: 0 ok, 1 validation or transition refused, 2 usage or forbidden`;
 
 const OPTIONS = {
@@ -91,6 +101,9 @@ const OPTIONS = {
   stdout: { type: 'boolean' },
   replay: { type: 'boolean' },
   doc: { type: 'boolean' },
+  from: { type: 'string' },
+  'via-mod': { type: 'boolean' },
+  'expect-revision': { type: 'string' },
   help: { type: 'boolean' },
 } as const;
 
@@ -186,6 +199,11 @@ function confirmAsUser(env: Env, what: string): Env {
   } finally {
     closeSync(fd);
   }
+  return asUser(env);
+}
+
+/** The user actor for a confirmed action: --actor's id, else git user.name, else $USER. */
+function asUser(env: Env): Env {
   const given = env.flags.actor?.slice(env.flags.actor.indexOf(':') + 1);
   let id = given || undefined;
   if (!id) {
@@ -196,6 +214,50 @@ function confirmAsUser(env: Env, what: string): Env {
     }
   }
   return { ...env, actor: { kind: 'user', id: id || process.env.USER || 'user' } };
+}
+
+interface Ticket {
+  gate?: unknown;
+  revision?: unknown;
+  sha256?: unknown;
+  exp?: unknown;
+  iat?: unknown;
+}
+
+/**
+ * Approval through the mod: a ticket written by the mod on the user's own Enter plus the
+ * one-shot nonce on stdin. The ticket is consumed (unlinked) before anything is checked.
+ */
+const TICKET_MAX_AGE_MS = 20000;
+
+function consumeTicket(driverDir: string, gate: string, nonce: string): { revision: number; sha256: string } {
+  const file = path.join(driverDir, '.mod', 'ticket.json');
+  let raw: string;
+  try {
+    raw = readFileSync(file, 'utf8');
+  } catch {
+    throw new OpRefusedError('no approval ticket (approve through the mod, or run "driver gate approve" in your terminal)', true);
+  }
+  rmSync(file, { force: true });
+  let t: Ticket;
+  try {
+    t = JSON.parse(raw) as Ticket;
+  } catch {
+    throw new OpRefusedError('approval ticket is malformed', true);
+  }
+  const now = Date.now();
+  if (typeof t.exp !== 'number' || t.exp < now) throw new OpRefusedError('approval ticket expired', true);
+  if (t.exp - now > TICKET_MAX_AGE_MS) throw new OpRefusedError('approval ticket expires too far ahead', true);
+  if (typeof t.iat !== 'number' || t.iat > now + 2000 || now - t.iat > TICKET_MAX_AGE_MS)
+    throw new OpRefusedError('approval ticket is not fresh', true);
+  if (t.gate !== gate) throw new OpRefusedError(`approval ticket is for gate ${String(t.gate)}, not ${gate}`, true);
+  const plan = readPlan(driverDir);
+  if (typeof t.revision !== 'number' || plan.revision !== t.revision)
+    throw new OpRefusedError(`plan changed since the ticket was issued (ticket revision ${String(t.revision)}, plan revision ${plan.revision})`, true);
+  const want = typeof t.sha256 === 'string' && /^[0-9a-f]{64}$/i.test(t.sha256) ? Buffer.from(t.sha256, 'hex') : undefined;
+  const got = createHash('sha256').update(nonce, 'utf8').digest();
+  if (!want || !timingSafeEqual(want, got)) throw new OpRefusedError('approval code does not match the ticket', true);
+  return { revision: t.revision, sha256: String(t.sha256).toLowerCase() };
 }
 
 interface Out {
@@ -209,8 +271,15 @@ function write(env: Env, o: Out): void {
   if (s) process.stdout.write(s.endsWith('\n') ? s : `${s}\n`);
 }
 
-function commit(env: Env, driverDir: string, op: Op, opts: { doc?: boolean } = {}): Out {
-  const r = mutate(driverDir, op, { actor: env.actor, now: env.now }, opts);
+function expectedRevision(env: Env): number | undefined {
+  const v = env.flags['expect-revision'];
+  if (v === undefined) return undefined;
+  if (!/^\d+$/.test(v)) throw new UsageError('--expect-revision must be a non-negative integer');
+  return Number(v);
+}
+
+function commit(env: Env, driverDir: string, op: Op, opts: { doc?: boolean; expectedRevision?: number } = {}): Out {
+  const r = mutate(driverDir, op, { actor: env.actor, now: env.now }, { expectedRevision: expectedRevision(env), ...opts });
   return {
     text: r.created ?? `ok (revision ${r.plan.revision})`,
     json: { ok: true, revision: r.plan.revision, created: r.created, events: r.events.length },
@@ -261,8 +330,10 @@ function validateResult(issues: Issue[]): Out {
 
 function statusCmd(env: Env, dirArg: string | undefined): Out {
   const plan = readPlan(locateDriverDir(env, dirArg));
-  const active = Object.values(plan.blocks).filter((b) => !b.retired);
-  const counts = Object.fromEntries(BLOCK_STATUSES.map((s) => [s, active.filter((b) => b.status === s).length]));
+  const view = project(plan);
+  const sum = summarize(view);
+  const active = view.blocks.filter((b) => !b.retired);
+  const counts = sum.counts;
   const gate = (name: 'route' | 'release') => {
     const g = plan.gates[name];
     return g.approved ? `${name} approved (${g.approvedBy ?? '?'}, baseline ${g.atBaseline ?? '?'})` : `${name} not approved`;
@@ -276,13 +347,42 @@ function statusCmd(env: Env, dirArg: string | undefined): Out {
   return {
     text,
     json: {
-      project: plan.project.name,
-      phase: plan.currentPhase,
-      baseline: plan.baseline,
-      revision: plan.revision,
-      gates: { route: plan.gates.route.approved, release: plan.gates.release.approved },
-      blocks: counts,
+      project: view.project,
+      currentPhase: view.currentPhase,
+      baseline: view.baseline,
+      revision: view.revision,
+      gates: view.gates,
+      counts,
+      ready: sum.ready,
+      inProgress: sum.inProgress,
+      blocked: sum.blocked,
     },
+  };
+}
+
+function whereCmd(env: Env): Out {
+  const driverDir = locateDriverDir(env);
+  const root = path.dirname(path.dirname(driverDir));
+  const planExists = existsSync(path.join(driverDir, 'plan.json'));
+  return { text: root, json: { root, driverDir, planExists } };
+}
+
+function applyCmd(env: Env, driverDir: string): Out {
+  let body;
+  try {
+    body = parseApplyBody(readStdin());
+  } catch (e) {
+    if (e instanceof ApplyInputError && e.failedOp === undefined) throw new UsageError(e.message);
+    throw e;
+  }
+  // a verification is always attributed to whoever applies it, never to a name the caller supplied
+  const ops = body.ops.map((o) =>
+    o.type === 'block.set' && o.patch.verification ? { ...o, patch: { ...o.patch, verification: { ...o.patch.verification, at: env.now, by: env.actor } } } : o,
+  );
+  const r = mutateMany(driverDir, ops, { actor: env.actor, now: env.now }, { expectedRevision: body.expectedRevision ?? expectedRevision(env) });
+  return {
+    text: `ok (revision ${r.plan.revision})${r.created.length ? `; created ${r.created.join(', ')}` : ''}`,
+    json: { ok: true, revision: r.plan.revision, created: r.created },
   };
 }
 
@@ -324,6 +424,10 @@ function runCommand(env0: Env, pos: string[]): Out {
       return validateCmd(env, sub);
     case 'status':
       return statusCmd(env, sub);
+    case 'where':
+      return whereCmd(env);
+    case 'apply':
+      return applyCmd(env, dir());
     case 'block': {
       switch (sub) {
         case 'add':
@@ -359,6 +463,13 @@ function runCommand(env0: Env, pos: string[]): Out {
           });
         case 'orphan':
           return commit(env, dir(), { type: 'block.orphan', owner: need(f.owner, 'owner') });
+        case 'owner':
+          return commit(env, dir(), {
+            type: 'block.owner',
+            id: need(arg, 'block id'),
+            owner: need(pos[3], 'agent id (block owner <id> <agentId> --from <prev>)'),
+            from: need(f.from, 'from'),
+          });
       }
       break;
     }
@@ -387,9 +498,15 @@ function runCommand(env0: Env, pos: string[]): Out {
     }
     case 'gate': {
       const gate = oneOf(need(arg, 'gate'), ['route', 'release'] as const, 'gate');
+      if (sub === 'approve' && f['via-mod']) {
+        const driverDir = dir();
+        const ticket = consumeTicket(driverDir, gate, readStdin().trim());
+        env = asUser(env);
+        return commit(env, driverDir, { type: 'gate.approve', gate, decision: f.decision, via: 'mod', ticket: ticket.sha256 }, { expectedRevision: ticket.revision });
+      }
       if (sub === 'approve') {
         env = confirmAsUser(env, `approve gate ${gate} in ${env.cwd}`);
-        return commit(env, dir(), { type: 'gate.approve', gate, decision: f.decision });
+        return commit(env, dir(), { type: 'gate.approve', gate, decision: f.decision, via: 'tty' });
       }
       if (sub === 'revoke') return commit(env, dir(), { type: 'gate.revoke', gate, reason: need(f.reason, 'reason') });
       break;
@@ -440,7 +557,7 @@ function runCommand(env0: Env, pos: string[]): Out {
     case 'renumber': {
       const driverDir = dir();
       const before = readPlan(driverDir).nextId;
-      const r = mutate(driverDir, { type: 'renumber' }, { actor: env.actor, now: env.now });
+      const r = mutate(driverDir, { type: 'renumber' }, { actor: env.actor, now: env.now }, { expectedRevision: expectedRevision(env) });
       const changed = (Object.keys(before) as (keyof typeof before)[]).filter((k) => before[k] !== r.plan.nextId[k]);
       return {
         text: changed.length ? changed.map((k) => `nextId.${k}: ${before[k]} -> ${r.plan.nextId[k]}`).join('\n') : 'nothing to renumber',
@@ -482,15 +599,36 @@ function runHook(name: string | undefined): void {
   }
 }
 
+const GLOBAL_OPTIONS = new Set(['cwd', 'root', 'actor', 'json', 'now', 'expect-revision']);
+
+type Token = { kind: string; name?: string };
+
+/**
+ * parseArgs lets options sit between positionals, so `gate --via-mod approve` would parse like
+ * `gate approve --via-mod` while slipping past text filters. For the user-only commands the
+ * subcommand words must come first; only the global options may precede them.
+ */
+function checkWordOrder(tokens: readonly Token[]): void {
+  const at = tokens.findIndex((t) => t.kind === 'positional');
+  if (at < 0) return;
+  const cmd = (tokens[at] as { value?: string }).value;
+  if (!['gate', 'rebaseline', 'block', 'apply'].includes(cmd ?? '')) return;
+  for (const t of tokens.slice(0, at))
+    if (t.kind === 'option' && !GLOBAL_OPTIONS.has(t.name ?? '')) throw new UsageError(`${cmd}: option --${t.name} must come after the subcommand words`);
+  const next = tokens[at + 1];
+  if ((cmd === 'gate' || cmd === 'block') && next && next.kind !== 'positional')
+    throw new UsageError(`${cmd}: the subcommand words must come right after "${cmd}", options after them`);
+}
+
 function main(argv: string[]): number {
   let parsed;
   try {
-    parsed = parseArgs({ args: argv, options: OPTIONS, allowPositionals: true });
+    parsed = parseArgs({ args: argv, options: OPTIONS, allowPositionals: true, tokens: true });
   } catch (e) {
     process.stderr.write(`driver: ${(e as Error).message}\n`);
     return 2;
   }
-  const { values, positionals } = parsed;
+  const { values, positionals, tokens } = parsed;
   if (positionals[0] === 'hook') {
     runHook(positionals[1]);
     return 0;
@@ -501,6 +639,7 @@ function main(argv: string[]): number {
   }
   const json = values.json === true;
   try {
+    checkWordOrder(tokens ?? []);
     const env: Env = {
       cwd: path.resolve(values.cwd ?? process.cwd()),
       actor: parseActor(values.actor ?? process.env.DRIVER_ACTOR ?? 'model:main'),
@@ -513,6 +652,15 @@ function main(argv: string[]): number {
     return out.exit ?? 0;
   } catch (e) {
     const err = e as Error;
+    // machine-readable failures go to stdout (like results); the human line stays on stderr
+    const fail = (message: string, extra: Record<string, unknown>): number => {
+      if (json) process.stdout.write(`${JSON.stringify({ ok: false, error: message, ...extra })}\n`);
+      process.stderr.write(`driver: ${message}\n`);
+      return 1;
+    };
+    if (err instanceof BatchError) return fail(err.cause.message, { failedOp: err.index });
+    if (err instanceof ApplyInputError) return fail(err.message, err.failedOp === undefined ? {} : { failedOp: err.failedOp });
+    if (err instanceof RevisionConflictError) return fail('revision conflict', { current: err.actual, expected: err.expected });
     const code =
       err instanceof UsageError || (err instanceof OpRefusedError && err.forbidden) ? 2 : 1;
     const known =

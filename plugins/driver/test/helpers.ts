@@ -69,3 +69,18 @@ export const HOOK = { kind: 'hook', id: 'subagent-stop' } as const;
 export function approveAsUser(root: string, gate: 'route' | 'release'): void {
   mutate(path.join(root, '.claude', 'driver'), { type: 'gate.approve', gate }, { actor: USER, now: NOW });
 }
+
+export function loadExamplePlan(name: 'web-waitlist' | 'video-explainer'): PlanV1 {
+  return JSON.parse(readFileSync(path.join(EXAMPLES, name, '.claude', 'driver', 'plan.json'), 'utf8'));
+}
+
+/** Same data, every object key order reversed (arrays keep their order unless `arrays`). */
+export function shuffleKeys<T>(v: T, arrays = false): T {
+  if (Array.isArray(v)) {
+    const m = v.map((x) => shuffleKeys(x, arrays));
+    return (arrays ? m.reverse() : m) as T;
+  }
+  if (v !== null && typeof v === 'object')
+    return Object.fromEntries(Object.entries(v).reverse().map(([k, x]) => [k, shuffleKeys(x, arrays)])) as T;
+  return v;
+}

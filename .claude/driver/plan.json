@@ -1,0 +1,346 @@
+{
+  "baseline": 1,
+  "baselines": [
+    {
+      "added": [
+        "B-001",
+        "B-002",
+        "B-003",
+        "B-004",
+        "B-005",
+        "B-006",
+        "B-007",
+        "B-008",
+        "B-009",
+        "B-010",
+        "B-011",
+        "B-012"
+      ],
+      "at": "2026-10-28T04:19:33.563Z",
+      "changed": [],
+      "decision": "D-001",
+      "n": 1,
+      "reason": "Gate 1: route approved",
+      "reqAdded": [
+        "R-001",
+        "R-002",
+        "R-003",
+        "R-004",
+        "R-005",
+        "R-006"
+      ],
+      "reqRetired": [],
+      "retired": []
+    }
+  ],
+  "blocks": {
+    "B-001": {
+      "artifacts": [
+        "docs/vision/definicao-inicial.md",
+        "docs/research/skills-landscape.md",
+        "docs/research/01-process-skills.md",
+        "docs/research/02-domain-packs.md",
+        "docs/research/03-plugin-infra.md"
+      ],
+      "dependsOn": [],
+      "phase": "discover",
+      "requirements": [
+        "R-001",
+        "R-005",
+        "R-006"
+      ],
+      "status": "done",
+      "statusBy": {
+        "id": "main",
+        "kind": "model"
+      },
+      "statusSince": "2026-10-28T03:38:07.766Z",
+      "tests": [],
+      "title": "Definição inicial e pesquisa de landscape",
+      "verification": {
+        "at": "2026-10-28T03:38:07.669Z",
+        "by": {
+          "id": "main",
+          "kind": "model"
+        },
+        "passes": true
+      }
+    },
+    "B-002": {
+      "artifacts": [],
+      "dependsOn": [
+        "B-001"
+      ],
+      "phase": "route",
+      "requirements": [
+        "R-001"
+      ],
+      "status": "not_started",
+      "statusBy": {
+        "id": "main",
+        "kind": "model"
+      },
+      "statusSince": "2026-10-28T03:37:47.267Z",
+      "tests": [],
+      "title": "ADRs 001 a 011 e planos aprovados"
+    },
+    "B-003": {
+      "artifacts": [],
+      "dependsOn": [
+        "B-002"
+      ],
+      "phase": "implement",
+      "requirements": [
+        "R-002",
+        "R-004"
+      ],
+      "status": "not_started",
+      "statusBy": {
+        "id": "main",
+        "kind": "model"
+      },
+      "statusSince": "2026-10-28T03:37:47.360Z",
+      "tests": [],
+      "title": "plan.json v1: schema, CLI, hooks, exemplos"
+    },
+    "B-004": {
+      "artifacts": [],
+      "dependsOn": [
+        "B-003"
+      ],
+      "phase": "implement",
+      "requirements": [
+        "R-003",
+        "R-004"
+      ],
+      "status": "not_started",
+      "statusBy": {
+        "id": "main",
+        "kind": "model"
+      },
+      "statusSince": "2026-10-28T03:37:47.454Z",
+      "tests": [],
+      "title": "Mod do diagrama vivo"
+    },
+    "B-005": {
+      "artifacts": [],
+      "dependsOn": [
+        "B-004"
+      ],
+      "phase": "implement",
+      "requirements": [
+        "R-001",
+        "R-005"
+      ],
+      "status": "not_started",
+      "statusBy": {
+        "id": "main",
+        "kind": "model"
+      },
+      "statusSince": "2026-10-28T03:37:47.546Z",
+      "tests": [],
+      "title": "Skills Discover e Route"
+    },
+    "B-006": {
+      "artifacts": [],
+      "dependsOn": [
+        "B-005"
+      ],
+      "phase": "implement",
+      "requirements": [
+        "R-001"
+      ],
+      "status": "not_started",
+      "statusBy": {
+        "id": "main",
+        "kind": "model"
+      },
+      "statusSince": "2026-10-28T03:37:47.639Z",
+      "tests": [],
+      "title": "Skills Implement, Validate, Evolve e Release"
+    },
+    "B-007": {
+      "artifacts": [],
+      "dependsOn": [
+        "B-006"
+      ],
+      "phase": "implement",
+      "requirements": [
+        "R-006"
+      ],
+      "status": "not_started",
+      "statusBy": {
+        "id": "main",
+        "kind": "model"
+      },
+      "statusSince": "2026-10-28T03:37:47.736Z",
+      "tests": [],
+      "title": "Primeiro pack de domínio (driver-web)"
+    },
+    "B-008": {
+      "artifacts": [],
+      "dependsOn": [
+        "B-005"
+      ],
+      "phase": "validate",
+      "requirements": [
+        "R-001",
+        "R-003"
+      ],
+      "status": "not_started",
+      "statusBy": {
+        "id": "main",
+        "kind": "model"
+      },
+      "statusSince": "2026-10-28T03:37:47.832Z",
+      "tests": [],
+      "title": "Dogfooding: DRIVER planejando o próprio DRIVER"
+    },
+    "B-009": {
+      "artifacts": [],
+      "dependsOn": [
+        "B-007",
+        "B-008"
+      ],
+      "phase": "validate",
+      "requirements": [
+        "R-004"
+      ],
+      "status": "not_started",
+      "statusBy": {
+        "id": "main",
+        "kind": "model"
+      },
+      "statusSince": "2026-10-28T03:37:47.928Z",
+      "tests": [],
+      "title": "Revisões adversariais e testes de ponta a ponta"
+    },
+    "B-010": {
+      "artifacts": [],
+      "dependsOn": [
+        "B-009"
+      ],
+      "phase": "evolve",
+      "requirements": [
+        "R-001"
+      ],
+      "status": "not_started",
+      "statusBy": {
+        "id": "main",
+        "kind": "model"
+      },
+      "statusSince": "2026-10-28T03:37:48.026Z",
+      "tests": [],
+      "title": "Retrospectiva e re-baseline antes de publicar"
+    },
+    "B-011": {
+      "artifacts": [],
+      "dependsOn": [
+        "B-010"
+      ],
+      "phase": "release",
+      "requirements": [
+        "R-001"
+      ],
+      "status": "not_started",
+      "statusBy": {
+        "id": "main",
+        "kind": "model"
+      },
+      "statusSince": "2026-10-28T03:37:48.123Z",
+      "tests": [],
+      "title": "Publicar marketplace e tags de versão"
+    },
+    "B-012": {
+      "artifacts": [],
+      "dependsOn": [
+        "B-001"
+      ],
+      "owner": "main",
+      "phase": "discover",
+      "requirements": [
+        "R-001",
+        "R-004"
+      ],
+      "status": "in_progress",
+      "statusBy": {
+        "id": "main",
+        "kind": "model"
+      },
+      "statusSince": "2026-10-28T04:17:57.984Z",
+      "tests": [],
+      "title": "Revisão do entendimento com o Diogo (Gate 1)"
+    }
+  },
+  "currentPhase": "discover",
+  "decisions": {
+    "D-001": {
+      "at": "2026-10-28T04:19:33.563Z",
+      "by": {
+        "id": "Diogo Martins",
+        "kind": "user"
+      },
+      "title": "Gate 1: route approved"
+    }
+  },
+  "gates": {
+    "release": {
+      "approved": false
+    },
+    "route": {
+      "approved": true,
+      "approvedAt": "2026-10-28T04:19:33.563Z",
+      "approvedBy": "Diogo Martins",
+      "approvedTicket": "3f2e65dd369f1ae768ebab9ba346925a4dbc67a35f5a3b8e6001aacf370c2b06",
+      "approvedVia": "mod",
+      "atBaseline": 1
+    }
+  },
+  "nextId": {
+    "B": 13,
+    "D": 2,
+    "R": 7,
+    "REL": 1
+  },
+  "project": {
+    "createdAt": "2026-10-28T03:37:46.523Z",
+    "name": "DRIVER",
+    "packs": []
+  },
+  "releases": [],
+  "requirements": {
+    "R-001": {
+      "kind": "functional",
+      "source": "user",
+      "title": "Impor o método DRIVER a qualquer projeto via plugin de Claude Code"
+    },
+    "R-002": {
+      "kind": "functional",
+      "source": "user",
+      "title": "Grafo de plano versionado em .claude/driver/plan.json como fonte de verdade"
+    },
+    "R-003": {
+      "kind": "functional",
+      "source": "user",
+      "title": "Diagrama vivo ao lado do chat (SVG no Desktop, texto no terminal)"
+    },
+    "R-004": {
+      "kind": "constraint",
+      "source": "user",
+      "title": "Dois gates humanos que o modelo não consegue aprovar"
+    },
+    "R-005": {
+      "kind": "constraint",
+      "source": "user",
+      "title": "Compor skills existentes pinadas em vez de reescrevê-las"
+    },
+    "R-006": {
+      "kind": "functional",
+      "source": "user",
+      "title": "Packs por domínio sugerem a stack ideal sob demanda"
+    }
+  },
+  "revision": 25,
+  "schemaVersion": 1,
+  "updatedAt": "2026-10-28T04:19:33.563Z"
+}

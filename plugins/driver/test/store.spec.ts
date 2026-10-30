@@ -35,9 +35,9 @@ const add = (dir: string, title = 'A') =>
 describe('initDriverDir', () => {
   it('creates the layout', () => {
     const dir = setup();
-    for (const d of ['blocks', 'requirements', 'decisions', 'discover', 'exports', 'log'])
+    for (const d of ['blocks', 'requirements', 'decisions', 'discover', 'exports', 'log', '.mod'])
       expect(existsSync(path.join(dir, d))).toBe(true);
-    expect(readFileSync(path.join(dir, '.gitignore'), 'utf8')).toBe('exports/\n.lock/\n.tmp/\n');
+    expect(readFileSync(path.join(dir, '.gitignore'), 'utf8')).toBe('exports/\n.lock/\n.tmp/\n.mod/\n');
     expect(readFileSync(path.join(dir, '.gitattributes'), 'utf8')).toBe('events.jsonl merge=union\n');
     expect(readFileSync(path.join(dir, 'events.jsonl'), 'utf8')).toBe('');
     expect(readFileSync(path.join(dir, 'plan.json'), 'utf8')).toBe(serializePlan(emptyPlan('demo', ['p'], NOW)));

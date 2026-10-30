@@ -1,0 +1,25 @@
+{"seq":1,"ts":"2026-10-28T03:37:46.614Z","revision":1,"actor":{"kind":"model","id":"main"},"type":"req.add","data":{"id":"R-001","title":"Impor o método DRIVER a qualquer projeto via plugin de Claude Code"}}
+{"seq":2,"ts":"2026-10-28T03:37:46.707Z","revision":2,"actor":{"kind":"model","id":"main"},"type":"req.add","data":{"id":"R-002","title":"Grafo de plano versionado em .claude/driver/plan.json como fonte de verdade"}}
+{"seq":3,"ts":"2026-10-28T03:37:46.797Z","revision":3,"actor":{"kind":"model","id":"main"},"type":"req.add","data":{"id":"R-003","title":"Diagrama vivo ao lado do chat (SVG no Desktop, texto no terminal)"}}
+{"seq":4,"ts":"2026-10-28T03:37:46.890Z","revision":4,"actor":{"kind":"model","id":"main"},"type":"req.add","data":{"id":"R-004","title":"Dois gates humanos que o modelo não consegue aprovar"}}
+{"seq":5,"ts":"2026-10-28T03:37:46.982Z","revision":5,"actor":{"kind":"model","id":"main"},"type":"req.add","data":{"id":"R-005","title":"Compor skills existentes pinadas em vez de reescrevê-las"}}
+{"seq":6,"ts":"2026-10-28T03:37:47.076Z","revision":6,"actor":{"kind":"model","id":"main"},"type":"req.add","data":{"id":"R-006","title":"Packs por domínio sugerem a stack ideal sob demanda"}}
+{"seq":7,"ts":"2026-10-28T03:37:47.169Z","revision":7,"actor":{"kind":"model","id":"main"},"type":"block.add","block":"B-001","data":{"phase":"discover","title":"Definição inicial e pesquisa de landscape"}}
+{"seq":8,"ts":"2026-10-28T03:37:47.267Z","revision":8,"actor":{"kind":"model","id":"main"},"type":"block.add","block":"B-002","data":{"phase":"route","title":"ADRs 001 a 011 e planos aprovados"}}
+{"seq":9,"ts":"2026-10-28T03:37:47.360Z","revision":9,"actor":{"kind":"model","id":"main"},"type":"block.add","block":"B-003","data":{"phase":"implement","title":"plan.json v1: schema, CLI, hooks, exemplos"}}
+{"seq":10,"ts":"2026-10-28T03:37:47.454Z","revision":10,"actor":{"kind":"model","id":"main"},"type":"block.add","block":"B-004","data":{"phase":"implement","title":"Mod do diagrama vivo"}}
+{"seq":11,"ts":"2026-10-28T03:37:47.546Z","revision":11,"actor":{"kind":"model","id":"main"},"type":"block.add","block":"B-005","data":{"phase":"implement","title":"Skills Discover e Route"}}
+{"seq":12,"ts":"2026-10-28T03:37:47.639Z","revision":12,"actor":{"kind":"model","id":"main"},"type":"block.add","block":"B-006","data":{"phase":"implement","title":"Skills Implement, Validate, Evolve e Release"}}
+{"seq":13,"ts":"2026-10-28T03:37:47.736Z","revision":13,"actor":{"kind":"model","id":"main"},"type":"block.add","block":"B-007","data":{"phase":"implement","title":"Primeiro pack de domínio (driver-web)"}}
+{"seq":14,"ts":"2026-10-28T03:37:47.832Z","revision":14,"actor":{"kind":"model","id":"main"},"type":"block.add","block":"B-008","data":{"phase":"validate","title":"Dogfooding: DRIVER planejando o próprio DRIVER"}}
+{"seq":15,"ts":"2026-10-28T03:37:47.928Z","revision":15,"actor":{"kind":"model","id":"main"},"type":"block.add","block":"B-009","data":{"phase":"validate","title":"Revisões adversariais e testes de ponta a ponta"}}
+{"seq":16,"ts":"2026-10-28T03:37:48.026Z","revision":16,"actor":{"kind":"model","id":"main"},"type":"block.add","block":"B-010","data":{"phase":"evolve","title":"Retrospectiva e re-baseline antes de publicar"}}
+{"seq":17,"ts":"2026-10-28T03:37:48.123Z","revision":17,"actor":{"kind":"model","id":"main"},"type":"block.add","block":"B-011","data":{"phase":"release","title":"Publicar marketplace e tags de versão"}}
+{"seq":18,"ts":"2026-10-28T03:38:07.352Z","revision":18,"actor":{"kind":"model","id":"main"},"type":"block.status","block":"B-001","from":"not_started","to":"in_progress"}
+{"seq":19,"ts":"2026-10-28T03:38:07.446Z","revision":19,"actor":{"kind":"model","id":"main"},"type":"block.set","block":"B-001","data":{"fields":["artifacts"]}}
+{"seq":20,"ts":"2026-10-28T03:38:07.570Z","revision":20,"actor":{"kind":"model","id":"main"},"type":"block.status","block":"B-001","from":"in_progress","to":"in_review"}
+{"seq":21,"ts":"2026-10-28T03:38:07.669Z","revision":21,"actor":{"kind":"model","id":"main"},"type":"block.set","block":"B-001","data":{"fields":["verification"]}}
+{"seq":22,"ts":"2026-10-28T03:38:07.766Z","revision":22,"actor":{"kind":"model","id":"main"},"type":"block.status","block":"B-001","from":"in_review","to":"done"}
+{"seq":23,"ts":"2026-10-28T04:17:53.968Z","revision":23,"actor":{"kind":"model","id":"main"},"type":"block.add","block":"B-012","data":{"phase":"discover","title":"Revisão do entendimento com o Diogo (Gate 1)"}}
+{"seq":24,"ts":"2026-10-28T04:17:57.984Z","revision":24,"actor":{"kind":"model","id":"main"},"type":"block.status","block":"B-012","from":"not_started","to":"in_progress"}
+{"seq":25,"ts":"2026-10-28T04:19:33.563Z","revision":25,"actor":{"kind":"user","id":"Diogo Martins"},"type":"gate.approve","data":{"baseline":1,"decision":"D-001","gate":"route","ticket":"3f2e65dd369f1ae768ebab9ba346925a4dbc67a35f5a3b8e6001aacf370c2b06","via":"mod"}}

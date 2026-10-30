@@ -3,7 +3,7 @@
 Plugin de Claude Code que impõe o método DRIVER (Discover · Route · Implement · Validate · Evolve · Release) a qualquer projeto, com plano em grafo de blocos e diagrama vivo.
 
 ## Estado
-Formato do `plan.json` v1 decidido (ADR-010) e em implementação em `plugins/driver` (schema zod, validador, CLI, hooks, exemplos). Depois: mod do diagrama, skills Discover e Route.
+`plan.json` v1 implementado e commitado (ADR-010). Mod do diagrama vivo implementado e aprovado visualmente em 2026-10-29 (ADR-011): `src/shared`, CLI de apoio, `mod/` com SVG vertical no Desktop; tudo ainda sem commit. Pendências: PER-619 (falso positivo do guard). Depois: skills Discover e Route.
 
 ## Leia antes de tocar
 - Guardrails (tabela "antes de tocar em X, leia Y"): `.claude/GUARDRAILS.md`
@@ -15,8 +15,10 @@ Formato do `plan.json` v1 decidido (ADR-010) e em implementação em `plugins/dr
 - Documento original da ideia: `docs/vision/definicao-inicial.md`
 
 ## Comandos
-- `cd plugins/driver && npm test` · `npm run typecheck` · `npm run build` (gera `dist/cli.js`, commitado)
-- `claude plugin validate .` na raiz após mexer em manifestos
+- `cd plugins/driver && npm test` (vitest, `*.spec.ts`) · `npm run typecheck` · `npm run build` (gera `dist/cli.js`, commitado)
+- `claude plugin test plugins/driver` (testes do mod, `mod/test/*.test.tsx`) · `tsc -p plugins/driver` (typecheck do mod, após o engine gerar `.claude-plugin/types`)
+- `claude plugin validate .` na raiz após mexer em manifestos ou no `hooks.json`
+- Regra dura: `src/shared/` não importa nada fora de si (nem zod, nem `node:*`); o mod só importa de lá
 
 ## Convenções
 - Português brasileiro nos docs. Código em inglês. Nomes de fases e de packs em inglês. Relatórios brutos de pesquisa podem ficar em inglês.

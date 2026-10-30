@@ -1,8 +1,9 @@
 {
+  "modules": ["../mod/index.tsx"],
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Agent|Task|Workflow",
+        "matcher": "Agent|Task|Workflow|SendMessage",
         "hooks": [
           { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/gate-check.sh\"", "timeout": 10 }
         ]

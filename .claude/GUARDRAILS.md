@@ -18,7 +18,8 @@ Use esta tabela como checklist. Antes de modificar um arquivo que se encaixe num
 | `src/state-machine.ts`, `src/reducer.ts` | `DECISIONS.md` (ADR-010 itens 3 e 4) | transições e revogação de gates são regras de método, não detalhe de código |
 | `src/store.ts`, qualquer escrita em `.claude/driver/` | `DECISIONS.md` (ADR-010 item 5), `ARCHITECTURE.md` | escritor único, lock, raiz no worktree principal |
 | `hooks/**` | `docs/research/03-plugin-infra.md` §3, `DECISIONS.md` (ADR-009, ADR-010 item 11) | gate por hook é a única garantia real; aprovação nunca pode vir do modelo |
-| `mods/**` | `docs/research/03-plugin-infra.md` §2, `ARCHITECTURE.md` | API early access; `Svg` só Desktop/VS Code; sem `fs.watch` |
+| `plugins/driver/mod/**`, `types/index.d.ts` | `DECISIONS.md` (ADR-011), `docs/research/05-mod-design.md`, `docs/research/03-plugin-infra.md` §2 | sem Node/DOM no mod; só importar `src/shared`; render nunca escreve estado; aprovação só por origem `composer`/`ui.press` + ticket |
+| `plugins/driver/src/shared/**` | `DECISIONS.md` (ADR-011 item 2) | sem dependências (nem zod, nem `node:*`): o mod importa daqui; mudança de layout/SVG tem golden test |
 | `skills/**` | `docs/research/skills-landscape.md` §2, `DECISIONS.md` (ADR-003, ADR-008) | compor skills pinadas, não reescrever; proporcionalidade de cerimônia |
 | `plugins/driver-*/` (packs) | `DECISIONS.md` (ADR-004, ADR-005), `docs/research/02-domain-packs.md` | core não conhece provedores; dados do pack em `ext` |
 | `.claude-plugin/*.json`, `package.json` | `STACK.md`, `DECISIONS.md` (ADR-003) | versões pinadas; `claude plugin validate` após editar |

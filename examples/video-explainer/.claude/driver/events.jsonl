@@ -10,6 +10,6 @@
 {"seq":10,"ts":"2026-10-24T10:00:00Z","revision":10,"actor":{"kind":"model","id":"orchestrator"},"type":"block.status","block":"B-001","from":"in_progress","to":"in_review"}
 {"seq":11,"ts":"2026-10-24T10:00:00Z","revision":11,"actor":{"kind":"user","id":"diogo"},"type":"block.set","block":"B-001","data":{"fields":["verification"]}}
 {"seq":12,"ts":"2026-10-24T10:00:00Z","revision":12,"actor":{"kind":"model","id":"orchestrator"},"type":"block.status","block":"B-001","from":"in_review","to":"done"}
-{"seq":13,"ts":"2026-10-24T11:00:00Z","revision":13,"actor":{"kind":"user","id":"diogo"},"type":"gate.approve","data":{"baseline":1,"decision":"D-001","gate":"route"}}
+{"seq":13,"ts":"2026-10-24T11:00:00Z","revision":13,"actor":{"kind":"user","id":"diogo"},"type":"gate.approve","data":{"baseline":1,"decision":"D-001","gate":"route","via":"tty"}}
 {"seq":14,"ts":"2026-10-24T11:00:00Z","revision":14,"actor":{"kind":"model","id":"orchestrator"},"type":"phase.change","from":"discover","to":"route"}
 {"seq":15,"ts":"2026-10-24T11:00:00Z","revision":15,"actor":{"kind":"model","id":"orchestrator"},"type":"block.status","block":"B-002","from":"not_started","to":"in_progress"}

@@ -27,7 +27,10 @@ export class LockTimeoutError extends Error {
 }
 
 export class RevisionConflictError extends Error {
-  constructor(expected: number, actual: number) {
+  constructor(
+    readonly expected: number,
+    readonly actual: number,
+  ) {
     super(`expected revision ${expected} but plan is at ${actual}`);
     this.name = 'RevisionConflictError';
   }
@@ -359,15 +362,95 @@ export function mutate(driverDir: string, op: Op, ctx: OpContext, opts: MutateOp
   });
 }
 
+export interface MutateManyResult {
+  plan: PlanV1;
+  events: Event[];
+  created: string[];
+}
+
+/** A batch op failed; nothing was written. */
+export class BatchError extends Error {
+  constructor(
+    readonly index: number,
+    readonly cause: Error,
+  ) {
+    super(`op ${index}: ${cause.message}`);
+    this.name = 'BatchError';
+  }
+}
+
+const REF = /^\$(\d+)$/;
+
+/** Replaces every string that is exactly "$n" with the n-th id created so far in the batch. */
+function resolveRefs<T>(v: T, created: string[]): T {
+  if (typeof v === 'string') {
+    const m = REF.exec(v);
+    if (!m) return v;
+    const id = created[Number(m[1])];
+    if (id === undefined) throw new OpRefusedError(`reference ${v} points at an id not created yet (${created.length} created so far)`);
+    return id as T;
+  }
+  if (Array.isArray(v)) return v.map((x) => resolveRefs(x, created)) as T;
+  if (v !== null && typeof v === 'object')
+    return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, resolveRefs(x, created)])) as T;
+  return v;
+}
+
+/**
+ * Applies the ops in order under one lock: one validation per step, one revision bump, one
+ * plan write, one event per emitted event. Any failure leaves every file untouched.
+ */
+export function mutateMany(driverDir: string, ops: Op[], ctx: OpContext, opts: MutateOptions = {}): MutateManyResult {
+  return withLock(driverDir, () => {
+    const current = readPlan(driverDir);
+    if (opts.expectedRevision !== undefined && current.revision !== opts.expectedRevision)
+      throw new RevisionConflictError(opts.expectedRevision, current.revision);
+    let working = current;
+    const created: string[] = [];
+    const events: Event[] = [];
+    const docs: { op: Op; id: string }[] = [];
+    ops.forEach((raw, index) => {
+      try {
+        const op = resolveRefs(raw, created);
+        if (op.type === 'release.add' || op.type === 'renumber') throw new OpRefusedError(`${op.type} cannot run in a batch`, true);
+        if (
+          op.type === 'block.status' &&
+          op.to === 'in_review' &&
+          working.blocks[op.id]?.status === 'in_progress' &&
+          !(op.force && ctx.actor.kind === 'user')
+        )
+          checkHandoff(driverDir, op.id);
+        const r = applyOp(working, op, ctx);
+        working = r.plan;
+        events.push(...r.events);
+        if (r.created) {
+          created.push(r.created);
+          docs.push({ op, id: r.created });
+        }
+      } catch (e) {
+        throw new BatchError(index, e as Error);
+      }
+    });
+    const plan: PlanV1 = { ...working, revision: current.revision + 1 };
+    for (const d of docs) writeDocs(driverDir, d.op, d.id, plan, opts);
+    writePlan(driverDir, plan);
+    const written = appendEvents(
+      driverDir,
+      events.map((e) => ({ ...e, revision: plan.revision })),
+    );
+    return { plan, events: written, created };
+  });
+}
+
 export function initDriverDir(driverDir: string, name: string, packs: string[], now: string): PlanV1 {
   if (existsSync(path.join(driverDir, 'plan.json'))) throw new Error(`${driverDir}/plan.json already exists`);
-  for (const d of ['blocks', 'requirements', 'decisions', 'discover', 'exports', 'log']) {
+  for (const d of ['blocks', 'requirements', 'decisions', 'discover', 'exports', 'log', '.mod']) {
     mkdirSync(path.join(driverDir, d), { recursive: true });
-    // exports/ is gitignored; keep the other empty dirs alive in git
-    if (d !== 'exports') writeNew(path.join(driverDir, d, '.gitkeep'), '');
+    // exports/ and .mod/ are gitignored; keep the other empty dirs alive in git
+    if (d !== 'exports' && d !== '.mod') writeNew(path.join(driverDir, d, '.gitkeep'), '');
   }
   const plan = emptyPlan(name, packs, now);
-  writeNew(path.join(driverDir, '.gitignore'), 'exports/\n.lock/\n.tmp/\n');
+  writeNew(path.join(driverDir, '.gitignore'), 'exports/\n.lock/\n.tmp/\n.mod/\n');
   writeNew(path.join(driverDir, '.gitattributes'), 'events.jsonl merge=union\n');
   writeNew(path.join(driverDir, 'events.jsonl'), '');
   writePlan(driverDir, plan);
