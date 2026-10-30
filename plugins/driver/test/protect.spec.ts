@@ -64,6 +64,12 @@ describe('normalizeCommand', () => {
   it('drops quotes and backslashes, collapses whitespace and path noise', () => {
     expect(normalizeCommand(`  echo  "a"\\b   .claude/./driver//plan.json `)).toBe('echo ab .claude/driver/plan.json');
   });
+  it('ends a command at a line break outside quotes, drops comments, keeps quoted and continued lines together', () => {
+    expect(normalizeCommand('a # it\'s a comment\nb')).toBe('a ; b');
+    expect(normalizeCommand('echo "x\ny" && ls')).toBe('echo x y && ls');
+    expect(normalizeCommand('a \\\n  b')).toBe('a b');
+    expect(normalizeCommand('echo $(( 1 << 2 ))\nls')).toBe('echo $(( 1 << 2 )) ; ls');
+  });
 });
 
 describe('protectCommand', () => {
@@ -107,8 +113,6 @@ describe('protectCommand', () => {
     'truncate -s 0 .claude/driver/events.jsonl',
     'cd .claude/driver && echo {} > plan.json',
     'cd .claude/driver && cp /tmp/x plan.json',
-    `node -e "require('fs').writeFileSync('.claude/driver/plan.json','{}')"`,
-    `python3 -c "open('.claude/driver/plan.json','w').write('{}')"`,
     'git checkout -- .claude/driver/plan.json',
     'git restore .claude/driver/plan.json',
     'jq . x | sponge .claude/driver/plan.json',
@@ -118,7 +122,6 @@ describe('protectCommand', () => {
     'echo {} > ".claude/driver"/plan.json',
     'echo {} > .claude/dri\\ver/plan.json',
     'rm .claude/driver/log/REL-1.jsonl',
-    'perl -e 1 .claude/driver/plan.json',
     // new in this step
     'echo {} > .Claude/Driver/plan.json',
     'rm -f .CLAUDE/driver/events.jsonl',
@@ -153,6 +156,241 @@ describe('protectCommand', () => {
     'echo x > .mod/ticket.json',
   ])('files: %s', (c) => {
     expect(protectCommand(c)).toMatch(/written only by the driver CLI/);
+  });
+
+  it.each([
+    `node -e "require('fs').writeFileSync('.claude/driver/plan.json','{}')"`,
+    `python3 -c "open('.claude/driver/plan.json','w').write('{}')"`,
+    'perl -e 1 .claude/driver/plan.json',
+    // PER-619: a heredoc read by an interpreter is the same inline script
+    `python3 - <<'EOF'\nopen('.claude/driver/plan.json','w').write('{}')\nEOF`,
+    `node - <<EOF\nrequire('fs').unlinkSync('.claude/driver/events.jsonl')\nEOF`,
+    `cd .claude/driver && python3 - <<'EOF'\nprint(1)\nEOF`,
+    `cat <<'EOF' | node -\nfs.writeFileSync('plan.json', '{}')\nEOF`,
+  ])('inline script: %s', (c) => {
+    expect(protectCommand(c)).toMatch(/inline script mentions/);
+  });
+
+  // PER-619: `$`, backticks and parens are only suspicious where they stand for a command
+  it.each([
+    '$CMD $ARGS',
+    '`which driver` status',
+    '$(cat /tmp/c)',
+    'cd x && ${D} status',
+    // code handed to a shell must be readable here
+    'X=1; eval "$X"',
+    'bash -c "$CMD"',
+    `eval "$(cat <<'EOF'\necho hi\nEOF\n)"`,
+    `eval "$(cat <<'EOF'\ndriver gate approve route\nEOF\n)"`,
+    // the loop runs each body line: `$l` is an opaque command
+    `while read l; do $l; done <<'EOF'\ndriver gate approve route\nEOF`,
+  ])('opaque command name: %s', (c) => {
+    expect(protectCommand(c)).toMatch(/cannot be checked/);
+  });
+
+  it.each([
+    '(driver rebaseline --reason x)',
+    '( driver gate approve route )',
+    '{ driver gate approve route; }',
+    '$(cat cmd) gate approve route',
+    'driver block status B-003 done $(echo --force)',
+    // heredoc bodies a shell runs
+    `bash <<'EOF'\ndriver gate approve route\nEOF`,
+    `cat <<'EOF' | bash\ndriver rebaseline --reason x\nEOF`,
+    `zsh -s <<EOF\ncd plugins/driver/dist && node cli.js gate approve route\nEOF`,
+    // the shell expands substitutions in an unquoted body before the command reads it
+    `cat <<EOF\n$(driver gate approve route)\nEOF`,
+    'cat <<EOF\n`driver rebaseline --reason x`\nEOF',
+    // xargs makes the body the arguments of the wrapped command
+    `xargs driver <<'EOF'\ngate approve route\nEOF`,
+    `echo x | xargs node dist/cli.js <<'EOF'\nblock status B-001 done --force\nEOF`,
+    // a `<<` inside quotes or a comment opens nothing: the next lines are still commands
+    `echo "x <<EOF"\ndriver gate approve route`,
+    `true # <<EOF\ndriver gate approve route`,
+    `echo \\<<EOF\ndriver gate approve route`,
+    // a new line is a new command, and a heredoc hides only its own body
+    'echo hi\ndriver gate approve route',
+    `cat <<'EOF'\nhello\nEOF\ndriver gate approve route`,
+    'driver gate \\\n approve route',
+    `bash <<'EOF'\necho hi\ndriver gate approve route\nEOF`,
+    // things that look like heredoc openers but are not, so the next line is still a command
+    'echo $(( 1 << 2 ))\ndriver gate approve route',
+    '(( x = 1 << 3 ))\ndriver gate approve route',
+    'echo "a\nb <<EOF"\ndriver gate approve route',
+    "# it's\ndriver gate approve route",
+    // the delimiter is read with quote removal, like bash does
+    `cat <<E"OF"\nx\nEOF\ndriver gate approve route`,
+    `cat <<EO\\F\nx\nEOF\ndriver gate approve route`,
+    // bodies that end up executed
+    `exec 3<<'EOF'\ndriver gate approve route\nEOF\nbash <&3`,
+    `source /dev/stdin <<'EOF'\ndriver gate approve route\nEOF`,
+    `while read a b c; do driver $a $b $c; done <<'EOF'\ngate approve route\nEOF`,
+    // keywords in front of the command
+    'if true; then driver gate approve route; fi',
+    '! driver rebaseline --reason x',
+    'until false; do driver gate approve route; done',
+    'driver gate --via"-"mod approve route',
+    // second review: comments, continued lines, delimiters, readers
+    'echo a\\ #; driver gate approve route',
+    'echo ${x// #/} && driver gate approve route',
+    `cat <<'EOF' \\\n| bash\ndriver gate approve route\nEOF`,
+    `cat <<'EOF' |\ndriver gate approve route\nEOF\nbash`,
+    `cat <<"E\\OF"\nx\nE\\OF\ndriver gate approve route`,
+    `cat <<$'EOF'\nx\nEOF\ndriver gate approve route`,
+    `x=$(cat <<'EOF'\nhi\nEOF)\ndriver gate approve route`,
+    'echo ${x:-<<EOF}\ndriver gate approve route',
+    'echo $[x<<y]\ndriver gate approve route',
+    'for((i=0;i<x<<y;i++)); do :; done\ndriver gate approve route',
+    "echo $'a\\'b'\ndriver gate approve route",
+    `tee >(bash) <<'EOF'\ndriver gate approve route\nEOF`,
+    `cat <<'EOF' > >(sh)\ndriver gate approve route\nEOF`,
+    `parallel <<'EOF'\ndriver gate approve route\nEOF`,
+    `python3 - <<-'EOF'\n\tprint(1)\n\tEOF\ndriver gate approve route`,
+    `cat <<'A' <<B\nx\nA\n$(driver gate approve route)\nB`,
+    // substitutions in argument position run too
+    'echo $(driver gate approve route)',
+    'x=`driver rebaseline --reason x`',
+    // wrappers with options, case patterns, functions, case-insensitive names
+    'sudo -E driver gate approve route',
+    'env -i PATH=/x driver gate approve route',
+    'nice -n 5 driver gate approve route',
+    'timeout 9 node dist/cli.js gate approve route',
+    'case x in x) driver gate approve route;; esac',
+    'f() { driver gate approve route; }; f',
+    'function f { driver gate approve route; }',
+    'Driver gate approve route',
+    // third pass: arithmetic after keywords and in subscripts, wrapper flags, case/function forms, process substitution
+    'while((x<<y)); do :; done\ndriver gate approve route',
+    'if((1)); then :; fi\ndriver gate approve route',
+    'a[1<<2]=3\ndriver gate approve route',
+    'env -i driver gate approve route',
+    'exec -a x driver gate approve route',
+    'case x in (x) driver gate approve route;; esac',
+    'f(){ driver gate approve route;}; f',
+    'f() (driver gate approve route)',
+    'echo <(driver gate approve route)',
+    'cat >(driver gate approve route)',
+    "echo ${x:-'}'}\ndriver gate approve route",
+    'bash -c "driver gate approve route"',
+    "sh -c 'driver rebaseline --reason x'",
+    // fourth pass: quoted code reaching a shell, and `[` or `[[` as plain arguments
+    "find . -exec sh -c 'true; driver gate approve route' \\;",
+    "su -c 'true; driver gate approve route'",
+    "watch 'true; driver gate approve route'",
+    "git -c alias.x='!true; driver gate approve route' x",
+    "printf '%s\\n' 'true; driver gate approve route' | sh",
+    "echo 'true; driver gate approve route' > /dev/stdin | bash",
+    "bash -lc 'true; driver gate approve route'",
+    'echo a[ ; driver gate approve route',
+    'echo x[1; driver gate approve route',
+    'echo [[ ; driver gate approve route',
+    'echo [[x; driver gate approve route',
+    'echo a[ && driver gate approve route',
+    'a[x]=1 driver gate approve route',
+    `echo "\${x:-'}"; driver gate approve route`,
+    // more things that run a quoted argument as code
+    "npx -c 'true; driver gate approve route'",
+    "npm exec -c 'true; driver gate approve route'",
+    "tmux new -d 'true; driver gate approve route'",
+    "make SHELL=sh -f /dev/null --eval 'x:; driver gate approve route' x",
+    "git -c core.sshCommand='true; driver gate approve route' fetch",
+    "printf 'true; driver gate approve route' | source /dev/stdin",
+  ])('user-only (parens, substitution, heredoc): %s', (c) => {
+    expect(protectCommand(c)).toMatch(/user-only/);
+  });
+
+  it.each([
+    `sh <<'EOF'\ncd .claude/driver && rm plan.json\nEOF`,
+    `tee .claude/driver/plan.json <<'EOF'\n{}\nEOF`,
+    `cat <<'EOF' > .claude/driver/plan.json\n{}\nEOF`,
+    `cat <<'EOF' >> .claude/driver/events.jsonl\n{}\nEOF`,
+    `cat <<EOF\n$(rm .claude/driver/plan.json)\nEOF`,
+    'echo a\\ #; rm .claude/driver/plan.json',
+    // a patch names what it rewrites; the cd context survives into a recursed body
+    `git apply <<'EOF'\n--- a/.claude/driver/plan.json\n+++ b/.claude/driver/plan.json\nEOF`,
+    `patch -p1 <<'EOF'\n--- a/.claude/driver/plan.json\n+++ b/.claude/driver/plan.json\nEOF`,
+    `cd .claude/driver && bash <<'EOF'\nrm -rf *\nEOF`,
+    // code handed to a shell is judged as the commands it is, separators inside the quotes included
+    'sh -c "cd .claude/driver; rm plan.json"',
+    "eval 'cd .claude/driver && rm plan.json'",
+  ])('files via heredoc: %s', (c) => {
+    expect(protectCommand(c)).toMatch(/written only by the driver CLI/);
+  });
+
+  it.each([
+    `python3 - <<'EOF'\nimport pty; pty.spawn(["bash"])\nEOF`,
+    `bash <<'EOF'\nscript -q /dev/null driver gate approve route\nEOF`,
+  ])('pty via heredoc: %s', (c) => {
+    expect(protectCommand(c)).toMatch(/pseudo-terminal/);
+  });
+
+  it.each([
+    // the PER-619 repro: code in a quoted heredoc is text, not commands
+    `python3 - <<'EOF'\nimport re\np = 'plugins/driver/test/rows.spec.ts'\ns = open(p).read()\ns = s.replace("a", "expect(rows[0]!.text).toMatch(/^↑ \\\\d+ more$/);")\nopen(p, 'w').write(s)\nEOF`,
+    `cat <<'EOF' > /tmp/x.ts\nexpect(rows[0]!.text).toMatch(/^↑ \\d+ more$/);\nconst s = \`\${a}\`;\nif (ok) { run(\$(x)); }\nEOF`,
+    `node - <<'EOF'\nconsole.log(process.env.HOME, \`\${1 + 1}\`)\nEOF`,
+    // an unquoted body is expanded, but these expansions run nothing of ours
+    `cat <<EOF > /tmp/notes.md\nHome: $HOME, date: $(date), see plan.json in the DRIVER repo\nEOF`,
+    // a quoted body is never expanded, so a substitution in it is text
+    `cat <<'EOF' > /tmp/x.sh\n$(driver gate approve route)\nEOF`,
+    `python3 - <<-'EOF'\n\tprint("gate approve is user-only")\n\tEOF\nls`,
+    // two heredocs on one line, bodies in order
+    `cat <<'A' <<'B'\n$(x)\nA\n\`y\`\nB`,
+    // here-strings are not heredocs
+    "driver apply --json <<< '{\"ops\":[]}'",
+    // the driver CLI may read protected names from its own stdin
+    `node plugins/driver/dist/cli.js apply --json <<'EOF'\n{"ops":[{"op":"block.add","title":"fix plan.json export"}]}\nEOF`,
+    // the commit-message idiom: a heredoc opened inside "$( … )" is still a heredoc, read by cat
+    `git commit -m "$(cat <<'EOF'\nfeat: gate approve via mod\n\n- driver rebaseline --reason x documented\nEOF\n)"`,
+    `git add . && git commit -m "$(cat <<'EOF'\nfeat: x\n\ndriver gate approve route is user-only now\nEOF\n)"`,
+    'echo "two\nlines" && ls',
+    // second review: arithmetic, literal single-quoted code, escapes in unquoted bodies
+    'if (( $x > 1 )); then echo big; fi',
+    '(( $# > 0 )) && echo ok',
+    "bash -c 'echo $HOME'",
+    "echo hi | xargs -I{} sh -c 'echo $0 {}'",
+    `x=$((1<<2)); cat <<'EOF' > f.sh\n$HOME stuff\nEOF`,
+    `cat <<EOF > f.txt\ncount: $(( $n + 1 ))\nEOF`,
+    `cat <<EOF | tee f.txt\n\\$HOME\nEOF`,
+    "echo '$(driver gate approve route)'",
+    'source ~/.nvm/nvm.sh',
+    'source $F',
+    // separators inside quotes, `[[ ]]`, `(( ))` and `${ }` do not split commands
+    'git commit -m "fix: guard; driver gate approve route is user-only"',
+    `echo "$(ls | grep -E '(a|b)$')"`,
+    '[[ $x =~ ^(a|b)$ ]] && echo y',
+    "grep -E 'a|(b)$' x.txt",
+    "sed -E 's/(foo|bar)$/x/' a.txt",
+    '(( a || b )) && echo z',
+    'echo ${x:-a|b}',
+    'env -i PATH=/x ls',
+    'diff <(ls a) <(ls b)',
+    'timeout 5 npm test',
+    // quoted blanks keep an argument whole; a quoted string is code only when something runs code
+    'git commit -m "feat: x; y and z"',
+    'driver block add "Fix gate approve copy" --phase discover',
+    "jq '.a | .b' x.json",
+    "awk -F'|' '{print $1}' x.csv",
+    'curl "https://x.test/a?b=1&c=2"',
+    'arr[0]=1; echo ${arr[0]}',
+    '[[ -f x ]] && echo ok',
+    "ssh host 'ls; pwd'",
+    // a quoted line break is not a new command (and a commit message is not a shell script)
+    'git commit -m "feat: x\n\n- driver gate approve route documented"',
+    // arithmetic shifts are not heredocs
+    'echo $(( 1 << 2 ))',
+    '(( x = 1 << 3 )); echo $x',
+    // a bare `$` in an argument of an ordinary command, or a heredoc read in a loop
+    `while read l; do echo "$l"; done <<'EOF'\ngate approve route\nEOF`,
+    'bash scripts/deploy.sh $ENV',
+    // parens and `$` in ordinary commands
+    'grep -E "^(esbuild|tsx)" plugins/driver/package.json',
+    '(cd plugins/driver && echo $HOME)',
+    'echo $(date) > /tmp/now',
+    'FOO=$(pwd); echo $FOO',
+    'git log --format="%h %s" | grep -E "fix\\(.*\\)"',
+  ])('allows (PER-619): %s', (c) => {
+    expect(protectCommand(c)).toBeNull();
   });
 
   it.each([

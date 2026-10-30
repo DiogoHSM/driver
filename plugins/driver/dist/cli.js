@@ -20015,6 +20015,8 @@ var MSG_FILES = 'DRIVER: plan.json, events.jsonl, log/*.jsonl and .mod/* are wri
 var MSG_PTY = "DRIVER: pseudo-terminal wrappers are not allowed; user-only actions must be run by the user in their own terminal";
 var MSG_GIT = "DRIVER: this git command can rewrite .claude/driver; use the driver CLI or ask the user.";
 var MSG_USER_ONLY = "DRIVER: gate approval, rebaseline and --force are user-only. Ask the user to run them in their own terminal.";
+var MSG_SUBST = "DRIVER: a command whose name comes from a substitution or a variable cannot be checked. Write the command literally.";
+var MSG_SCRIPT = "DRIVER: this inline script mentions .claude/driver files and the guard cannot tell whether it writes them. Use the Write/Edit tools or the driver CLI instead.";
 var PROTECTED_REL = /^(plan\.json|events\.jsonl|log\/.*|\.mod\/.*)$/;
 var PROTECTED_ABS = /(^|\/)\.claude\/driver\/(plan\.json|events\.jsonl|log\/.*|\.mod\/.*)$/;
 function normalizePath(p) {
@@ -20040,11 +20042,211 @@ function protectPath(filePath, opts = {}) {
   }
   return null;
 }
+var CODE = 0;
+var SQ = 1;
+var DQ = 2;
+var COMMENT = 3;
+var ARITH = 4;
+var ESC = 5;
+var PARAM = 6;
+var SUBCODE = 7;
+var TEST = 8;
+var isCode = (s) => s === CODE || s === SUBCODE;
+var SEP_BEFORE_COMMENT = /[\s;&|(]/;
+var ARITH_KEYWORD = /(^|\s)(for|while|until|if|elif)$/;
+var SEP_SWAP = { "|": "\uE001", ";": "\uE002", "&": "\uE003", " ": "\uE004", "	": "\uE004" };
+var SWAPPED = /[-]/;
+var restoreSeparators = (s) => s.replace(//g, "|").replace(//g, ";").replace(//g, "&").replace(//g, " ");
+var COMMAND_POSITION = /(^|[;&|({!]|\b(?:if|then|else|elif|while|until|do))\s*$/;
+var ShellScanner = class {
+  sq = false;
+  /** `$'…'`: a backslash escapes inside the single quotes. */
+  ansi = false;
+  dq = false;
+  subst = [];
+  /** Open parens of `$(( … ))` / `(( … ))`, or -1 while inside `$[ … ]` or a subscript `a[ … ]`. */
+  arith = 0;
+  param = 0;
+  /** The `${ … }` was opened inside double quotes, where a single quote is text. */
+  paramInDq = false;
+  test = false;
+  /** The last line ended with an unescaped backslash: the line break continues the command. */
+  continues = false;
+  get inQuotes() {
+    return this.sq || this.dq;
+  }
+  feed(line) {
+    const st = new Uint8Array(line.length);
+    const code = () => this.subst.length > 0 ? SUBCODE : CODE;
+    this.continues = false;
+    this.test = false;
+    if (this.arith < 0) this.arith = 0;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (this.arith !== 0) {
+        if (this.arith < 0) {
+          if (c === "]") this.arith = 0;
+          else if (/[;&|]/.test(c)) {
+            this.arith = 0;
+            st[i] = code();
+            continue;
+          }
+          st[i] = ARITH;
+          continue;
+        }
+        st[i] = ARITH;
+        if (c === "(") this.arith++;
+        else if (c === ")") this.arith--;
+        continue;
+      }
+      if (this.sq) {
+        st[i] = SQ;
+        if (this.ansi && c === "\\" && i + 1 < line.length) st[++i] = SQ;
+        else if (c === "'") this.sq = this.ansi = false;
+        continue;
+      }
+      if (this.param > 0) {
+        st[i] = PARAM;
+        if (c === "{") this.param++;
+        else if (c === "}") this.param--;
+        else if (c === "'" && !this.paramInDq || c === '"') {
+          for (i++; i < line.length && line[i] !== c; i++) {
+            st[i] = PARAM;
+            if (c === '"' && line[i] === "\\") st[++i] = PARAM;
+          }
+          if (i < line.length) st[i] = PARAM;
+        }
+        continue;
+      }
+      if (this.test) {
+        if (c === ";") {
+          this.test = false;
+          st[i] = code();
+          continue;
+        }
+        st[i] = TEST;
+        if (c === "]" && line[i + 1] === "]") {
+          st[++i] = TEST;
+          this.test = false;
+        }
+        continue;
+      }
+      if (c === "\\") {
+        st[i] = this.dq ? DQ : code();
+        if (i + 1 < line.length) st[++i] = ESC;
+        else this.continues = true;
+        continue;
+      }
+      if (c === "$" && line[i + 1] === "(") {
+        if (line[i + 2] === "(") {
+          st[i] = st[i + 1] = st[i + 2] = ARITH;
+          this.arith = 2;
+          i += 2;
+          continue;
+        }
+        this.subst.push(this.dq);
+        this.dq = false;
+        st[i] = st[i + 1] = SUBCODE;
+        i++;
+        continue;
+      }
+      if (c === "$" && line[i + 1] === "{") {
+        st[i] = st[i + 1] = PARAM;
+        this.param = 1;
+        this.paramInDq = this.dq;
+        i++;
+        continue;
+      }
+      if (c === "$" && line[i + 1] === "[" && !this.dq) {
+        st[i] = st[i + 1] = ARITH;
+        this.arith = -1;
+        i++;
+        continue;
+      }
+      if (this.dq) {
+        st[i] = DQ;
+        if (c === '"') this.dq = false;
+        continue;
+      }
+      if (c === "'") {
+        this.sq = true;
+        this.ansi = line[i - 1] === "$" && st[i - 1] !== ESC;
+        st[i] = SQ;
+        continue;
+      }
+      if (c === '"') {
+        this.dq = true;
+        st[i] = DQ;
+        continue;
+      }
+      if (c === ")" && this.subst.length > 0) {
+        this.dq = this.subst.pop();
+        st[i] = code();
+        continue;
+      }
+      if (c === "(" && line[i + 1] === "(" && (i === 0 || !/\w/.test(line[i - 1]) || ARITH_KEYWORD.test(line.slice(0, i)))) {
+        st[i] = st[i + 1] = ARITH;
+        this.arith = 2;
+        i++;
+        continue;
+      }
+      if (c === "[" && i > 0 && /\w/.test(line[i - 1]) && isCode(st[i - 1])) {
+        let s = i - 1;
+        while (s > 0 && /\w/.test(line[s - 1])) s--;
+        const close = line.indexOf("]", i);
+        if ((s === 0 || /[\s;&|(]/.test(line[s - 1])) && close > 0 && /^\+?=/.test(line.slice(close + 1, close + 3))) {
+          st[i] = ARITH;
+          this.arith = -1;
+          continue;
+        }
+      }
+      if (c === "[" && line[i + 1] === "[" && COMMAND_POSITION.test(line.slice(0, i))) {
+        st[i] = st[i + 1] = TEST;
+        this.test = true;
+        i++;
+        continue;
+      }
+      if (c === "#" && (i === 0 || isCode(st[i - 1]) && SEP_BEFORE_COMMENT.test(line[i - 1]))) {
+        for (; i < line.length; i++) st[i] = COMMENT;
+        break;
+      }
+      st[i] = code();
+    }
+    return st;
+  }
+};
+function hasExpansion(text) {
+  const sc = new ShellScanner();
+  for (const line of text.split("\n")) {
+    const st = sc.feed(line);
+    for (let i = 0; i < line.length; i++) {
+      if ((line[i] === "$" || line[i] === "`") && (isCode(st[i]) || st[i] === DQ || st[i] === PARAM || st[i] === ARITH)) return true;
+    }
+  }
+  return false;
+}
 function normalizeCommand(cmd) {
-  return cmd.replace(/['"\\]/g, "").replace(/\s+/g, " ").replace(/\/(?:\.\/)+/g, "/").replace(/\/{2,}/g, "/").trim();
+  const sc = new ShellScanner();
+  let out = "";
+  for (const raw of cmd.split("\n")) {
+    const line = raw.replace(/\r$/, "");
+    const st = sc.feed(line);
+    let kept = "";
+    for (let i = 0; i < line.length; i++) {
+      const s = st[i];
+      if (s === COMMENT) continue;
+      const c = line[i];
+      const swap = s === SQ || s === DQ ? c in SEP_SWAP : !isCode(s) && s !== ESC && c in SEP_SWAP && c !== " " && c !== "	";
+      kept += swap ? SEP_SWAP[c] : c;
+    }
+    out += kept + (sc.continues ? " " : sc.inQuotes ? " " : " ; ");
+  }
+  return out.replace(/['"\\]/g, "").replace(/\s+/g, " ").replace(/\/(?:\.\/)+/g, "/").replace(/\/{2,}/g, "/").replace(/(\s*;)+\s*$/, "").trim();
 }
 var baseName = (w) => w.slice(w.lastIndexOf("/") + 1);
-var WRAPPERS = ["sudo", "command", "env", "exec", "nohup", "time", "nice", "stdbuf"];
+var WRAPPERS = ["sudo", "command", "env", "exec", "nohup", "time", "nice", "stdbuf", "timeout", "coproc", "noglob", "nocorrect", "builtin"];
+var WRAPPER_WITH_VALUE = /* @__PURE__ */ new Set(["-n", "-u", "-C", "-P", "-S", "-k", "-s", "-a", "-g", "-h", "--signal", "--kill-after"]);
+var KEYWORDS = ["if", "then", "else", "elif", "fi", "while", "until", "do", "done", "esac", "!"];
 var LAUNCHERS = /* @__PURE__ */ new Set(["node", "nodejs", "bun", "deno", "npx", "pnpm", "yarn", "npm", "sh", "bash", "zsh", "dash", "ksh", "xargs", "eval", "tsx"]);
 var PTY_COMMANDS = /* @__PURE__ */ new Set(["script", "expect", "unbuffer", "socat"]);
 var INLINE_INTERPRETER = {
@@ -20059,21 +20261,151 @@ var GIT_WRITES = /* @__PURE__ */ new Set(["reset", "checkout", "restore", "stash
 var PROTECTED_NAMES = [".claude", "driver", ".mod", "plan.json", "events.jsonl", "ticket.json", "rel-1.jsonl", "log"];
 var PROTECTED_MENTION = /plan\.json|events\.jsonl|ticket\.json|rel-\d+\.jsonl|\.mod(\/|$|\s)|\.claude\/driver(\/|$|\s)/i;
 function commandWords(norm) {
-  return norm.split(/&&|\|\||[;&|\n]/).map((seg) => seg.trim().split(" ").filter(Boolean)).map((w) => {
+  return norm.split(/&&|\|\||[;&|\n]/).map((seg) => seg.trim()).filter((seg) => !seg.replace(/^(?:(?:if|then|else|elif|while|until|do|!)\s+)+/, "").startsWith("((")).map((seg) => seg.split(" ").filter((t) => t !== "" && !/^[()]+$|^[{}]$/.test(t))).map((w) => {
     let i = 0;
     for (; ; ) {
-      while (i < w.length && (/^\w+=/.test(w[i]) || WRAPPERS.includes(w[i]))) i++;
+      for (; ; ) {
+        if (i < w.length) w[i] = w[i].replace(/^\(+/, "");
+        const t = w[i] ?? "";
+        if (t === "") {
+          if (i < w.length) i++;
+          else break;
+        } else if (/^\w+(\[[^\]]*\])?\+?=/.test(t) || KEYWORDS.includes(t)) i++;
+        else if (t === "case") i += 3;
+        else if (/^[^()\s]+\)$/.test(t)) i++;
+        else if (/^\w+\(\)\{?$/.test(t)) i++;
+        else if (t === "function") i += 2;
+        else if (WRAPPERS.includes(baseName(t))) {
+          i++;
+          while (i < w.length && w[i].startsWith("-")) i += WRAPPER_WITH_VALUE.has(w[i]) ? 2 : 1;
+          if (baseName(t) === "timeout" && i < w.length) i++;
+        } else break;
+      }
       if (baseName(w[i] ?? "") !== "xargs") break;
       i++;
       while (i < w.length && w[i].startsWith("-")) i += XARGS_WITH_VALUE.has(w[i]) ? 2 : 1;
     }
     return w.slice(i);
-  }).filter((w) => w.length > 0);
+  }).filter((w) => w.length > 0 && w[0] !== "");
 }
+var PTY_API = /\bpty\.spawn\b|\bos\.openpty\b|\bforkpty\b/;
 function usesPty(command) {
   const norm = normalizeCommand(command);
-  if (/\bpty\.spawn\b|\bos\.openpty\b|\bforkpty\b/.test(norm)) return true;
+  if (PTY_API.test(norm)) return true;
   return commandWords(norm).some((w) => PTY_COMMANDS.has(baseName(w[0])));
+}
+var DQ_ESCAPABLE = /* @__PURE__ */ new Set(["$", "`", '"', "\\"]);
+function heredocOpens(line, st) {
+  const out = [];
+  for (let i = 0; i < line.length; i++) {
+    if (!isCode(st[i]) || line[i] !== "<" || line[i + 1] !== "<" || line[i + 2] === "<" || line[i - 1] === "<") continue;
+    const inSubst = st[i] === SUBCODE;
+    let j = i + 2;
+    let strip = false;
+    if (line[j] === "-") {
+      strip = true;
+      j++;
+    }
+    while (line[j] === " " || line[j] === "	") j++;
+    let delim = "";
+    let quoted = false;
+    for (; j < line.length; j++) {
+      const c = line[j];
+      if (st[j] === ESC) {
+        quoted = true;
+        delim += c;
+      } else if (st[j] === SQ) {
+        quoted = true;
+        if (c !== "'") delim += c;
+      } else if (st[j] === DQ) {
+        quoted = true;
+        if (c === "\\" && DQ_ESCAPABLE.has(line[j + 1] ?? "")) continue;
+        if (c !== '"') delim += c;
+      } else if (!isCode(st[j]) || /[\s<>|&;()]/.test(c)) break;
+      else if (c === "$" && (line[j + 1] === "'" || line[j + 1] === '"')) continue;
+      else if (c !== "\\") delim += c;
+    }
+    if (delim !== "") out.push({ delim, quoted, strip, inSubst });
+    i = j - 1;
+  }
+  return out;
+}
+function extractHeredocs(command) {
+  const lines = command.split("\n");
+  const text = [];
+  const docs = [];
+  const sc = new ShellScanner();
+  let pending = [];
+  let logical = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    text.push(line);
+    pending.push(...heredocOpens(line, sc.feed(line)));
+    logical.push(line);
+    if (sc.continues || pending.length === 0) {
+      if (!sc.continues) logical = [];
+      continue;
+    }
+    let j = i + 1;
+    const bodies = [];
+    for (const open2 of pending) {
+      const body = [];
+      for (; j < lines.length; j++) {
+        const l = open2.strip ? lines[j].replace(/^\t+/, "") : lines[j];
+        if (l === open2.delim || open2.inSubst && l === `${open2.delim})`) break;
+        body.push(lines[j]);
+      }
+      bodies.push(body.join("\n"));
+      j++;
+    }
+    let cmd = logical.join(" ");
+    if (/(\||&&)\s*$/.test(normalizeCommand(cmd)) && j < lines.length) cmd += ` ${lines[j]}`;
+    pending.forEach((open2, k) => docs.push({ cmd, body: bodies[k], quoted: open2.quoted }));
+    pending = [];
+    logical = [];
+    i = j - 1;
+  }
+  return { text: text.join("\n"), docs };
+}
+function substitutions(body, shellQuoting = false) {
+  const out = [];
+  let st = null;
+  if (shellQuoting) {
+    const sc = new ShellScanner();
+    const parts = body.split("\n").map((l) => sc.feed(l));
+    st = new Uint8Array(body.length);
+    let off = 0;
+    for (const p of parts) {
+      st.set(p, off);
+      off += p.length + 1;
+    }
+  }
+  const literal2 = (i) => st !== null && (st[i] === SQ || st[i] === ESC);
+  let tick = body.indexOf("`");
+  while (tick >= 0) {
+    const end = body.indexOf("`", tick + 1);
+    if (end < 0) break;
+    if (!literal2(tick)) out.push(body.slice(tick + 1, end));
+    tick = body.indexOf("`", end + 1);
+  }
+  const openers = shellQuoting ? ["$(", "<(", ">("] : ["$("];
+  for (const opener of openers) {
+    for (let at = body.indexOf(opener); at >= 0; at = body.indexOf(opener, at + 2)) {
+      if (body[at - 1] === "\\" || body[at + 2] === "(" || literal2(at) || opener === "<(" && body[at - 1] === "<") continue;
+      let depth = 0;
+      let end = -1;
+      for (let k = at + 1; k < body.length; k++) {
+        const c = body[k];
+        if (c === "(") depth++;
+        else if (c === ")" && --depth === 0) {
+          end = k;
+          break;
+        }
+      }
+      out.push(end < 0 ? body.slice(at + 2) : body.slice(at + 2, end));
+    }
+  }
+  return out;
 }
 var hasGlob = (t) => /[*?[]/.test(t);
 function globToRegExp(seg) {
@@ -20127,8 +20459,6 @@ function writesProtected(w, ctx) {
   const files = args.filter((a) => !unaryFlag(a));
   const noOperand = files.every((a) => a === "." || a === ".." || hasGlob(a));
   const anyProt = args.some(prot);
-  const inline = INLINE_INTERPRETER[cmd];
-  if (inline?.some((f) => args.includes(f)) && (PROTECTED_MENTION.test(w.join(" ")) || ctx.cdProtected)) return true;
   if (["rm", "tee", "truncate", "sponge", "shred", "unlink", "dd", "patch", "install"].includes(cmd))
     return anyProt || ctx.cdProtected && (cmd === "rm" || cmd === "patch") && noOperand;
   if (cmd === "cp" || cmd === "rsync" || cmd === "ln" || cmd === "mv") {
@@ -20154,29 +20484,41 @@ function redirectTargets(norm) {
   const clean = norm.replace(/\d*>&\d+/g, "").replace(/\d*>>?\s*\/dev\/null/g, "");
   return [...clean.matchAll(/\d*>>?\|?\s*([^\s<>|&;()]+)/g)].map((m) => m[1]);
 }
-function writesDriverDir(norm) {
+function contextOf(norm) {
   const words = commandWords(norm);
   const globRisk = /\.claude/i.test(norm) || words.some((w) => baseName(w[0]) === "cd");
   const ctx = { globRisk, cdProtected: false };
   ctx.cdProtected = words.some((w) => baseName(w[0]) === "cd" && w.slice(1).some((a) => !unaryFlag(a) && isProtectedToken(a, { ...ctx, cdProtected: true })));
+  return ctx;
+}
+function writesDriverDir(norm, ctx) {
   for (const seg of norm.split(/&&|\|\||[;&|\n]/)) {
     if (redirectTargets(seg).some((t) => isProtectedToken(t, ctx))) return true;
   }
-  return words.some((w) => writesProtected(w, ctx));
+  return commandWords(norm).some((w) => writesProtected(w, ctx));
+}
+function inlineScriptMentions(norm, ctx) {
+  const inline = commandWords(norm).some((w) => {
+    const flags = INLINE_INTERPRETER[baseName(w[0])];
+    return flags !== void 0 && w.slice(1).some((a) => flags.includes(a));
+  });
+  return inline && (PROTECTED_MENTION.test(norm) || ctx.cdProtected);
 }
 var isCliJs = (t) => {
-  if (baseName(t) !== "cli.js") return false;
-  return !t.includes("/") || /(^|\/)dist\/cli\.js$/.test(t) || /driver/.test(t);
+  const low = t.toLowerCase();
+  if (baseName(low) !== "cli.js") return false;
+  return !low.includes("/") || /(^|\/)dist\/cli\.js$/.test(low) || /driver/.test(low);
 };
-var isDriverToken = (t) => baseName(t) === "driver" || isCliJs(t);
+var isDriverToken = (t) => baseName(t).toLowerCase() === "driver" || isCliJs(t);
+var isOpaqueName = (t) => /[$`]/.test(t);
 function isDriverInvocation(w) {
-  const first = baseName(w[0]);
+  const first = baseName(w[0]).toLowerCase();
   if (first === "driver" || isCliJs(w[0])) return true;
-  if (/[$`(]/.test(w[0])) return true;
+  if (isOpaqueName(w[0])) return true;
   return LAUNCHERS.has(first) && w.slice(1).some(isDriverToken);
 }
 function userOnlyAction(w) {
-  const toks = new Set(w.map((t) => t.startsWith("--") && t.includes("=") ? t.slice(0, t.indexOf("=")) : t));
+  const toks = new Set(w.map((t) => t.replace(/\)+$/, "")).map((t) => t.startsWith("--") && t.includes("=") ? t.slice(0, t.indexOf("=")) : t));
   if (toks.has("rebaseline") || toks.has("via-mod") || toks.has("--via-mod") || toks.has("--force") || toks.has("-f")) return true;
   if (toks.has("gate") && toks.has("approve")) return true;
   for (let i = 0; i < w.length; i++) {
@@ -20201,17 +20543,86 @@ function rewritesWorkingTree(norm) {
   }
   return false;
 }
+var SHELLS = /* @__PURE__ */ new Set(["sh", "bash", "zsh", "dash", "ksh", "parallel"]);
+var RUNS_TEXT = /* @__PURE__ */ new Set(["eval", "source", ".", "exec"]);
+var CODE_RUNNERS = /* @__PURE__ */ new Set(["eval", "source", "su", "watch", "xargs", "ssh", "nohup", "timeout", "env", "sudo", "find", "npx", "npm", "pnpm", "yarn", "bun", "tmux", "screen", "make", "docker", "flock", "caffeinate", "parallel"]);
+var GIT_CODE_SETTING = /^(alias\.[^=]+=!|core\.(sshcommand|pager|editor|hookspath|fsmonitor)=|diff\.external=|credential\.helper=)/i;
+var SCRIPT_READERS = /* @__PURE__ */ new Set([...Object.keys(INLINE_INTERPRETER), "node", "nodejs", "bun", "deno", "tsx", "php", "osascript"]);
+var PATCHERS = /* @__PURE__ */ new Set(["patch"]);
+var GIT_PATCH = /* @__PURE__ */ new Set(["apply", "am"]);
+function commandNames(segs) {
+  const names = [];
+  for (const w of segs) {
+    names.push(baseName(w[0]));
+    for (const t of w.slice(1)) if (/^[<>]\(/.test(t)) names.push(baseName(t.slice(2).replace(/\)$/, "")));
+  }
+  return names;
+}
+function protectHeredoc(d, ctx) {
+  const line = normalizeCommand(d.cmd);
+  const segs = commandWords(line);
+  const names = commandNames(segs);
+  if (names.some((n) => SHELLS.has(n) || RUNS_TEXT.has(n)) || /(^|\s)\d+<<-?/.test(d.cmd)) return protect(d.body, ctx);
+  if (/(^|[\s/])xargs(\s|$)/.test(line) && segs.some(isDriverInvocation)) {
+    const bodyWords = normalizeCommand(d.body).split(" ").filter(Boolean);
+    if (segs.some((w) => isDriverInvocation(w) && userOnlyAction([...w, ...bodyWords]))) return MSG_USER_ONLY;
+  }
+  if (PTY_API.test(normalizeCommand(d.body))) return MSG_PTY;
+  if (segs.some((w) => PATCHERS.has(baseName(w[0])) || baseName(w[0]) === "git" && GIT_PATCH.has(w[1] ?? "")) && PROTECTED_MENTION.test(d.body)) return MSG_FILES;
+  if (segs.some((w) => SCRIPT_READERS.has(baseName(w[0])) && !isDriverInvocation(w)) && (PROTECTED_MENTION.test(d.body) || ctx.cdProtected)) return MSG_SCRIPT;
+  if (!d.quoted) {
+    for (const s of substitutions(d.body)) {
+      const reason = protect(s, ctx);
+      if (reason) return reason;
+    }
+  }
+  return null;
+}
 function protectCommand(command) {
-  const norm = normalizeCommand(command);
-  if (/via-mod/i.test(norm)) return MSG_USER_ONLY;
-  for (const w of commandWords(norm)) {
+  return protect(command, null);
+}
+function protect(command, outer) {
+  const { text, docs } = extractHeredocs(command);
+  const norm = normalizeCommand(text);
+  if (/via-mod/i.test(command) || /via-mod/i.test(norm)) return MSG_USER_ONLY;
+  const expands = hasExpansion(text);
+  const segs = commandWords(norm);
+  const words = segs.flat();
+  if (words.some((t) => SHELLS.has(baseName(t)) || CODE_RUNNERS.has(baseName(t)) || GIT_CODE_SETTING.test(t))) {
+    for (const t of words) {
+      if (!SWAPPED.test(t)) continue;
+      const reason = protect(restoreSeparators(t.replace(GIT_CODE_SETTING, "")), outer);
+      if (reason) return reason;
+    }
+  }
+  for (const w of segs) {
+    const first = baseName(w[0]);
+    const handsCode = first === "eval" || SHELLS.has(first) && w.includes("-c");
+    if (handsCode) {
+      if (expands && w.slice(1).some(isOpaqueName)) return MSG_SUBST;
+      const code = restoreSeparators(w.slice(first === "eval" ? 1 : w.indexOf("-c") + 1).join(" "));
+      const reason = protect(code, outer);
+      if (reason) return reason;
+    }
     if (!isDriverInvocation(w)) continue;
     if (userOnlyAction(w)) return MSG_USER_ONLY;
+    if (isOpaqueName(w[0])) return MSG_SUBST;
     if (/[$`]/.test(w.join(" "))) return MSG_USER_ONLY;
   }
   if (usesPty(norm)) return MSG_PTY;
-  if (writesDriverDir(norm)) return MSG_FILES;
+  const own2 = contextOf(norm);
+  const ctx = outer ? { globRisk: own2.globRisk || outer.globRisk, cdProtected: own2.cdProtected || outer.cdProtected } : own2;
+  if (writesDriverDir(norm, ctx)) return MSG_FILES;
+  if (inlineScriptMentions(norm, ctx)) return MSG_SCRIPT;
   if (rewritesWorkingTree(norm)) return MSG_GIT;
+  for (const s of substitutions(text, true)) {
+    const reason = protect(s, ctx);
+    if (reason) return reason;
+  }
+  for (const d of docs) {
+    const reason = protectHeredoc(d, ctx);
+    if (reason) return reason;
+  }
   return null;
 }
 

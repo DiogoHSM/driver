@@ -67,7 +67,11 @@
       }
     },
     "B-002": {
-      "artifacts": [],
+      "artifacts": [
+        ".claude/docs/DECISIONS.md",
+        ".claude/plans/2026-10-27-plan-json-v1.md",
+        ".claude/plans/2026-10-28-mod-diagrama.md"
+      ],
       "dependsOn": [
         "B-001"
       ],
@@ -75,17 +79,30 @@
       "requirements": [
         "R-001"
       ],
-      "status": "not_started",
+      "status": "done",
       "statusBy": {
         "id": "main",
         "kind": "model"
       },
-      "statusSince": "2026-10-28T03:37:47.267Z",
+      "statusSince": "2026-10-30T02:47:41.083Z",
       "tests": [],
-      "title": "ADRs 001 a 011 e planos aprovados"
+      "title": "ADRs 001 a 011 e planos aprovados",
+      "verification": {
+        "at": "2026-10-30T02:47:09.250Z",
+        "by": {
+          "id": "main",
+          "kind": "model"
+        },
+        "passes": true
+      }
     },
     "B-003": {
-      "artifacts": [],
+      "artifacts": [
+        "plugins/driver/src",
+        "plugins/driver/dist/cli.js",
+        "plugins/driver/schema/plan.v1.schema.json",
+        "examples"
+      ],
       "dependsOn": [
         "B-002"
       ],
@@ -94,17 +111,29 @@
         "R-002",
         "R-004"
       ],
-      "status": "not_started",
+      "status": "done",
       "statusBy": {
         "id": "main",
         "kind": "model"
       },
-      "statusSince": "2026-10-28T03:37:47.360Z",
+      "statusSince": "2026-10-30T02:48:07.423Z",
       "tests": [],
-      "title": "plan.json v1: schema, CLI, hooks, exemplos"
+      "title": "plan.json v1: schema, CLI, hooks, exemplos",
+      "verification": {
+        "at": "2026-10-30T02:47:09.250Z",
+        "by": {
+          "id": "main",
+          "kind": "model"
+        },
+        "passes": true
+      }
     },
     "B-004": {
-      "artifacts": [],
+      "artifacts": [
+        "plugins/driver/mod",
+        "plugins/driver/src/shared",
+        "docs/research/06-review-mod.md"
+      ],
       "dependsOn": [
         "B-003"
       ],
@@ -113,31 +142,40 @@
         "R-003",
         "R-004"
       ],
-      "status": "not_started",
+      "status": "done",
       "statusBy": {
         "id": "main",
         "kind": "model"
       },
-      "statusSince": "2026-10-28T03:37:47.454Z",
+      "statusSince": "2026-10-30T02:48:22.670Z",
       "tests": [],
-      "title": "Mod do diagrama vivo"
+      "title": "Mod do diagrama vivo",
+      "verification": {
+        "at": "2026-10-30T02:47:09.250Z",
+        "by": {
+          "id": "main",
+          "kind": "model"
+        },
+        "passes": true
+      }
     },
     "B-005": {
       "artifacts": [],
       "dependsOn": [
         "B-004"
       ],
+      "owner": "main",
       "phase": "implement",
       "requirements": [
         "R-001",
         "R-005"
       ],
-      "status": "not_started",
+      "status": "in_progress",
       "statusBy": {
         "id": "main",
         "kind": "model"
       },
-      "statusSince": "2026-10-28T03:37:47.546Z",
+      "statusSince": "2026-10-30T02:48:29.115Z",
       "tests": [],
       "title": "Skills Discover e Route"
     },
@@ -252,27 +290,37 @@
       "title": "Publicar marketplace e tags de versão"
     },
     "B-012": {
-      "artifacts": [],
+      "artifacts": [
+        ".claude/driver/blocks/B-012.md",
+        "docs/vision/definicao-inicial.md"
+      ],
       "dependsOn": [
         "B-001"
       ],
-      "owner": "main",
       "phase": "discover",
       "requirements": [
         "R-001",
         "R-004"
       ],
-      "status": "in_progress",
+      "status": "done",
       "statusBy": {
         "id": "main",
         "kind": "model"
       },
-      "statusSince": "2026-10-28T04:17:57.984Z",
+      "statusSince": "2026-10-30T02:47:16.266Z",
       "tests": [],
-      "title": "Revisão do entendimento com o Diogo (Gate 1)"
+      "title": "Revisão do entendimento com o Diogo (Gate 1)",
+      "verification": {
+        "at": "2026-10-30T02:47:09.250Z",
+        "by": {
+          "id": "main",
+          "kind": "model"
+        },
+        "passes": true
+      }
     }
   },
-  "currentPhase": "discover",
+  "currentPhase": "implement",
   "decisions": {
     "D-001": {
       "at": "2026-10-28T04:19:33.563Z",
@@ -340,7 +388,7 @@
       "title": "Packs por domínio sugerem a stack ideal sob demanda"
     }
   },
-  "revision": 25,
+  "revision": 41,
   "schemaVersion": 1,
-  "updatedAt": "2026-10-28T04:19:33.563Z"
+  "updatedAt": "2026-10-30T02:48:29.115Z"
 }

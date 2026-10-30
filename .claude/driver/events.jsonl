@@ -23,3 +23,25 @@
 {"seq":23,"ts":"2026-10-28T04:17:53.968Z","revision":23,"actor":{"kind":"model","id":"main"},"type":"block.add","block":"B-012","data":{"phase":"discover","title":"Revisão do entendimento com o Diogo (Gate 1)"}}
 {"seq":24,"ts":"2026-10-28T04:17:57.984Z","revision":24,"actor":{"kind":"model","id":"main"},"type":"block.status","block":"B-012","from":"not_started","to":"in_progress"}
 {"seq":25,"ts":"2026-10-28T04:19:33.563Z","revision":25,"actor":{"kind":"user","id":"Diogo Martins"},"type":"gate.approve","data":{"baseline":1,"decision":"D-001","gate":"route","ticket":"3f2e65dd369f1ae768ebab9ba346925a4dbc67a35f5a3b8e6001aacf370c2b06","via":"mod"}}
+{"seq":26,"ts":"2026-10-30T02:46:42.756Z","revision":26,"actor":{"kind":"model","id":"main"},"type":"block.set","block":"B-012","data":{"fields":["artifacts"]}}
+{"seq":27,"ts":"2026-10-30T02:46:42.756Z","revision":26,"actor":{"kind":"model","id":"main"},"type":"block.set","block":"B-002","data":{"fields":["artifacts"]}}
+{"seq":28,"ts":"2026-10-30T02:46:42.756Z","revision":26,"actor":{"kind":"model","id":"main"},"type":"block.set","block":"B-003","data":{"fields":["artifacts"]}}
+{"seq":29,"ts":"2026-10-30T02:46:42.756Z","revision":26,"actor":{"kind":"model","id":"main"},"type":"block.set","block":"B-004","data":{"fields":["artifacts"]}}
+{"seq":30,"ts":"2026-10-30T02:46:48.297Z","revision":27,"actor":{"kind":"model","id":"main"},"type":"block.status","block":"B-012","from":"in_progress","to":"in_review"}
+{"seq":31,"ts":"2026-10-30T02:47:09.250Z","revision":28,"actor":{"kind":"model","id":"main"},"type":"block.set","block":"B-012","data":{"fields":["verification"]}}
+{"seq":32,"ts":"2026-10-30T02:47:09.250Z","revision":28,"actor":{"kind":"model","id":"main"},"type":"block.set","block":"B-002","data":{"fields":["verification"]}}
+{"seq":33,"ts":"2026-10-30T02:47:09.250Z","revision":28,"actor":{"kind":"model","id":"main"},"type":"block.set","block":"B-003","data":{"fields":["verification"]}}
+{"seq":34,"ts":"2026-10-30T02:47:09.250Z","revision":28,"actor":{"kind":"model","id":"main"},"type":"block.set","block":"B-004","data":{"fields":["verification"]}}
+{"seq":35,"ts":"2026-10-30T02:47:16.266Z","revision":29,"actor":{"kind":"model","id":"main"},"type":"block.status","block":"B-012","from":"in_review","to":"done"}
+{"seq":36,"ts":"2026-10-30T02:47:22.814Z","revision":30,"actor":{"kind":"model","id":"main"},"type":"phase.change","from":"discover","to":"route"}
+{"seq":37,"ts":"2026-10-30T02:47:30.610Z","revision":31,"actor":{"kind":"model","id":"main"},"type":"block.status","block":"B-002","from":"not_started","to":"in_progress"}
+{"seq":38,"ts":"2026-10-30T02:47:35.112Z","revision":32,"actor":{"kind":"model","id":"main"},"type":"block.status","block":"B-002","from":"in_progress","to":"in_review"}
+{"seq":39,"ts":"2026-10-30T02:47:41.083Z","revision":33,"actor":{"kind":"model","id":"main"},"type":"block.status","block":"B-002","from":"in_review","to":"done"}
+{"seq":40,"ts":"2026-10-30T02:47:47.132Z","revision":34,"actor":{"kind":"model","id":"main"},"type":"phase.change","from":"route","to":"implement"}
+{"seq":41,"ts":"2026-10-30T02:47:54.659Z","revision":35,"actor":{"kind":"model","id":"main"},"type":"block.status","block":"B-003","from":"not_started","to":"in_progress"}
+{"seq":42,"ts":"2026-10-30T02:48:01.369Z","revision":36,"actor":{"kind":"model","id":"main"},"type":"block.status","block":"B-003","from":"in_progress","to":"in_review"}
+{"seq":43,"ts":"2026-10-30T02:48:07.423Z","revision":37,"actor":{"kind":"model","id":"main"},"type":"block.status","block":"B-003","from":"in_review","to":"done"}
+{"seq":44,"ts":"2026-10-30T02:48:12.956Z","revision":38,"actor":{"kind":"model","id":"main"},"type":"block.status","block":"B-004","from":"not_started","to":"in_progress"}
+{"seq":45,"ts":"2026-10-30T02:48:18.175Z","revision":39,"actor":{"kind":"model","id":"main"},"type":"block.status","block":"B-004","from":"in_progress","to":"in_review"}
+{"seq":46,"ts":"2026-10-30T02:48:22.670Z","revision":40,"actor":{"kind":"model","id":"main"},"type":"block.status","block":"B-004","from":"in_review","to":"done"}
+{"seq":47,"ts":"2026-10-30T02:48:29.115Z","revision":41,"actor":{"kind":"model","id":"main"},"type":"block.status","block":"B-005","from":"not_started","to":"in_progress"}

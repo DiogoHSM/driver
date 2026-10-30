@@ -3,7 +3,7 @@
 Plugin de Claude Code que impõe o método DRIVER (Discover · Route · Implement · Validate · Evolve · Release) a qualquer projeto, com plano em grafo de blocos e diagrama vivo.
 
 ## Estado
-`plan.json` v1 implementado e commitado (ADR-010). Mod do diagrama vivo implementado e aprovado visualmente em 2026-10-29 (ADR-011): `src/shared`, CLI de apoio, `mod/` com SVG vertical no Desktop; tudo ainda sem commit. Pendências: PER-619 (falso positivo do guard). Depois: skills Discover e Route.
+`plan.json` v1 implementado e commitado (ADR-010). Mod do diagrama vivo implementado e aprovado visualmente em 2026-10-29 (ADR-011): `src/shared`, CLI de apoio, `mod/` com SVG vertical no Desktop (commit `77a61a1`). Guard `protectCommand` refeito com scanner de shell (PER-619). Em andamento: skills Discover e Route (B-005 do plano em `.claude/driver/`).
 
 ## Leia antes de tocar
 - Guardrails (tabela "antes de tocar em X, leia Y"): `.claude/GUARDRAILS.md`
