@@ -160,7 +160,12 @@
       }
     },
     "B-005": {
-      "artifacts": [],
+      "artifacts": [
+        "plugins/driver/skills/discover/SKILL.md",
+        "plugins/driver/skills/route/SKILL.md",
+        "plugins/driver/references/driver-conventions.md",
+        "plugins/driver/test/skills.spec.ts"
+      ],
       "dependsOn": [
         "B-004"
       ],
@@ -200,7 +205,7 @@
     "B-007": {
       "artifacts": [],
       "dependsOn": [
-        "B-006"
+        "B-005"
       ],
       "phase": "implement",
       "requirements": [
@@ -237,6 +242,7 @@
     "B-009": {
       "artifacts": [],
       "dependsOn": [
+        "B-006",
         "B-007",
         "B-008"
       ],
@@ -329,6 +335,15 @@
         "kind": "user"
       },
       "title": "Gate 1: route approved"
+    },
+    "D-002": {
+      "at": "2026-11-10T18:21:32.526Z",
+      "by": {
+        "id": "main",
+        "kind": "model"
+      },
+      "reason": "B-007 (pack driver-web) precisa das convenções e das skills Discover e Route (B-005), não das skills de Implement a Release (B-006). B-009 passa a depender de B-006 diretamente, antes alcançado só via B-007. Pedido do Diogo em 2026-11-10.",
+      "title": "Dependências só por artefato real: B-006 e B-007 em paralelo"
     }
   },
   "gates": {
@@ -346,7 +361,7 @@
   },
   "nextId": {
     "B": 13,
-    "D": 2,
+    "D": 3,
     "R": 7,
     "REL": 1
   },
@@ -388,7 +403,7 @@
       "title": "Packs por domínio sugerem a stack ideal sob demanda"
     }
   },
-  "revision": 41,
+  "revision": 43,
   "schemaVersion": 1,
-  "updatedAt": "2026-10-30T02:48:29.115Z"
+  "updatedAt": "2026-11-10T18:21:32.526Z"
 }

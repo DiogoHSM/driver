@@ -20452,6 +20452,29 @@ function isProtectedToken(raw, ctx) {
   return false;
 }
 var unaryFlag = (a) => a.startsWith("-");
+function editOperands(args) {
+  const out = [];
+  let scriptSeen = false;
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === "-e" || a === "--expression" || a === "-f" || a === "--file" || /^-[A-Za-z]*[ef]$/.test(a)) {
+      scriptSeen = true;
+      i++;
+      continue;
+    }
+    if (/^--?(expression|file)=/.test(a)) {
+      scriptSeen = true;
+      continue;
+    }
+    if (unaryFlag(a)) continue;
+    if (!scriptSeen) {
+      scriptSeen = true;
+      continue;
+    }
+    out.push(a);
+  }
+  return out;
+}
 function writesProtected(w, ctx) {
   const cmd = baseName(w[0]);
   const args = w.slice(1);
@@ -20470,8 +20493,8 @@ function writesProtected(w, ctx) {
     const extract = args.some((a) => /^-?[a-zA-Z]*x[a-zA-Z]*$/.test(a) && !a.startsWith("--")) || args.includes("--extract");
     return extract && (anyProt || ctx.cdProtected);
   }
-  if (cmd === "sed") return args.some((a) => a === "--in-place" || /^-[A-Za-z]*i/.test(a)) && (anyProt || ctx.cdProtected);
-  if (cmd === "perl" || cmd === "ruby") return args.some((a) => /^-[A-Za-z]*i/.test(a)) && (anyProt || ctx.cdProtected);
+  if (cmd === "sed") return args.some((a) => a === "--in-place" || /^-[A-Za-z]*i/.test(a)) && (editOperands(args).some(prot) || ctx.cdProtected);
+  if (cmd === "perl" || cmd === "ruby") return args.some((a) => /^-[A-Za-z]*i/.test(a)) && (editOperands(args).some(prot) || ctx.cdProtected);
   if (cmd === "awk" || cmd === "gawk") return args.includes("inplace") && (anyProt || ctx.cdProtected);
   if (cmd === "find") return args.some((a) => ["-delete", "-exec", "-execdir", "-ok"].includes(a)) && (anyProt || ctx.cdProtected);
   if (cmd === "git") {

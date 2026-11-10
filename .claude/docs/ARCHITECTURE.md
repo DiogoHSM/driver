@@ -1,4 +1,4 @@
-# Arquitetura — DRIVER
+# Arquitetura · DRIVER
 
 ## Visão geral
 DRIVER é um marketplace de plugins de Claude Code. O core `driver` impõe o método Discover · Route · Implement · Validate · Evolve · Release sobre um projeto do usuário; packs de domínio (`driver-web`, `driver-mobile`, `driver-finance`, `driver-social`, `driver-video`) acrescentam perguntas, provedores, validadores e checklists. O artefato central é o grafo de plano em `.claude/driver/plan.json` dentro do projeto do usuário (ADR-002, ADR-009, ADR-010). Tudo o mais lê ou escreve esse arquivo.
@@ -11,7 +11,7 @@ DRIVER é um marketplace de plugins de Claude Code. O core `driver` impõe o mé
 - **Hooks (`plugins/driver/hooks/`)**: `PreToolUse` em `Agent|Task|Workflow` (gate por fase, via `jq`), `PreToolUse` em `Edit|Write|Bash` (protege `plan.json` e bloqueia `driver approve` vindo do modelo), `SubagentStop` (bloco órfão vira `blocked`).
 - **Código compartilhado sem dependências (`src/shared/`)**: fases, paleta, projeção `PlanView`, veredito de gate, regras de proteção, layout em swimlanes, SVG e linhas do terminal. É a única parte do core que o mod pode importar (o mod não tem Node nem zod); o código node importa daqui também, então hook shell e mod aplicam as mesmas regras (ADR-011).
 - **Mod (`plugins/driver/mod/`)**: painel ao lado do chat que lê `plan.json` por polling (`$.fs`, 1 s), projeta em `$.state` e desenha SVG vertical na largura do painel (Desktop/VS Code, `mod/render-svg.tsx`), quadro de cartões (mobile, `mod/render-board.tsx`) ou linhas Box/Text (terminal, `mod/render-terminal.tsx`); seleção de bloco por `Select`/`Input` na barra, porque cliques no SVG não chegam ao plugin. Registra as tools `mcp__driver__set_block_state`, `plan_ops` e `plan_status` e o comando `/driver`. Escreve sempre pela CLI (`$.process.run`). Hooks: `agent.spawn` (gate + claim de owner, inclusive agentes de Workflow), `classic.SubagentStop`, guard `tool.call`. `/driver approve <gate>` só com origem `composer` (ou botão do painel) e ticket one-shot com hash: o canal de aprovação à prova de modelo.
-- **Skills de fase (futuro, `plugins/driver/skills/`)**: Discover, Route, Implement, Validate, Evolve, Release. Compõem skills externas pinadas (ADR-003) e escrevem no plano via tool ou CLI.
+- **Skills de fase (`plugins/driver/skills/`)**: `discover` e `route` existem (ADR-012); Implement, Validate, Evolve e Release são futuro. Skills nativas de plugin (`SKILL.md` com frontmatter, `user-invocable: true`, slash `/driver:discover` e `/driver:route`), texto em inglês, entrevista na língua do usuário via `AskUserQuestion`. Convenções compartilhadas (tools, regra `"$n"`, pré-condições do reducer, formatos de arquivo, regras duras) em `plugins/driver/references/driver-conventions.md`, fora de `skills/` para não ser varrido como skill. Escrevem no plano só pelas tools `mcp__driver__*` (fallback: CLI). Discover grava a árvore de decisões em `discover/interview.md` a cada resposta e manda um lote único de `req.add`/`decision.add` no fim; Route cria blocos com `block.add` em lote, preenche `blocks/B-nnn.md` e `route/risks.md`, valida o diagrama com o usuário e avança a fase. As futuras compõem skills externas pinadas (ADR-003).
 - **Packs (futuro, `plugins/driver-*/`)**: plugins separados no mesmo marketplace, dependentes do core. Dados extras em `ext['driver-<pack>']`.
 
 ### No projeto do usuário (`.claude/driver/`)
@@ -33,7 +33,7 @@ Regras: um escritor (o processo que segura o lock); raiz resolvida pelo worktree
 
 ## Integrações externas
 - Claude Code CLI ≥ 2.1.287 (mods) e sistema de plugins com `dependencies` semver (ADR-003).
-- Plugins pinados como dependência: superpowers, feature-dev, code-review (quando as skills de fase existirem).
+- Plugins pinados como dependência: superpowers, feature-dev, code-review (a partir das skills Implement/Validate/Evolve/Release; Discover e Route não dependem de nenhum, ADR-012 item 4).
 - Provedores de domínio (Vercel, Supabase, Resend, HyperFrames, ElevenLabs...) só via registro de capacidades, por bloco (ADR-004). O core não conhece provedores.
 
 ## Diagrama
@@ -46,7 +46,7 @@ flowchart LR
     hooks[Hooks]
     shared[src/shared · sem deps]
     mod[Mod: pane, tools, /driver]
-    skills[Skills de fase · futuro]
+    skills[Skills de fase · discover, route]
     packs[Packs · futuro]
   end
   subgraph user[Projeto do usuário]

@@ -143,8 +143,8 @@ type Primary = { label: string; run: 'approve-route' | 'approve-release' | 'adva
 /** The one contextual action: approve a gate where the method asks for it, or advance when the next phase is open. */
 export function primaryAction(view: DriverView): Primary | null {
   const cur = view.currentPhase
-  if (cur === 'discover' && !view.gates.route.approved) return { label: 'Approve gate route', run: 'approve-route' }
-  if (cur === 'evolve' && !view.gates.release.approved) return { label: 'Approve gate release', run: 'approve-release' }
+  if (cur === 'discover' && !view.gates.route.approved) return { label: 'Approve route gate', run: 'approve-route' }
+  if (cur === 'evolve' && !view.gates.release.approved) return { label: 'Approve release gate', run: 'approve-release' }
   const next = PHASES[PHASES.indexOf(cur) + 1]
   if (!next) return null
   const guard = next === 'route' ? view.gates.route : next === 'release' ? view.gates.release : null
@@ -186,7 +186,6 @@ function blockPicker(kit: RichKit, s: Snapshot, a: Actions, drawn: string[]) {
   return (
     <Select
       key="block"
-      label="Block"
       options={drawn.map((id) => ({ value: id, label: `${id} · ${cutLabel(title.get(id) ?? '', 36)}` }))}
       {...(s.ui.selected && drawn.includes(s.ui.selected) ? { value: s.ui.selected } : {})}
       onSelect={(v) => a.select(v)}
@@ -194,34 +193,47 @@ function blockPicker(kit: RichKit, s: Snapshot, a: Actions, drawn: string[]) {
   )
 }
 
-/** One row, never wrapping: the focus, the block picker on drawing surfaces, two toggles, and the one contextual action pushed to the right. */
+/**
+ * Two rows that wrap on a narrow pane. First: what the drawing shows (focus and the two toggles, with
+ * explicit verbs). Second: the block picker on drawing surfaces and, pushed to the right, the one
+ * contextual action.
+ */
 function toolbar(kit: RichKit, s: Snapshot, a: Actions, canSelect: boolean, drawn: string[] | null) {
-  const { Box, Button } = kit
+  const { Box, Button, Text } = kit
   const view = s.view
   if (!view) return null
   const Select = canSelect ? kit.Select : undefined
   const primary = primaryAction(view)
+  const picker = canSelect && drawn ? blockPicker(kit, s, a, drawn) : null
   return (
-    <Box flexDirection="row" alignItems="center" gap="sm">
-      {Select ? (
-        <Select key="focus" label="Focus" options={FOCUS_OPTIONS} value={s.ui.focus} onSelect={(v) => a.setFocus(v as DriverUi['focus'])} />
-      ) : (
-        <Button key="focus" variant="secondary" onPress={() => a.cycleFocus()}>
-          {`Focus: ${focusLabel(s.ui.focus)}`}
+    <Box flexDirection="column" gap="xs">
+      <Box flexDirection="row" alignItems="center" flexWrap="wrap" gap="sm">
+        <Text dimColor>Show</Text>
+        {Select ? (
+          <Select key="focus" options={FOCUS_OPTIONS} value={s.ui.focus} onSelect={(v) => a.setFocus(v as DriverUi['focus'])} />
+        ) : (
+          <Button key="focus" variant="secondary" onPress={() => a.cycleFocus()}>
+            {focusLabel(s.ui.focus)}
+          </Button>
+        )}
+        <Button key="done" variant="secondary" onPress={() => a.toggleDone()}>
+          {s.ui.collapseDone ? 'Show done' : 'Hide done'}
         </Button>
-      )}
-      {canSelect && drawn ? blockPicker(kit, s, a, drawn) : null}
-      <Button key="done" variant="secondary" onPress={() => a.toggleDone()}>
-        {s.ui.collapseDone ? 'Done ○' : 'Done ✓'}
-      </Button>
-      <Button key="retired" variant={s.ui.showRetired ? 'primary' : 'secondary'} onPress={() => a.toggleRetired()}>
-        Retired
-      </Button>
-      <Box flexGrow={1} />
-      {primary && (
-        <Button key="action" hotkey="g" variant="primary" onPress={() => a.primary(primary)}>
-          {primary.label}
+        <Button key="retired" variant="secondary" onPress={() => a.toggleRetired()}>
+          {s.ui.showRetired ? 'Hide retired' : 'Show retired'}
         </Button>
+      </Box>
+      {(picker || primary) && (
+        <Box flexDirection="row" alignItems="center" flexWrap="wrap" gap="sm">
+          {picker && <Text dimColor>Open</Text>}
+          {picker}
+          <Box flexGrow={1} />
+          {primary && (
+            <Button key="action" hotkey="g" variant="primary" onPress={() => a.primary(primary)}>
+              {primary.label}
+            </Button>
+          )}
+        </Box>
       )}
     </Box>
   )
@@ -283,7 +295,7 @@ function confirmView(kit: Kit, s: Snapshot, a: Actions) {
   if (!c) return null
   return (
     <Box flexDirection="column">
-      <Text color="yellow">{`Approve gate ${c.gate} at revision ${c.revision} (baseline ${c.baseline})?`}</Text>
+      <Text color="yellow">{`Approve ${c.gate} gate at revision ${c.revision} (baseline ${c.baseline})?`}</Text>
       <Box flexDirection="row" gap={1}>
         <Button key="confirm-yes" variant="primary" onPress={() => a.confirmApprove()}>
           Approve

@@ -60,7 +60,7 @@ test('desktop and vscode draw the SVG diagram with a block picker', async ($, on
     for (const piece of ['<title>B-004 Signup API', 'IMPLEMENT', 'gate route · diogo', 'gate release · pending', 'font:13px']) expect(source).toContain(piece)
     // no card buttons any more
     expect(await ui.find({ key: 'B-004', type: 'Button' })).toBeUndefined()
-    expect((await ui.find({ key: 'done' }))?.text).toBe('Done ✓')
+    expect((await ui.find({ key: 'done' }))?.text).toBe('Hide done')
     expect((await ui.find({ key: 'export' }))?.text).toBe('Export Mermaid')
 
     // the picker lists the drawn blocks; choosing one opens its detail and selects its card
@@ -89,7 +89,6 @@ test('mobile and desktop keep the same header and detail', async ($, on) => {
     const ui = await $.ui.mount({ ...PANE, surface })
     expect((await ui.find({ type: 'Text', text: /^web-waitlist$/ }))?.text).toBe('web-waitlist')
     expect(await ui.find({ type: 'Text', text: /^phase implement · rev 34 · baseline 1$/ })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: /^gate route ✓ diogo$/ })).toBeDefined()
     await ui.unmount()
   }
 })
@@ -103,12 +102,10 @@ test('mobile draws the card board', async ($, on) => {
     // header: name and state on the left, the gates as pills on the right
     expect((await ui.find({ type: 'Text', text: /^web-waitlist$/ }))?.text).toBe('web-waitlist')
     expect(await ui.find({ type: 'Text', text: /^phase implement · rev 34 · baseline 1$/ })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: /^gate route ✓ diogo$/ })).toBeDefined()
     // phases and gates
     expect(await ui.find({ type: 'Text', text: /^▾ IMPLEMENT$/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /^\s+1\/3 done$/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /^✓ gate route · approved by diogo$/ })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: /^gate release · pending$/ })).toBeDefined()
     // cards: id and the status in words
     const card = await ui.find({ key: 'B-004' })
     expect(card?.text).toContain('B-004')
@@ -116,8 +113,8 @@ test('mobile draws the card board', async ($, on) => {
     expect(card?.text).toContain('Signup API')
     expect((await ui.find({ key: 'B-005' }))?.text).toContain('blocked')
     // toolbar
-    expect((await ui.find({ key: 'done' }))?.text).toBe('Done ✓')
-    expect((await ui.find({ key: 'retired' }))?.text).toBe('Retired')
+    expect((await ui.find({ key: 'done' }))?.text).toBe('Hide done')
+    expect((await ui.find({ key: 'retired' }))?.text).toBe('Show retired')
     expect((await ui.find({ key: 'export' }))?.text).toBe('Export Mermaid')
     expect((await ui.find({ key: 'action' }))?.text).toBe('Advance to validate')
     expect(await ui.find({ type: 'Select' })).toBeUndefined()
@@ -159,7 +156,7 @@ test('the toolbar and the phase headers change what the board shows', async ($, 
   expect((await svgOf(ui)).source).not.toContain('<title>B-001')
   expect(await optionIds()).toContain('B-003')
   await ui.press({ key: 'done' })
-  expect((await ui.find({ key: 'done' }))?.text).toBe('Done ○')
+  expect((await ui.find({ key: 'done' }))?.text).toBe('Show done')
   expect(await optionIds()).not.toContain('B-003')
   expect((await svgOf(ui)).source).not.toContain('<title>B-003')
   expect((await svgOf(ui)).source).toContain('✓ 1 done')
@@ -170,9 +167,9 @@ test('the toolbar and the phase headers change what the board shows', async ($, 
 
   // mobile has no Select: a button cycles the focus
   const mobile = await $.ui.mount({ ...PANE, surface: 'mobile' })
-  expect((await mobile.find({ key: 'focus' }))?.text).toBe('Focus: current phase (auto)')
+  expect((await mobile.find({ key: 'focus' }))?.text).toBe('current phase (auto)')
   await mobile.press({ key: 'focus' })
-  expect((await mobile.find({ key: 'focus' }))?.text).toBe('Focus: all phases')
+  expect((await mobile.find({ key: 'focus' }))?.text).toBe('all phases')
   await mobile.unmount()
 })
 
@@ -198,13 +195,13 @@ const primaryLabel = async ($: Engine, on: On, plan: string) => {
 }
 
 test('the contextual action in discover is approving gate route', async ($, on) => {
-  expect(await primaryLabel($, on, discoverPlan)).toBe('Approve gate route')
+  expect(await primaryLabel($, on, discoverPlan)).toBe('Approve route gate')
 })
 test('the contextual action advances when the next phase is open', async ($, on) => {
   expect(await primaryLabel($, on, WAITLIST_PLAN)).toBe('Advance to validate')
 })
 test('the contextual action in evolve is approving gate release', async ($, on) => {
-  expect(await primaryLabel($, on, evolvePlan)).toBe('Approve gate release')
+  expect(await primaryLabel($, on, evolvePlan)).toBe('Approve release gate')
 })
 test('there is no contextual action after the last phase', async ($, on) => {
   expect(await primaryLabel($, on, releasePlan)).toBeUndefined()
@@ -311,7 +308,7 @@ test('approving a gate takes two presses and sends the nonce on stdin only', asy
 
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
   await ui.press({ key: 'action' })
-  expect((await ui.find({ type: 'Text', text: /Approve gate release/ }))?.text).toBe('Approve gate release at revision 34 (baseline 1)?')
+  expect((await ui.find({ type: 'Text', text: /Approve release gate/ }))?.text).toBe('Approve release gate at revision 34 (baseline 1)?')
   expect(w.writes).toHaveLength(0)
   await ui.press({ key: 'confirm-no' })
   expect(await ui.find({ key: 'confirm-yes' })).toBeUndefined()

@@ -185,24 +185,9 @@ export function boardView(kit: BoardKit, rows: Row[], hd: BoardHandlers, isDim =
   )
 }
 
-function pill(kit: BoardKit, key: string, text: string, ok: boolean) {
-  const { Box, Text } = kit
-  return (
-    <Box key={key} paddingX="xs" borderStyle="round" borderColor={ok ? 'success' : 'warning'}>
-      <Text size="caption" color={ok ? 'success' : 'warning'}>
-        {text}
-      </Text>
-    </Box>
-  )
-}
-
-/** Project name and state on the left, the two gates and the export on the right. */
+/** Project name and state on the left, the export on the right. The gates are drawn in the board itself. */
 export function boardHeader(kit: BoardKit, view: DriverView, onExport: () => void) {
   const { Box, Text, Button } = kit
-  const gate = (g: DriverGateName) => {
-    const v = view.gates[g]
-    return v.approved ? `gate ${g} ✓${v.by ? ` ${v.by}` : ''}` : `gate ${g} · pending`
-  }
   return (
     <Box flexDirection="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap="sm">
       <Box flexDirection="column">
@@ -211,13 +196,9 @@ export function boardHeader(kit: BoardKit, view: DriverView, onExport: () => voi
         </Text>
         <Text dimColor>{`phase ${view.currentPhase} · rev ${view.revision} · baseline ${view.baseline}`}</Text>
       </Box>
-      <Box flexDirection="row" gap="xs" alignItems="center">
-        {pill(kit, 'pill-route', gate('route'), view.gates.route.approved)}
-        {pill(kit, 'pill-release', gate('release'), view.gates.release.approved)}
-        <Button key="export" variant="secondary" onPress={onExport}>
-          Export Mermaid
-        </Button>
-      </Box>
+      <Button key="export" variant="secondary" onPress={onExport}>
+        Export Mermaid
+      </Button>
     </Box>
   )
 }

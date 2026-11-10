@@ -106,6 +106,10 @@ describe('protectCommand', () => {
     'echo {} > .claude/driver/plan.json',
     'echo x >> /p/.claude/driver/events.jsonl',
     "sed -i '' s/a/b/ .claude/driver/plan.json",
+    "sed -i -e 's/.*/x/' .claude/driver/plan.json",
+    "sed -i '' -e s/a/b/ -e s/c/d/ .claude/driver/plan.json",
+    "sed -i 's/a/b/' .claude/driver/*.json",
+    "perl -pi -e 's/.*/x/' .claude/driver/events.jsonl",
     'jq .revision=9 .claude/driver/plan.json > t && mv t .claude/driver/plan.json',
     'tee .claude/driver/events.jsonl < x',
     'cp /tmp/x .claude/driver/plan.json',
@@ -389,6 +393,11 @@ describe('protectCommand', () => {
     'echo $(date) > /tmp/now',
     'FOO=$(pwd); echo $FOO',
     'git log --format="%h %s" | grep -E "fix\\(.*\\)"',
+    // the script of an in-place editor is not a path: `.*` is a regex, not a glob over .mod
+    "sed -i '' '5s/.*/x/' .claude/GUARDRAILS.md",
+    "sed -i -e 's/.*/x/' .claude/docs/STACK.md",
+    "perl -pi -e 's/.*/x/' .claude/GUARDRAILS.md",
+    "ruby -i -pe 'gsub(/.*/, \"x\")' .claude/GUARDRAILS.md",
   ])('allows (PER-619): %s', (c) => {
     expect(protectCommand(c)).toBeNull();
   });

@@ -1,4 +1,4 @@
-# Stack — DRIVER
+# Stack · DRIVER
 
 ## Linguagem e runtime
 - TypeScript 5 (strict, ES2022, NodeNext): toda a lógica do plugin, da CLI e do mod.
