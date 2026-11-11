@@ -5,6 +5,19 @@ title: "Signup API"
 
 # B-004 Signup API
 
+This file is a generated document. You never edit it. It shows what the file looks like after one `mcp__driver__block_doc` call, and each section below is an input field of that tool:
+
+```
+{ "blocks": [ { "id": "B-004", "spec": "...", "acceptance": ["...", "..."], "notes": "...", "handoff": "..." } ] }
+```
+
+- `spec` becomes `## Spec`.
+- `acceptance` (a list of strings) becomes `## Acceptance criteria` as a checklist.
+- `notes` becomes `## Notes`; keep the `Input:`, `Output:`, `Risk:`, `Provider:` lines.
+- `handoff` becomes `## Handoff`; send it only when closing a block that is `in_progress`.
+
+Only the named sections are rewritten; frontmatter, heading and unnamed sections stay. A block that is `done` or retired is refused.
+
 ## Spec
 
 Signup API for the waitlist: one HTTP endpoint that validates an email, stores it once in the `waitlist` table and returns a result the landing page can show. Covers R-001 and R-003. Out of scope: the confirmation email (B-006) and any admin view (non-goal N-01).

@@ -4,7 +4,10 @@ import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, rmS
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { ApplyInputError, parseApplyBody } from './apply.js';
-import { denyOutput, findPlanFile, gateCheck, parseHookInput, protectPlan } from './hooks.js';
+import { BlockDocRefusedError, writeBlockDocs } from './block-doc.js';
+import { ReqDocRefusedError, writeReqDocs } from './req-doc.js';
+import { DiscoverRefusedError, countsByStatus, frontier, line1, logDiscover, readState, summaryText, type DiscoverState } from './discover-log.js';
+import { denyOutput,findPlanFile, gateCheck, parseHookInput, protectPlan } from './hooks.js';
 import { toMermaid } from './mermaid.js';
 import { OpRefusedError, PlanInvariantError, type Op } from './reducer.js';
 import { replayIssues } from './replay.js';
@@ -45,13 +48,17 @@ const HELP = `driver <command> [options]
   status [dir]
   where
   apply                                      (ops JSON on stdin: {"ops":[{"op":"block.add",...}],"expectedRevision":N}; "$0" refers to the first created id)
+  discover log                               (JSON on stdin: {"meta":{..},"nodes":[..],"nonGoals":[..]}; appends to discover/interview.jsonl, regenerates the three discover/*.md)
+  discover show                              (interview state and frontier, no write)
   block add <title> --phase <p> [--depends B-001,..] [--req R-001,..] [--provider cap:provider:access] [--credentials A,B] [--risk low|medium|high]
   block set <id> [--title] [--depends] [--req] [--artifacts a,b] [--add-artifact p] [--test ref:layer:result] [--verified true|false] [--provider] [--credentials] [--risk]
+  block doc                                  (JSON on stdin: {"blocks":[{"id":"B-004","spec"?,"acceptance"?:[..],"notes"?,"handoff"?}]}, 1..30; rewrites only the named sections of blocks/<id>.md; no plan change)
   block status <id> <to> [--reason ..] [--owner <platform agent id>] [--force]
   block retire <id> --decision D-001 --reason ..
   block orphan --owner <agentId>
   block owner <id> <agentId> --from <prev>
   decision add --title .. [--reason ..]
+  req doc                                    (JSON on stdin: {"requirements":[{"id":"R-003","statement"?,"acceptance"?,"origin"?,"notes"?}]}, 1..30; rewrites only the named sections of requirements/<id>.md; no plan change)
   req add <title> --kind functional|nonfunctional|constraint|non-goal --source user|assumed [--ref ..] [--doc]
   req retire <id> --decision D-001 --reason ..
   gate approve <route|release> [--via-mod] | gate revoke <route|release> --reason ..
@@ -386,6 +393,34 @@ function applyCmd(env: Env, driverDir: string): Out {
   };
 }
 
+function discoverCmd(env: Env, driverDir: string, sub: string | undefined): Out {
+  if (sub !== 'log' && sub !== 'show') throw new UsageError('discover: expected "log" or "show"');
+  if (!existsSync(path.join(driverDir, 'plan.json'))) throw new NotInitializedError(driverDir);
+  if (sub === 'log') {
+    let raw: unknown;
+    try {
+      raw = JSON.parse(readStdin());
+    } catch {
+      throw new UsageError('discover log: stdin must hold one JSON object {meta?, nodes?, nonGoals?}');
+    }
+    const r = logDiscover(driverDir, raw, env.now);
+    return { text: r.text, json: { ok: true, text: r.text, created: r.created, counts: countsByStatus(r.state), state: r.state, frontier: r.frontier, warnings: r.warnings } };
+  }
+  const { state, exists } = readState(driverDir);
+  const f = frontier(state);
+  const text = exists ? `${summaryText(state)}\n${showNodes(state)}` : 'no discovery interview yet';
+  return { text, json: { ok: true, exists, state, frontier: f } };
+}
+
+function showNodes(state: DiscoverState): string {
+  const m = state.meta;
+  const lines = [`goal: ${line1(m.goal) || '-'}`, `class: ${m.class ?? '-'}; domain: ${line1(m.domain) || '-'}; language: ${line1(m.language) || '-'}; checkpoint: ${m.checkpoint}; accepted: ${m.accepted ? 'yes' : 'no'}`];
+  for (const n of state.nodes)
+    lines.push(`${n.id} [${n.status}${n.assumption ? ` ${n.assumption}` : ''}] ${line1(n.question)}${n.answer ? ` => ${line1(n.answer)}` : ''}`);
+  for (const g of state.nonGoals) lines.push(`${g.id} ${line1(g.statement)}${g.reason ? ` (${line1(g.reason)})` : ''}`);
+  return lines.join('\n');
+}
+
 function blockSet(env: Env, driverDir: string, id: string): Out {
   const f = env.flags;
   const patch: Extract<Op, { type: 'block.set' }>['patch'] = {};
@@ -428,6 +463,8 @@ function runCommand(env0: Env, pos: string[]): Out {
       return whereCmd(env);
     case 'apply':
       return applyCmd(env, dir());
+    case 'discover':
+      return discoverCmd(env, dir(), sub);
     case 'block': {
       switch (sub) {
         case 'add':
@@ -442,6 +479,16 @@ function runCommand(env0: Env, pos: string[]): Out {
           });
         case 'set':
           return blockSet(env, dir(), need(arg, 'block id'));
+        case 'doc': {
+          let raw: unknown;
+          try {
+            raw = JSON.parse(readStdin());
+          } catch {
+            throw new UsageError('block doc: stdin must hold one JSON object {"blocks":[{"id":"B-004","spec"?,"acceptance"?,"notes"?,"handoff"?}]}');
+          }
+          const r = writeBlockDocs(dir(), raw);
+          return { text: r.text, json: { ok: true, text: r.text, blocks: r.blocks } };
+        }
         case 'status': {
           if (f.owner !== undefined && pos[3] !== 'in_progress') throw new UsageError('--owner only applies to in_progress');
           if (f.force) env = confirmAsUser(env, `force block ${arg} -> ${pos[3]} (skips dependency checks) in ${env.cwd}`);
@@ -474,6 +521,16 @@ function runCommand(env0: Env, pos: string[]): Out {
       break;
     }
     case 'req': {
+      if (sub === 'doc') {
+        let raw: unknown;
+        try {
+          raw = JSON.parse(readStdin());
+        } catch {
+          throw new UsageError('req doc: stdin must hold one JSON object {"requirements":[{"id":"R-003","statement"?,"acceptance"?,"origin"?,"notes"?}]}');
+        }
+        const r = writeReqDocs(dir(), raw);
+        return { text: r.text, json: { ok: true, text: r.text, requirements: r.requirements } };
+      }
       if (sub === 'add')
         return commit(
           env,
@@ -666,6 +723,9 @@ function main(argv: string[]): number {
     const known =
       code === 2 ||
       err instanceof OpRefusedError ||
+      err instanceof DiscoverRefusedError ||
+      err instanceof BlockDocRefusedError ||
+      err instanceof ReqDocRefusedError ||
       err instanceof PlanInvariantError ||
       err instanceof LockTimeoutError ||
       err instanceof RevisionConflictError ||

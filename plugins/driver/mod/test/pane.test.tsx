@@ -31,7 +31,7 @@ test('the terminal draws header, controls, phases, gates and rows as text', asyn
   expect((await ui.find({ key: 'done' }))?.text).toBe('Hide done')
   expect((await ui.find({ key: 'retired' }))?.text).toBe('Show retired')
   expect((await ui.find({ key: 'export' }))?.text).toBe('Export Mermaid')
-  expect((await ui.find({ key: 'action' }))?.text).toBe('Advance to validate')
+  expect((await ui.find({ key: 'action' }))?.text).toBe('Continue implement')
   expect(await ui.find({ key: 'focus', type: 'Select' })).toBeDefined()
   await ui.press({ key: 'B-004' })
   expect((await ui.find({ key: 'detail-doc' }))?.text).toContain('Signup API')
@@ -116,7 +116,7 @@ test('mobile draws the card board', async ($, on) => {
     expect((await ui.find({ key: 'done' }))?.text).toBe('Hide done')
     expect((await ui.find({ key: 'retired' }))?.text).toBe('Show retired')
     expect((await ui.find({ key: 'export' }))?.text).toBe('Export Mermaid')
-    expect((await ui.find({ key: 'action' }))?.text).toBe('Advance to validate')
+    expect((await ui.find({ key: 'action' }))?.text).toBe('Continue implement')
     expect(await ui.find({ type: 'Select' })).toBeUndefined()
 
     // detail: no raw front matter, no empty headings, a close button
@@ -197,29 +197,70 @@ const primaryLabel = async ($: Engine, on: On, plan: string) => {
 test('the contextual action in discover is approving gate route', async ($, on) => {
   expect(await primaryLabel($, on, discoverPlan)).toBe('Approve route gate')
 })
-test('the contextual action advances when the next phase is open', async ($, on) => {
-  expect(await primaryLabel($, on, WAITLIST_PLAN)).toBe('Advance to validate')
+test('the contextual action keeps an unfinished phase going', async ($, on) => {
+  expect(await primaryLabel($, on, WAITLIST_PLAN)).toBe('Continue implement')
 })
 test('the contextual action in evolve is approving gate release', async ($, on) => {
   expect(await primaryLabel($, on, evolvePlan)).toBe('Approve release gate')
 })
-test('there is no contextual action after the last phase', async ($, on) => {
-  expect(await primaryLabel($, on, releasePlan)).toBeUndefined()
+test('the last phase keeps going until its blocks are done', async ($, on) => {
+  expect(await primaryLabel($, on, releasePlan)).toBe('Continue release')
 })
 
-test('Advance runs phase advance through the CLI as the model, and refusals are shown', async ($, on) => {
+const implementDone = editPlan(WAITLIST_PLAN, (p) => {
+  for (const id of ['B-004', 'B-005']) p.blocks[id].status = 'done'
+})
+
+test('the contextual action starts the next phase once the current one is complete', async ($, on) => {
+  expect(await primaryLabel($, on, implementDone)).toBe('Start validate')
+})
+
+test('the pane always says what comes next', async ($, on) => {
+  await boot($, on, waitlist)
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect((await ui.find({ type: 'Text', text: /^Next: / }))?.text).toBe('Next: 2 of 3 implement blocks left. "Continue implement" asks Claude to pick up the next one.')
+  await ui.unmount()
+})
+
+test('Continue writes nothing to the plan and hands the phase to Claude', async ($, on) => {
+  const w = await boot($, on, waitlist)
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  await ui.press({ key: 'action' })
+  expect(w.cliRuns().some((r) => r.args[0] === 'phase')).toBe(false)
+  expect(w.prompts).toHaveLength(1)
+  expect(w.prompts[0]).toContain('pressed "Continue implement" in the pane')
+  expect(w.prompts[0]).toContain('mcp__driver__plan_status')
+  await ui.unmount()
+})
+
+test('Start runs phase advance through the CLI as the model, then hands the phase to Claude; refusals are shown', async ($, on) => {
   let refuse = true
-  const w = await boot($, on, waitlist, (args) =>
-    args[0] === 'phase' ? (refuse ? { exitCode: 1, stderr: 'DRIVER: phase validate needs B-004 done' } : { stdout: JSON.stringify({ ok: true, revision: 35 }) }) : {},
+  const w = await boot($, on, { [PLAN_FILE]: implementDone }, (args) =>
+    args[0] === 'phase' ? (refuse ? { exitCode: 1, stderr: 'DRIVER: phase validate is not open' } : { stdout: JSON.stringify({ ok: true, revision: 35 }) }) : {},
   )
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
   await ui.press({ key: 'action' })
   expect(w.cliRuns().find((r) => r.args[0] === 'phase')?.args).toEqual(expect.arrayContaining(['phase', 'advance']))
   expect(w.cliRuns().find((r) => r.args[0] === 'phase')?.args.join(' ')).not.toContain('user:')
-  expect((await ui.find({ type: 'Text', text: /needs B-004 done/ }))?.text).toContain('phase validate')
+  expect((await ui.find({ type: 'Text', text: /is not open/ }))?.text).toContain('phase validate')
+  expect(w.prompts).toHaveLength(0)
   refuse = false
   await ui.press({ key: 'action' })
-  expect(w.toasts.join('\n')).toContain('Advanced to validate.')
+  expect(w.toasts.join('\n')).toContain('Started validate.')
+  expect(w.prompts).toHaveLength(1)
+  await ui.unmount()
+})
+
+test('approving the route gate in the pane advances to route and starts the route skill', async ($, on) => {
+  const w = await boot($, on, { [PLAN_FILE]: discoverPlan }, (args) => (args[0] === 'gate' ? { stdout: JSON.stringify({ ok: true, revision: 35 }) } : {}))
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  await ui.press({ key: 'action' })
+  expect(w.prompts).toHaveLength(0)
+  await ui.press({ key: 'confirm-yes' })
+  const order = w.cliRuns().map((r) => r.args[0]).filter((a) => a === 'gate' || a === 'phase')
+  expect(order).toEqual(['gate', 'phase'])
+  expect(w.prompts).toEqual([expect.stringContaining('approved the route gate')])
+  expect(w.prompts[0]).toContain('Run the driver:route skill now.')
   await ui.unmount()
 })
 
@@ -308,7 +349,7 @@ test('approving a gate takes two presses and sends the nonce on stdin only', asy
 
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
   await ui.press({ key: 'action' })
-  expect((await ui.find({ type: 'Text', text: /Approve release gate/ }))?.text).toBe('Approve release gate at revision 34 (baseline 1)?')
+  expect((await ui.find({ type: 'Text', text: /Approve release gate/ }))?.text).toBe('Approve release gate at revision 34 (baseline 1) and start release?')
   expect(w.writes).toHaveLength(0)
   await ui.press({ key: 'confirm-no' })
   expect(await ui.find({ key: 'confirm-yes' })).toBeUndefined()
@@ -328,4 +369,46 @@ test('approving a gate takes two presses and sends the nonce on stdin only', asy
   expect(call?.args.join(' ')).not.toContain(nonce)
   expect(ticket!.text).not.toContain(nonce)
   await ui.unmount()
+})
+
+test('a session that starts in a spare directory finds the project once it is moved, and opens the pane', async ($, on) => {
+  const w = world(on, waitlist)
+  w.place = '/spare'
+  w.cli = (args) =>
+    args[0] === 'where'
+      ? w.place === ROOT
+        ? whereReply()
+        : { stdout: JSON.stringify({ root: '/spare', driverDir: '/spare/.claude/driver', planExists: false }) }
+      : {}
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  const clock = mock.clock(on)
+  await $.session.start({ cwd: '/spare', surface: 'desktop', isInteractive: true })
+  expect(w.opens).toBe(0)
+
+  w.place = ROOT
+  await clock.advance(1100)
+  expect(w.opens).toBe(1)
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect(await ui.find({ type: 'Text', text: /^DRIVER · web-waitlist/ })).toBeDefined()
+  await ui.unmount()
+})
+
+const planShowsUp = async ($: Engine, on: On, surface: 'desktop' | 'terminal') => {
+  const w = world(on)
+  w.cli = (args) => (args[0] === 'where' ? whereReply(false) : {})
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  const clock = mock.clock(on)
+  await $.session.start({ cwd: ROOT, surface, isInteractive: true })
+  w.files.set(PLAN_FILE, WAITLIST_PLAN)
+  w.touch()
+  await clock.advance(5100)
+  return w.opens
+}
+
+test('a plan created during the session opens the pane on the desktop', async ($, on) => {
+  expect(await planShowsUp($, on, 'desktop')).toBe(1)
+})
+
+test('a plan created during the session opens no pane on the terminal', async ($, on) => {
+  expect(await planShowsUp($, on, 'terminal')).toBe(0)
 })

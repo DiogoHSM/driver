@@ -26,11 +26,14 @@ test('/driver approve from the composer writes a ticket and hands the nonce over
   const w = world(on, { [PLAN_FILE]: WAITLIST_PLAN })
   w.cli = (args) => (args[0] === 'where' ? whereReply() : { stdout: JSON.stringify({ ok: true, revision: 35 }) })
   on('session.start', (_, e) => ({ cwd: e.cwd }))
-  mock.clock(on, { now: 5_000 })
+  const clock = mock.clock(on, { now: 5_000 })
   await $.session.start({ cwd: ROOT, surface: 'terminal', isInteractive: true })
 
   const r = await $.command.run(typed('approve release', { kind: 'composer' }))
-  expect(r.text).toBe('Approved gate release at revision 34.')
+  expect(r.text).toBe('Approved gate release at revision 34. Started release. Claude takes it from here.')
+  expect(w.prompts).toHaveLength(0)
+  await clock.advance(60)
+  expect(w.prompts).toEqual([expect.stringContaining('approved the release gate')])
   expect(r.context).toEqual(['User approved gate release via /driver at rev 34'])
 
   expect(w.writes).toHaveLength(1)

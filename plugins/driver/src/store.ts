@@ -16,6 +16,7 @@ import {
   writeSync,
 } from 'node:fs';
 import path from 'node:path';
+import { BLOCK_HEADINGS, sectionText } from './md-sections.js';
 import { OpRefusedError, applyOp, type Event, type Op, type OpContext } from './reducer.js';
 import { PlanV1Schema, emptyPlan, type PlanV1 } from './schema.js';
 
@@ -67,7 +68,16 @@ export function resolveProjectRoot(cwd: string): string {
   const main = parseMainWorktree(git(cwd, ['worktree', 'list', '--porcelain']) ?? '');
   // In a submodule `worktree list` reports the gitdir under .git/modules/, not a working tree.
   if (main && !/[\\/]\.git[\\/]modules[\\/]/.test(main)) return main;
-  return top ? top : path.resolve(cwd);
+  if (top) return top;
+  // Outside git a shell that moved into a subdirectory still belongs to the project above it:
+  // the nearest ancestor that already holds a plan wins over the directory itself.
+  const start = path.resolve(cwd);
+  for (let dir = start; ; ) {
+    if (existsSync(path.join(dir, '.claude', 'driver', 'plan.json'))) return dir;
+    const up = path.dirname(dir);
+    if (up === dir) return start;
+    dir = up;
+  }
 }
 
 export const driverDirOf = (root: string): string => path.join(root, '.claude', 'driver');
@@ -319,14 +329,10 @@ function writeDocs(driverDir: string, op: Op, created: string | undefined, plan:
 export function checkHandoff(driverDir: string, id: string): void {
   const file = path.join(driverDir, 'blocks', `${id}.md`);
   if (!existsSync(file)) throw new OpRefusedError(`in_review requires ${file} with a ## Handoff section`);
-  const lines = readFileSync(file, 'utf8').split('\n');
-  const start = lines.findIndex((l) => /^##\s+Handoff\s*$/.test(l));
-  if (start < 0) throw new OpRefusedError(`${id}.md has no ## Handoff section`);
-  const body = [];
-  for (const l of lines.slice(start + 1)) {
-    if (/^#{1,2}\s/.test(l)) break;
-    body.push(l);
-  }
+  const body = sectionText(readFileSync(file, 'utf8'), BLOCK_HEADINGS, 'Handoff', (m) => {
+    throw new OpRefusedError(`${id}.md: ${m}`);
+  });
+  if (!body) throw new OpRefusedError(`${id}.md has no ## Handoff section`);
   if (!body.some((l) => l.trim() !== ''))
     throw new OpRefusedError(`${id}.md: write the ## Handoff section before moving to in_review (or use --force as the user)`);
 }

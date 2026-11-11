@@ -63,6 +63,8 @@ export type DriverUi = {
   initName: string
   exportPath: string | null
   notice: string | null
+  /** ADR-015: the person switched the Implement autopilot on for this session. */
+  autopilot: boolean
 }
 
 export type DriverDetail = {

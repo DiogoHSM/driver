@@ -19,7 +19,7 @@ Observable and testable, in the user's language. Each line can be checked by a p
 
 ## Origin
 
-Q-05 (user answer, round 2)
+Q-05 (user answer)
 
 ## Notes
 

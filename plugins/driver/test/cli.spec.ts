@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { appendFileSync, cpSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { mutate } from '../src/store.js';
@@ -313,10 +313,30 @@ describe('hook gate-check (bash script and node implementation agree)', () => {
       expect(decision(run(i))).toBe('deny');
     });
 
+    it('outside git, a subdirectory of the project is gated by the plan above it', () => {
+      const d = tmp();
+      const plan = loadFixture('valid', 'mid-implement');
+      plan.gates.route.approved = false;
+      writePlanFile(d, plan);
+      const sub = path.join(d, 'App', 'Features');
+      mkdirSync(sub, { recursive: true });
+      expect(decision(run(input(sub, 'DRIVER-BLOCK: B-003 go')))).toBe('deny');
+    });
+
     it('corrupt plan.json -> deny (fail closed)', () => {
       const d = tmp();
       writePlanFile(d, '{ not json');
       expect(decision(run(input(d)))).toBe('deny');
+    });
+
+    it('outside git, a subdirectory of the project is gated by the plan above it', () => {
+      const d = tmp();
+      const plan = loadFixture('valid', 'mid-implement');
+      plan.gates.route.approved = false;
+      writePlanFile(d, plan);
+      const sub = path.join(d, 'App', 'Features');
+      mkdirSync(sub, { recursive: true });
+      expect(decision(run(input(sub, 'DRIVER-BLOCK: B-003 go')))).toBe('deny');
     });
 
     it('plan.json that is not an object -> deny', () => {

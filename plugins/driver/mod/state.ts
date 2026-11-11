@@ -27,6 +27,7 @@ export const DEFAULT_UI: DriverUi = {
   initName: '',
   exportPath: null,
   notice: null,
+  autopilot: false,
 }
 
 const pathsAtom = atom({ plugin: 'driver', key: 'paths' } as const, null)
@@ -87,12 +88,35 @@ async function fallbackPaths($: Dollar): Promise<DriverPaths> {
   return { root, driverDir, planExists: await $.fs.exists(`${driverDir}/plan.json`) }
 }
 
+// Where the session was when the paths were resolved. The Desktop app can start a session in a
+// spare directory and move it to the real project afterwards; paths resolved before the move
+// point at the spare, so they are resolved again whenever the session's place changes.
+let anchor: string | undefined
+
+async function sessionPlace($: Dollar): Promise<string | undefined> {
+  try {
+    const [root, cwd] = await Promise.all([$.session.root(), $.session.cwd()])
+    return `${root}\n${cwd}`
+  } catch {
+    return undefined
+  }
+}
+
 /** Paths from state; without them, derived from the session root (no process is spawned). */
 export async function getPaths($: Dollar): Promise<DriverPaths | null> {
   const known = await read($, pathsAtom)
-  if (known) return known
+  if (known) {
+    const place = await sessionPlace($)
+    if (place === undefined || anchor === undefined || place === anchor) {
+      if (anchor === undefined) anchor = place
+      return known
+    }
+    lastSig = ''
+    return refreshPaths($)
+  }
   try {
     const p = await fallbackPaths($)
+    anchor = await sessionPlace($)
     await update($, pathsAtom, () => p)
     return p
   } catch {
@@ -102,6 +126,7 @@ export async function getPaths($: Dollar): Promise<DriverPaths | null> {
 
 /** Asks the CLI where the project is (`where --json`); falls back to the session root. */
 export async function refreshPaths($: Dollar): Promise<DriverPaths | null> {
+  anchor = await sessionPlace($)
   const r = await runCli($, ['where'], { noRoot: true })
   const j = r.json as Partial<DriverPaths> | undefined
   if (r.ok && j && typeof j.root === 'string' && typeof j.driverDir === 'string') {
@@ -163,6 +188,14 @@ export async function loadDetail($: Dollar, id: string, revision: number): Promi
 let lastSig = ''
 let timer: Timer | undefined
 let timerMs = 0
+// undefined until the first look; false once a look found no plan. A plan that shows up after
+// that (init, or the session moving into a project that has one) opens the pane once, if asked.
+let sawPlan: boolean | undefined
+let opensOnAppear = false
+
+export function setOpensOnAppear(value: boolean): void {
+  opensOnAppear = value
+}
 
 async function invalidIssues($: Dollar, message: string): Promise<DriverIssue[]> {
   const r = await runCli($, ['validate'])
@@ -258,9 +291,13 @@ export async function tick($: Dollar, force = false): Promise<void> {
       await update($, detailAtom, () => null)
     }
     if (paths.planExists) await update($, pathsAtom, (p) => (p ? { ...p, planExists: false } : p))
+    sawPlan = false
     return
   }
   if (!paths.planExists) await update($, pathsAtom, (p) => (p ? { ...p, planExists: true } : p))
+  const isNew = sawPlan === false
+  sawPlan = true
+  if (isNew && opensOnAppear) void $.ui.open({ id: PANE_ID, title: 'DRIVER', columns: 72, closeOnEscape: true }).catch(() => undefined)
   if (!force && sig === lastSig) return
   lastSig = sig
 
@@ -308,6 +345,9 @@ export function resetPoller(): void {
   timer = undefined
   timerMs = 0
   lastSig = ''
+  anchor = undefined
+  sawPlan = undefined
+  opensOnAppear = false
   prev = undefined
   flagged.clear()
   warned.clear()

@@ -521,6 +521,8 @@ function substitutions(body: string, shellQuoting = false): string[] {
 const hasGlob = (t: string): boolean => /[*?[]/.test(t);
 
 function globToRegExp(seg: string): RegExp {
+  // `[]a]`, `[!]]`, `[[:alpha:]]`: valid shell classes this translation does not model; assume they match
+  if (/\[[!^]?\]|\[:/.test(seg)) return /^[\s\S]*$/;
   let re = '';
   for (let i = 0; i < seg.length; i++) {
     const c = seg[i]!;
@@ -535,7 +537,13 @@ function globToRegExp(seg: string): RegExp {
       }
     } else re += c.replace(/[.+^${}()|\\]/g, '\\$&');
   }
-  return new RegExp(`^${re}$`, 'i');
+  try {
+    return new RegExp(`^${re}$`, 'i');
+  } catch {
+    // a bracket that is no valid class (`[adr-012]`, range out of order): the shell matches it
+    // literally, so does this
+    return new RegExp(`^${seg.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+  }
 }
 
 const isProtectedBase = (b: string): boolean => b === 'plan.json' || b === 'events.jsonl' || b === 'ticket.json' || /^rel-\d+\.jsonl$/.test(b);
@@ -549,11 +557,21 @@ interface Ctx {
 
 /** Whether a path-like token names (or may expand to) something only the CLI may write. */
 function isProtectedToken(raw: string, ctx: Ctx): boolean {
+  // brace expansion names several files at once: `{plan,x}.json`
+  const brace = /^(.*?)\{([^{}]*,[^{}]*)\}(.*)$/.exec(raw);
+  if (brace) return brace[2]!.split(',').slice(0, 32).some((alt) => isProtectedToken(brace[1]! + alt + brace[3]!, ctx));
+  // a sequence `{a..c}` or a zsh alternation `(a|b)` stands for names not written here: judge it as a `*`
+  if (/\{[^{}]*\.\.[^{}]*\}|\(/.test(raw)) {
+    const starred = raw.replace(/\{[^{}]*\.\.[^{}]*\}/g, '*').replace(/\(.*$/, '*');
+    return isProtectedToken(starred, { ...ctx, globRisk: true });
+  }
   const eq = /^(?:--?[\w-]+|[a-z]+)=(.*)$/i.exec(raw);
   const tok = normalizePath(eq ? eq[1]! : raw).toLowerCase();
   if (!tok) return false;
   const segs = tok.split('/').filter(Boolean);
   if (segs.length === 0) return false;
+  // inside the plan dir every file under log/ belongs to the CLI
+  if (ctx.cdProtected && segs[0] === 'log') return true;
   if (segs.includes('.mod') || isProtectedBase(segs[segs.length - 1]!)) return true;
   for (let i = 0; i < segs.length; i++) {
     if (segs[i] !== '.claude') continue;
@@ -581,29 +599,83 @@ const unaryFlag = (a: string): boolean => a.startsWith('-');
  * path, so a dot-star substitution must not read as a glob over protected names. The script is the value of
  * `-e`/`--expression`/`-f`/`--file`, or the first operand when no such flag names it.
  */
-function editOperands(args: string[]): string[] {
-  const out: string[] = [];
+function editArgs(cmd: string, args: string[]): { operands: string[]; scripts: string[]; inPlace: boolean; scriptFile: boolean } {
+  const operands: string[] = [];
+  const scripts: string[] = [];
+  let inPlace = false;
+  let scriptFile = false;
   let scriptSeen = false;
+  // sed: -e script, -f file, -E is a regex flag; perl and ruby: -e and -E are both code
+  const scriptLetters = cmd === 'sed' ? 'e' : 'eE';
+  const inPlaceLetters = cmd === 'sed' ? 'iI' : 'i';
   for (let i = 0; i < args.length; i++) {
     const a = args[i]!;
-    if (a === '-e' || a === '--expression' || a === '-f' || a === '--file' || /^-[A-Za-z]*[ef]$/.test(a)) {
-      scriptSeen = true;
-      i++;
+    if (a === '--') {
+      for (const rest of args.slice(i + 1)) {
+        if (!scriptSeen) {
+          scriptSeen = true;
+          scripts.push(rest);
+        } else operands.push(rest);
+      }
+      break;
+    }
+    if (a.startsWith('--')) {
+      const m = /^--(expression|file|in-place)(?:=(.*))?$/.exec(a);
+      if (!m) continue;
+      if (m[1] === 'in-place') inPlace = true;
+      else {
+        scriptSeen = true;
+        if (m[1] === 'file') scriptFile = true;
+        else scripts.push(m[2] ?? args[++i] ?? '');
+        if (m[1] === 'file' && m[2] === undefined) i++;
+      }
       continue;
     }
-    if (/^--?(expression|file)=/.test(a)) {
-      scriptSeen = true;
+    if (a.startsWith('-') && a.length > 1) {
+      // a flag cluster, read letter by letter: the script may be glued to its letter (`-es/a/b/`)
+      for (let k = 1; k < a.length; k++) {
+        const c = a[k]!;
+        if (scriptLetters.includes(c)) {
+          scriptSeen = true;
+          scripts.push(k + 1 < a.length ? a.slice(k + 1) : (args[++i] ?? ''));
+          break;
+        }
+        if (cmd === 'sed' && c === 'f') {
+          scriptSeen = true;
+          scriptFile = true;
+          if (k + 1 >= a.length) i++;
+          break;
+        }
+        if (inPlaceLetters.includes(c)) {
+          inPlace = true;
+          break; // the rest of the cluster is the backup suffix
+        }
+        if (cmd === 'sed' && c === 'l') {
+          if (k + 1 >= a.length) i++; // GNU -l N: the line length is not the script
+          break;
+        }
+        if (!/[A-Za-z0-9]/.test(c)) break;
+      }
       continue;
     }
-    if (unaryFlag(a)) continue;
     if (!scriptSeen) {
       scriptSeen = true;
+      scripts.push(a);
       continue;
     }
-    out.push(a);
+    operands.push(a);
   }
-  return out;
+  return { operands, scripts, inPlace, scriptFile };
 }
+
+/** An operand the shell may turn into other names: globs, braces, zsh alternation, tilde, `=cmd`, expansions. */
+const mayExpand = (o: string): boolean => /[*?[{(|~<$`]/.test(o) || o.startsWith('=');
+
+/** sed's `w file`, `s///w file` and GNU `e command`: a sed script can write files and run commands. */
+const SED_WRITES = /(^|[;{}\n])\s*[0-9,$!+~\s]*[wW]\s*\S|\/[gpiImMe0-9]*\s*[wW]\s+\S/;
+const SED_EXEC = /(^|[;{}\n])\s*([0-9,$!+~\s]*|\/.*\/[IM,]*\s*)e(\s|$)|(^|[;{}\n])[\s/]*e\s+\S|\/[gpiImMw0-9]*e[gpiImM0-9]*\s*($|[;}\n])/;
+/** `$VAR`, `${…}`, `$(…)` or a backtick: text the shell rewrites before the command sees it (`$/` is a regex anchor). */
+const EXPANDS = /\$[A-Za-z_{(]|`/;
 
 /** Does this simple command write a protected target? */
 function writesProtected(w: string[], ctx: Ctx): boolean {
@@ -625,8 +697,26 @@ function writesProtected(w: string[], ctx: Ctx): boolean {
     const extract = args.some((a) => /^-?[a-zA-Z]*x[a-zA-Z]*$/.test(a) && !a.startsWith('--')) || args.includes('--extract');
     return extract && (anyProt || ctx.cdProtected);
   }
-  if (cmd === 'sed') return (args.some((a) => a === '--in-place' || /^-[A-Za-z]*i/.test(a))) && (editOperands(args).some(prot) || ctx.cdProtected);
-  if (cmd === 'perl' || cmd === 'ruby') return args.some((a) => /^-[A-Za-z]*i/.test(a)) && (editOperands(args).some(prot) || ctx.cdProtected);
+  if (cmd === 'sed') {
+    const e = editArgs(cmd, args);
+    // the script itself may write (`w file`, `s///w file`) or run a command (GNU `e`), with or without -i
+    const near = (s: string): boolean => PROTECTED_MENTION.test(s) || ctx.cdProtected;
+    const scripts = e.scripts.map(restoreSeparators);
+    // `e` runs a shell command and is never needed here; `w` matters near protected files;
+    // in the plan dir a script the shell expands may carry either
+    if (scripts.some((s) => SED_EXEC.test(s) || (SED_WRITES.test(s) && near(s)) || (ctx.cdProtected && EXPANDS.test(s)))) return true;
+    if (e.scriptFile && ctx.cdProtected) return true; // a script file is not read here
+    if (!e.inPlace) return false;
+    // after a cd into the plan dir a named, unprotected file (discover/interview.md) is fine;
+    // no operand, or one the shell may expand, can still land on a protected file
+    return e.operands.some(prot) || (ctx.cdProtected && (e.operands.length === 0 || e.operands.some(mayExpand)));
+  }
+  if (cmd === 'perl' || cmd === 'ruby') {
+    // the code is arbitrary: in the plan dir any in-place run is denied; elsewhere the operands decide
+    // (code that names a protected file is caught by inlineScriptMentions)
+    const e = editArgs(cmd, args);
+    return e.inPlace && (e.operands.some(prot) || ctx.cdProtected);
+  }
   if (cmd === 'awk' || cmd === 'gawk') return args.includes('inplace') && (anyProt || ctx.cdProtected);
   if (cmd === 'find') return args.some((a) => ['-delete', '-exec', '-execdir', '-ok'].includes(a)) && (anyProt || ctx.cdProtected);
   if (cmd === 'git') {
@@ -646,7 +736,16 @@ function contextOf(norm: string): Ctx {
   const words = commandWords(norm);
   const globRisk = /\.claude/i.test(norm) || words.some((w) => baseName(w[0]!) === 'cd');
   const ctx: Ctx = { globRisk, cdProtected: false };
-  ctx.cdProtected = words.some((w) => baseName(w[0]!) === 'cd' && w.slice(1).some((a) => !unaryFlag(a) && isProtectedToken(a, { ...ctx, cdProtected: true })));
+  const cds = words.filter((w) => ['cd', 'pushd', 'popd'].includes(baseName(w[0]!)));
+  const probe: Ctx = { globRisk, cdProtected: false };
+  ctx.cdProtected = cds.some((w) => w.slice(1).some((a) => !unaryFlag(a) && isProtectedToken(a, probe)));
+  // a cd below the plan dir followed by another cd, or by a path that climbs (`..`), may end up in it
+  if (!ctx.cdProtected) {
+    const below = cds.some((w) => w.slice(1).some((a) => /(^|\/)\.claude(\/|$)/i.test(normalizePath(a))));
+    ctx.cdProtected = below && (cds.length > 1 || /(^|[\s/])\.\.(\/|\s|$)/.test(norm));
+  }
+  // a cd whose target is an expansion may be the plan dir
+  if (!ctx.cdProtected) ctx.cdProtected = cds.some((w) => w.slice(1).some((a) => /[$`]/.test(a)));
   return ctx;
 }
 
@@ -665,7 +764,11 @@ function writesDriverDir(norm: string, ctx: Ctx): boolean {
 function inlineScriptMentions(norm: string, ctx: Ctx): boolean {
   const inline = commandWords(norm).some((w) => {
     const flags = INLINE_INTERPRETER[baseName(w[0]!)];
-    return flags !== undefined && w.slice(1).some((a) => flags.includes(a));
+    if (flags === undefined) return false;
+    const cmd = baseName(w[0]!);
+    // perl and ruby take the code in a flag cluster too: `-pe`, `-pi -e`, `-nE`, `-pes/a/b/`
+    const cluster = cmd === 'perl' || cmd === 'ruby' ? /^-[A-Za-z0-9]*[eE]/ : null;
+    return w.slice(1).some((a) => flags.includes(a) || (cluster !== null && !a.startsWith('--') && cluster.test(a)));
   });
   return inline && (PROTECTED_MENTION.test(norm) || ctx.cdProtected);
 }

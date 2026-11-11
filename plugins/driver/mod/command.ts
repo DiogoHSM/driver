@@ -4,6 +4,8 @@ import { BLOCK_STATUSES, STATUS_LABEL } from '../src/shared/phases.js'
 import { summarize } from '../src/shared/view.js'
 import type { DriverGateName, DriverView } from '../types'
 import { approveViaMod } from './approve.js'
+import { setAutopilot } from './autopilot.js'
+import { afterApproval } from './next.js'
 import { refusal, runCli, type Dollar } from './cli.js'
 import { PANE_ID, ensurePoller, forceTick, getPaths, refreshPaths, getView } from './state.js'
 
@@ -77,12 +79,22 @@ export function registerCommand(on: On): void {
       if (e.origin.kind !== 'composer') return { text: NOT_TYPED }
       const gate = rest[0]
       if (!gate || !GATES.includes(gate)) return { text: 'Usage: /driver approve <route|release>' }
+      const before = await getView($)
       const r = await approveViaMod($, gate as DriverGateName)
+      if (!r.ok || !before) return { text: r.message }
+      // ADR-014: an approval leads somewhere. The gate's phase starts at once, as a turn of its own.
+      const started = await afterApproval($, gate as DriverGateName, before.currentPhase, true)
       return {
-        text: r.message,
-        ...(r.ok ? { context: [`User approved gate ${gate} via /driver at rev ${r.seenRevision ?? '?'}`] } : {}),
+        text: `${r.message} ${started.message}`,
+        context: [`User approved gate ${gate} via /driver at rev ${r.seenRevision ?? '?'}`],
       }
     }
-    return { text: 'Usage: /driver [status|export|init <name>|approve <route|release>]' }
+    if (sub === 'auto') {
+      // Like approval, the autopilot is the person's switch: the model cannot turn it on for itself.
+      if (e.origin.kind !== 'composer') return { text: 'DRIVER: the autopilot is switched by you (/driver auto on|off, or the Autopilot button in the pane).' }
+      if (rest[0] !== 'on' && rest[0] !== 'off') return { text: 'Usage: /driver auto <on|off>' }
+      return { text: await setAutopilot($, rest[0] === 'on') }
+    }
+    return { text: 'Usage: /driver [status|export|init <name>|approve <route|release>|auto <on|off>]' }
   }).catch(($, e, next) => (next.called ? next(e) : { text: 'DRIVER: the command failed unexpectedly.' }))
 }

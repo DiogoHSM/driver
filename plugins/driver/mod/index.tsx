@@ -1,10 +1,11 @@
 import type { Register } from 'claude-code'
 
 import { setConfig } from './cli.js'
+import { registerAutopilot, resetAutopilot } from './autopilot.js'
 import { openPane, registerCommand } from './command.js'
 import { registerSpawnGuard, registerToolGuard, resetPending } from './hooks.js'
 import { registerPane } from './pane.js'
-import { ensurePoller, getPaths, refreshPaths, resetPoller, tick } from './state.js'
+import { ensurePoller, getPaths, refreshPaths, resetPoller, setOpensOnAppear, tick } from './state.js'
 import { resetTickets } from './tickets.js'
 import { registerToolHooks, registerTools } from './tools.js'
 
@@ -13,6 +14,7 @@ export const register: Register = (on, options) => {
   resetPoller()
   resetTickets()
   resetPending()
+  resetAutopilot()
 
   on('session.start', async ($, e, next) => {
     try {
@@ -20,9 +22,12 @@ export const register: Register = (on, options) => {
       await $.command.register({
         name: 'driver',
         description: 'DRIVER plan: open the pane, show status, export the diagram, init a plan, approve a gate',
-        argumentHint: '[status|export|init <name>|approve <route|release>]',
+        argumentHint: '[status|export|init <name>|approve <route|release>|auto <on|off>]',
       })
       const paths = (await refreshPaths($)) ?? (await getPaths($))
+      // A plan created later in the session (or found once the app moves the session into the
+      // real project) opens the pane too, under the same rule as below.
+      setOpensOnAppear(e.surface !== 'terminal')
       await tick($, true)
       ensurePoller($)
       // Never open a pane unasked on the terminal; elsewhere ui.open is harmless when no surface
@@ -40,4 +45,5 @@ export const register: Register = (on, options) => {
   registerSpawnGuard(on)
   registerToolGuard(on)
   registerCommand(on)
+  registerAutopilot(on)
 }

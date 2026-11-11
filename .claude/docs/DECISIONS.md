@@ -214,6 +214,74 @@ Rejeitados: `brainstorming` do superpowers como Discover (texto livre, sem persi
 
 ---
 
+## [ADR-013] Entrevista por interesse: núcleo de produto, áreas por escolha, resumo como mensagem final, registro silencioso
+**Data:** 2026-11-10
+**Status:** Aceito (revisa o ADR-008 e os itens 2 e 5 do ADR-012)
+
+### Contexto
+Primeiro dogfooding das skills (cópia de `examples/web-waitlist`, classe S). O protocolo funcionou, mas o Diogo apontou quatro problemas: (1) entrevista longa demais para o tamanho, porque "dados pessoais" (um campo de e-mail) subiu a profundidade para classe M e o teto por rodada virou meta; (2) perguntas técnicas de baixo impacto feitas a quem pode não querer decidi-las, sem que decisões relevantes possam ser tomadas às escondidas; (3) o resumo de aceite não apareceu: texto escrito antes de uma chamada de ferramenta é condensado no terminal, e a pergunta "o resumo acima está correto?" ficou sem resumo; (4) cada resposta gerava um diff de `interview.md` na tela, e as edições por `sed` esbarravam no guard.
+
+### Decisão
+1. **Núcleo de produto, sempre perguntado.** Depois da classificação (domínio e tamanho), a entrevista pergunta só o que apenas o usuário sabe: objetivo e sinal de sucesso, público, capacidades indispensáveis, o que fica de fora. Orçamento total do núcleo, contado em perguntas e não em rodadas: XS 2, S 4, M 6, L 8. É teto, não meta: nó com default seguro vira premissa sem pergunta.
+2. **Áreas técnicas por escolha.** Depois do núcleo, uma pergunta de múltipla escolha: "Em quais áreas você quer decidir os detalhes?", com 2 a 4 áreas derivadas do domínio (para web: infraestrutura e hospedagem, dados e privacidade, design e conteúdo, métricas). Área marcada: até 3 perguntas. Área não marcada: o modelo decide e registra cada decisão como premissa `A-nn` com a escolha e o motivo em uma linha. XS pula a pergunta de áreas (tudo decidido pelo modelo e mostrado no resumo).
+3. **Exceção de sempre perguntar.** Decisão cara de reverter, que gasta dinheiro, que coleta dado sensível (pagamento, saúde, documentos, menores) ou que age em produção é perguntada mesmo com a área pulada. Substitui a subida de classe do ADR-008: um e-mail de contato não é gatilho.
+4. **Progresso e saída antecipada.** Toda pergunta traz o progresso ("3 de ~6"). A partir da terceira pergunta depois da classificação, uma das opções é "Já basta, resuma": os nós abertos viram premissas com o default recomendado. Checkpoint (pre-mortem, red team, socrático) só para classe M e L.
+5. **Resumo como mensagem final do turno.** O resumo é texto corrido na língua do usuário, sem chamada de ferramenta depois dele no mesmo turno: objetivo, o que será construído, o que o usuário decidiu, o que o modelo decidiu por ele (com motivo), o que fica de fora, perguntas em aberto. Termina pedindo "aceito" ou o que mudar; o usuário também pode perguntar o porquê de uma decisão ou abrir uma área pulada. O mesmo texto é gravado em `.claude/driver/discover/summary.md`. O aceite vem na mensagem seguinte do usuário; só então roda o lote de saída.
+6. **Registro silencioso pela tool `mcp__driver__discover_log`.** Fonte de verdade da entrevista passa a ser `.claude/driver/discover/interview.jsonl` (append-only, escrito só pela CLI). A tool chama `driver discover log` (JSON na stdin) e a CLI regenera `interview.md`, `assumptions.md` e `non-goals.md` a partir do log; o modelo não edita mais esses três arquivos. Sem argumentos de escrita a tool devolve o estado (meta, nós, não-objetivos, fronteira) para retomada. Contrato:
+   - entrada `{ meta?, nodes?, nonGoals? }`, todos opcionais;
+   - `meta`: `goal`, `class` (XS|S|M|L), `domain`, `language`, `stage` (core|areas|summary|closed), `areas` (lista oferecida), `chosenAreas`, `reclassified` (bool), `checkpoint` (none|pre-mortem|red-team|socratic|skipped), `batchApplied` (string); chaves ausentes ficam como estão;
+   - `nodes[]`: `id` (`Q-nn`; ausente cria o próximo), `question`, `area` (core ou nome da área), `dependsOn[]`, `kind` (fact|decision), `status` (open|researching|settled|assumed|deferred), `answer`, `source` (user|research|assumed), `options[]` (mostradas), `why` (motivo, obrigatório quando `status` é assumed), `requirement` (`R-nnn`, preenchido depois do lote); atualização é por `id`, campo ausente fica como está; um nó que passa a `assumed` ganha `A-nn` automático;
+   - `nonGoals[]`: `id` (`N-nn`; ausente cria), `statement`, `reason`, `requirement`;
+   - saída: ids criados, contagens por status e a fronteira (nós abertos cujos `dependsOn` estão resolvidos ou assumidos).
+7. **Route segue o mesmo padrão** (acrescentado no mesmo dia, depois de o Diogo rodar o Route no terminal): a confirmação do plano deixa de ser pergunta de ferramenta sobre um diagrama que o terminal não mostra. O turno termina com a lista de blocos por fase (id, título, dependências, risco, o que roda em paralelo), contagem contra a faixa, caminho crítico e blocos de risco alto, na língua do usuário, gravada também em `.claude/driver/route/summary.md`; a confirmação vem na mensagem seguinte. Os documentos de bloco são preenchidos pela tool `mcp__driver__block_doc` (`driver block doc`, JSON na stdin: `{blocks:[{id, spec?, acceptance?[], notes?, handoff?}]}`, 1 a 30 por chamada), que reescreve só as seções nomeadas, preserva frontmatter e título, recusa bloco `done` ou aposentado e não mexe em `plan.json`. As skills não usam mais Write, Edit, `sed` ou redirecionamento em `blocks/` nem nos arquivos gerados de `discover/`.
+8. **Guard.** `sed -i`, `perl -pi` e `ruby -i` depois de um `cd` para dentro da pasta do plano só são negados quando o operando é protegido, é glob ou não existe (antes, qualquer edição in-place ali era negada, inclusive de `discover/interview.md`). Exceção inesperada no guard continua negando a chamada, mas o caso que a provocou vira teste. Mudança no guard passa por revisão adversarial (GUARDRAILS).
+
+9. **Ajustes da revisão adversarial (mesmo dia).** Orçamentos por classe, todos tetos: núcleo XS 2, S 4, M 6, L 8; perguntas de área no total XS 0, S 3, M 6, L 9 (no máximo 3 por área); "sempre perguntar" no máximo 2, fora dos orçamentos e válido para toda classe, por lista fechada (gasta dinheiro; coleta dado de pagamento, saúde, documento ou de menores; apaga dado sem volta; cria compromisso legal). Hospedar, escolher banco e campo de e-mail não são gatilhos. O aceite é gravado (`meta.accepted`) antes do lote de saída, que primeiro lê os requisitos já no plano e só acrescenta o que falta. Só viram requisito decisões que o produto precisa cumprir (classificação e escolha de áreas ficam no registro). Arquivos de requisito passam pela tool `mcp__driver__req_doc`. Corpo de seção não pode conter título de nível 1 ou 2 fora de bloco de código, e o reducer exige exatamente um `## Handoff`. O mod recusa escrita vinda de subagente, exceto estado e documento do bloco de que ele é owner. Os dois resumos (`discover/summary.md`, `route/summary.md`) são documentos do usuário, na língua dele, títulos incluídos.
+10. **Guard, segunda rodada.** Além do item 8: script de `sed` com `w` perto de arquivo protegido ou com `e` é negado, com ou sem `-i`; código de `perl`/`ruby` em qualquer cluster de flags conta como script inline, e edição in-place deles dentro da pasta do plano continua negada; script colado na flag, `-I` do sed BSD, `--in-place=SUF` e `-l N` são reconhecidos; chaves, sequências `{a..b}` e alternância do zsh contam como expansão; `cd` que alcança a pasta do plano por `..`, `pushd` ou variável conta como estar nela; `log/*` relativo é protegido ali.
+
+### Consequências
+A profundidade da entrevista passa a depender do interesse do usuário, não só do tamanho: quem não é técnico responde o núcleo e revisa o resumo; quem quer decidir infra marca a área. A classe continua fixando a faixa de blocos do Route. Custos: mais decisões tomadas pelo modelo (mitigação: nenhuma fica fora do resumo e a exceção do item 3); o aceite custa um turno a mais; `interview.jsonl` é mais um arquivo e a CLI ganha um renderizador de markdown. `interview.jsonl` não entra na lista de arquivos protegidos pelo guard nesta rodada (a skill proíbe editá-lo; proteger é decisão futura se o dogfooding mostrar edição manual). Rejeitado: manter rodadas com tetos menores (não resolve "quem decide o quê"); pôr o resumo no campo de pergunta da ferramenta (limite de tamanho, sem formatação).
+
+---
+
+## [ADR-014] Próximo passo sempre visível: o painel diz o que fazer e o botão principal aciona o Claude
+
+**Data:** 2026-11-11 · **Status:** Aceito · **Issue:** PER-669 (segundo dogfooding)
+
+**Contexto.** No segundo dogfooding (projeto novo, app Desktop) o Discover e o Route correram bem, mas a passagem entre eles deixou o usuário perdido: aprovar o gate e clicar em "Advance to route" mudou a fase no plano e nada mais aconteceu, porque o painel só escreve no plano e não aciona o modelo. Além disso o painel oferecia "Advance to implement" com a fase route sem nenhum bloco, e "Advance to validate" com implement em 0 de 12.
+
+**Decisão.**
+1. O painel mostra sempre uma linha "Next: ..." com o próximo passo, derivada só da `PlanView` (função pura `nextStep`). Nenhum estado do plano fica sem próximo passo visível, salvo release concluída.
+2. O botão principal tem três formas, nesta ordem:
+   - **Approve `<gate>` gate** quando o método pede um gate e ele não está aprovado (regra do ADR-011, inalterada, com as duas confirmações e o ticket). Aprovado o gate, o mod avança a fase e aciona o Claude, sem segundo clique.
+   - **Continue `<fase>`** quando a fase atual não tem blocos ou tem bloco ativo não concluído. Não escreve no plano; só aciona o Claude.
+   - **Start `<próxima fase>`** quando todos os blocos ativos da fase atual estão concluídos e a próxima não depende de gate pendente. Avança a fase e aciona o Claude.
+   O botão "Advance to ..." deixa de existir: avançar com a fase incompleta continua possível pela tool `plan_ops` e pela CLI (o reducer não muda), mas o painel não oferece.
+3. "Acionar o Claude" é `$.prompt.submit` com um texto curto e fixo que nomeia a fase e a skill (`driver:discover`, `driver:route`); para fases ainda sem skill, o texto pede `plan_status`, a lista dos blocos prontos com recomendação e motivo, e a pergunta de qual começar. O envio é um turno próprio, entra na fila se a sessão estiver ocupada e chega ao modelo com origem `plugin`.
+4. `/driver approve <gate>` digitado faz o mesmo que o botão: aprova, avança e aciona.
+5. O prompt enviado pelo mod nunca aprova nada: aprovação continua exigindo origem `composer` ou `ui.press` mais ticket. Um prompt de origem `plugin` é só um pedido de trabalho, igual a uma mensagem do usuário, e passa pelos mesmos hooks de gate.
+
+**Alternativas descartadas.** Só preencher o campo de mensagem com `/driver:route` (minha proposta inicial): ainda exige saber que falta um Enter, e o usuário pediu que aprovar leve adiante. Disparar sem clique ao detectar gate aprovado no polling: gastaria turno por aprovação feita em outro terminal ou sessão.
+
+**Consequências.** Quem aprova um gate aceita gastar o turno seguinte; isso fica dito no texto da confirmação ("Approve and start ..."). As skills de fase devem terminar toda mensagem final com o próximo passo do usuário (já era regra do ADR-013 para Discover e Route; vale para as de B-006).
+
+## [ADR-015] Próximo passo em toda resposta e piloto automático opcional no Implement
+
+**Data:** 2026-11-11 · **Status:** Aceito · **Issue:** PER-669 (segundo dogfooding)
+
+**Contexto.** No Implement do coffee-app o Claude fechou um bloco, fez o commit pedido e encerrou a resposta sem dizer o que vinha depois. O autor sabe que basta pedir para continuar; um usuário comum fica parado. O pedido foi: sempre haver uma dica, uma pergunta, ou uma opção de ligar o automático e deixar o Claude decidir tudo até o fim da implementação.
+
+**Decisão.**
+1. **Regra permanente no prompt.** Em projeto com plano, o mod acrescenta uma seção ao system prompt (`prompt.compose`, id `driver:next-step`, escopo `session`): toda resposta final da sessão principal termina com o próximo passo do usuário, como pergunta com opções ou como a ação exata a tomar; depois de uma tarefa lateral (commit, dúvida) a resposta volta ao plano, lista os blocos prontos e recomenda um com o motivo. Vale em qualquer fase e não depende de skill.
+2. **Piloto automático**, desligado por padrão, ligado pelo usuário no painel (botão "Autopilot") ou por `/driver auto on|off`. Só age na fase implement. Ligado, a cada fim de turno da sessão principal o mod lê o plano e, havendo trabalho, envia o próximo pedido por `$.prompt.submit`. O texto do pedido manda o Claude escolher o bloco, decidir sozinho o que tem padrão seguro, registrar escolhas não óbvias com `decision.add` e não fazer perguntas.
+3. **O piloto para sozinho** (desliga e avisa no painel e por toast) quando: todos os blocos de implement estão concluídos; não há bloco pronto nem em andamento (o que resta está bloqueado); o turno foi interrompido pelo usuário, recusado ou morreu por erro; o plano não mudou de revisão em dois turnos automáticos seguidos; ou passou de 60 turnos automáticos numa ativação.
+4. **O que o piloto nunca decide.** A lista fechada de "sempre perguntar" do ADR-013 (gastar dinheiro, dado de pagamento, saúde, documento ou de menores, apagar sem volta, compromisso legal), mais publicar ou enviar para fora (push, deploy, loja) e credencial ausente. Nesses casos o Claude marca o bloco como `blocked` com o motivo e segue para outro bloco pronto; sem outro, o piloto para pelo item 3. Gates continuam humanos: o piloto não aprova, e nem poderia (ADR-011).
+5. O estado do piloto vive em `$.state` (sessão), não no plano: fechar a sessão desliga.
+
+**Alternativas descartadas.** Hook de fim de turno que só cobra o próximo passo quando falta: exigiria julgar o texto da resposta. Piloto cobrindo validate e evolve: essas fases ainda não têm skill e o Evolve decide escopo; fica para depois de B-006.
+
+**Consequências.** O piloto gasta turnos sem pedir; os cinco freios do item 3 limitam o custo, e o de "plano sem mudança" pega laço improdutivo. Decisões tomadas no automático ficam em `decisions/` para revisão no Evolve.
+
 ## [ADR-008] Proporcionalidade de cerimônia
 **Data:** 2026-10-26 (fechado em 2026-10-30 pelo ADR-012)
 **Status:** Aceito
@@ -232,5 +300,7 @@ A profundidade do Discover e o número de blocos do Route escalam com uma classe
 | L | meses ou um time | 3 ou mais, até a fronteira esvaziar | 8 | 15 a 30 |
 
 Dinheiro, dados pessoais, produção, ações irreversíveis ou domínio regulado sobem a profundidade do Discover em uma classe, sem mudar a faixa de blocos. A classe é registrada como decisão no plano; o usuário pode reclassificar uma vez, ao fim da primeira rodada; exceder a faixa de blocos exige motivo declarado.
+
+**Revisão de 2026-11-10 (ADR-013):** as colunas "Rodadas" e "Perguntas por rodada" e a subida de classe por risco deixam de valer. A classe fixa o orçamento do núcleo da entrevista (XS 2, S 4, M 6, L 8 perguntas no total) e a faixa de blocos; a profundidade técnica vem das áreas que o usuário escolhe.
 
 A faixa de blocos conta só blocos de implement e validate. Os blocos fixos de cada plano ("Discovery interview", "Route plan", "Evolve review" e o bloco de release) são sobrecarga constante e não contam; sem isso XS não caberia em 2 a 4 (revisão de 2026-10-30). XS também dispensa a pergunta de reclassificação e a pergunta de não-objetivos: ambos entram no play back.

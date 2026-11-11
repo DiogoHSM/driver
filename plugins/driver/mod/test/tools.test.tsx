@@ -102,3 +102,118 @@ test('plan_status reads the plan without spawning anything', async ($, on) => {
   expect(block.block.record.status).toBe('in_review')
   expect(w.runs.length).toBe(before)
 })
+
+test('discover_log sends JSON on stdin to discover log, and reads with discover show --json', async ($, on) => {
+  const w = world(on, { [PLAN_FILE]: WAITLIST_PLAN })
+  const text = 'ok; created Q-01\nnodes: 1 (open 1); non-goals: 0; stage: core\nfrontier:\n- Q-01 Who is it for?'
+  const state = { ok: true, exists: true, state: { meta: {}, nodes: [], nonGoals: [] }, frontier: [] }
+  w.cli = (args) =>
+    args[0] === 'where'
+      ? whereReply()
+      : args[0] === 'discover' && args[1] === 'log'
+        ? { stdout: JSON.stringify({ ok: true, text }) }
+        : args[0] === 'discover' && args[1] === 'show'
+          ? { stdout: JSON.stringify(state) }
+          : {}
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  mock.clock(on)
+  await $.session.start({ cwd: ROOT, surface: 'terminal', isInteractive: true })
+
+  const input = { meta: { class: 'S' }, nodes: [{ question: 'Who is it for?', kind: 'decision' }] }
+  const r = await callTool($, { tool: TOOL('discover_log'), ...input })
+  expect(r.result).toBe(text)
+  const run = w.cliRuns().find((x) => x.args[0] === 'discover' && x.args[1] === 'log')!
+  expect(JSON.parse(run.stdin!)).toEqual(input)
+  expect(run.actor).toBe('model:main')
+
+  const read = await callTool($, { tool: TOOL('discover_log') })
+  expect(JSON.parse(String(read.result))).toEqual(state)
+  const show = w.cliRuns().find((x) => x.args[1] === 'show')!
+  expect(show.args).toEqual(['discover', 'show'])
+  expect(show.full).toContain('--json')
+  expect(show.stdin).toBeUndefined()
+
+  expect((await callTool($, { tool: TOOL('discover_log'), nodes: 'x' })).deny).toContain('nodes must be an array')
+})
+
+test('discover_log reports a CLI refusal like the other tools', async ($, on) => {
+  const w = world(on, { [PLAN_FILE]: WAITLIST_PLAN })
+  w.cli = (args) =>
+    args[0] === 'where'
+      ? whereReply()
+      : { exitCode: 1, stdout: JSON.stringify({ ok: false, error: 'nodes[0] (Q-01): status assumed needs a why' }), stderr: 'driver: nodes[0] (Q-01): status assumed needs a why' }
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  mock.clock(on)
+  await $.session.start({ cwd: ROOT, surface: 'terminal', isInteractive: true })
+
+  const r = await callTool($, { tool: TOOL('discover_log'), nodes: [{ id: 'Q-01', status: 'assumed' }] })
+  expect(r.deny).toBe('DRIVER refused: nodes[0] (Q-01): status assumed needs a why')
+})
+
+test('block_doc sends the blocks on stdin to block doc and returns the CLI text', async ($, on) => {
+  const w = world(on, { [PLAN_FILE]: WAITLIST_PLAN })
+  const text = 'B-004: spec, acceptance (2)'
+  w.cli = (args) => (args[0] === 'where' ? whereReply() : args[0] === 'block' && args[1] === 'doc' ? { stdout: JSON.stringify({ ok: true, text }) } : {})
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  mock.clock(on)
+  await $.session.start({ cwd: ROOT, surface: 'terminal', isInteractive: true })
+
+  const blocks = [{ id: 'B-004', spec: 'S', acceptance: ['a', 'b'] }]
+  const r = await callTool($, { tool: TOOL('block_doc'), blocks })
+  expect(r.result).toBe(text)
+  const run = w.cliRuns().find((x) => x.args[0] === 'block' && x.args[1] === 'doc')!
+  expect(run.args).toEqual(['block', 'doc'])
+  expect(JSON.parse(run.stdin!)).toEqual({ blocks })
+
+  expect((await callTool($, { tool: TOOL('block_doc'), blocks: [] })).deny).toContain('1 to 30')
+})
+
+test('req_doc sends the requirements on stdin to req doc', async ($, on) => {
+  const w = world(on, { [PLAN_FILE]: WAITLIST_PLAN })
+  const text = 'R-001: statement'
+  w.cli = (args) => (args[0] === 'where' ? whereReply() : args[0] === 'req' && args[1] === 'doc' ? { stdout: JSON.stringify({ ok: true, text }) } : {})
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  mock.clock(on)
+  await $.session.start({ cwd: ROOT, surface: 'terminal', isInteractive: true })
+
+  const requirements = [{ id: 'R-001', statement: 'S' }]
+  expect((await callTool($, { tool: TOOL('req_doc'), requirements })).result).toBe(text)
+  const run = w.cliRuns().find((x) => x.args[0] === 'req' && x.args[1] === 'doc')!
+  expect(run.args).toEqual(['req', 'doc'])
+  expect(JSON.parse(run.stdin!)).toEqual({ requirements })
+  expect((await callTool($, { tool: TOOL('req_doc'), requirements: [] })).deny).toContain('1 to 30')
+})
+
+const SUBAGENT = 'DRIVER refused: subagents report to the main session; only the main session writes the plan'
+
+test('a subagent may not write the plan, but may read it', async ($, on) => {
+  const plan = JSON.parse(WAITLIST_PLAN)
+  plan.blocks['B-005'].owner = 'sub-1'
+  const w = world(on, { [PLAN_FILE]: JSON.stringify(plan) })
+  w.cli = (args) => (args[0] === 'where' ? whereReply() : args[0] === 'discover' ? { stdout: JSON.stringify({ ok: true, exists: false }) } : { stdout: JSON.stringify({ ok: true, revision: 40, text: 'ok' }) })
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  mock.clock(on)
+  await $.session.start({ cwd: ROOT, surface: 'terminal', isInteractive: true })
+  const before = w.cliRuns().length
+  const as = (input: Record<string, unknown>) => callTool($, { agentId: 'sub-1', ...input })
+
+  expect((await as({ tool: TOOL('plan_ops'), ops: [{ op: 'phase.advance' }] })).deny).toBe(SUBAGENT)
+  expect((await as({ tool: TOOL('discover_log'), meta: { goal: 'g' } })).deny).toBe(SUBAGENT)
+  expect((await as({ tool: TOOL('req_doc'), requirements: [{ id: 'R-001', notes: 'n' }] })).deny).toBe(SUBAGENT)
+  expect((await as({ tool: TOOL('set_block_state'), block: 'B-004', status: 'done' })).deny).toBe(SUBAGENT)
+  expect((await as({ tool: TOOL('block_doc'), blocks: [{ id: 'B-004', notes: 'n' }] })).deny).toBe(SUBAGENT)
+  expect((await as({ tool: TOOL('block_doc'), blocks: [{ id: 'B-005', notes: 'n' }, { id: 'B-004', notes: 'n' }] })).deny).toBe(SUBAGENT)
+  expect(w.cliRuns().length).toBe(before)
+
+  // reads stay open
+  expect((await as({ tool: TOOL('discover_log') })).result).toContain('"exists":false')
+  expect(JSON.parse(String((await as({ tool: TOOL('plan_status') })).result)).revision).toBe(34)
+
+  // the owner of B-005 may move and document it, with itself as the actor
+  expect((await as({ tool: TOOL('set_block_state'), block: 'B-005', status: 'in_review' })).result).toBe('ok rev 40')
+  expect((await as({ tool: TOOL('block_doc'), blocks: [{ id: 'B-005', handoff: 'done' }] })).result).toBe('ok')
+  expect(w.cliRuns().filter((x) => x.args[0] === 'block').map((x) => x.actor)).toEqual(['model:sub-1', 'model:sub-1'])
+
+  // the main session (no agentId) is unaffected
+  expect((await callTool($, { tool: TOOL('plan_ops'), ops: [{ op: 'phase.advance' }] })).result).toBe('ok rev 40')
+})

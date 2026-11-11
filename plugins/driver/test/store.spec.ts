@@ -177,6 +177,16 @@ describe('resolveProjectRoot', () => {
     expect(resolveProjectRoot(d)).toBe(path.resolve(d));
   });
 
+  it('outside git, a subdirectory resolves to the nearest ancestor that holds a plan', () => {
+    const d = tmp();
+    const sub = path.join(d, 'App', 'Features');
+    mkdirSync(sub, { recursive: true });
+    expect(resolveProjectRoot(sub)).toBe(path.resolve(sub));
+    mkdirSync(path.join(d, '.claude', 'driver'), { recursive: true });
+    writeFileSync(path.join(d, '.claude', 'driver', 'plan.json'), '{}');
+    expect(resolveProjectRoot(sub)).toBe(path.resolve(d));
+  });
+
   it('returns the main worktree from a linked worktree', () => {
     const d = tmp();
     const main = path.join(d, 'main');

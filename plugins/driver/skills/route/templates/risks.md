@@ -15,8 +15,8 @@ Likelihood and impact use L (low), M (medium), H (high). One row per risk. A `hi
 
 | Phase | Done when |
 |---|---|
-| discover | Requirements, assumptions and non-goals are written, the user accepted the play back, the route gate is approved. |
-| route | Every non-goal-free requirement has an implement and a validate block, `driver validate` shows no `req.coverage` warning, the user chose "Looks right" on the diagram. |
+| discover | Requirements, assumptions and non-goals are written, the user accepted the summary, the route gate is approved. |
+| route | Every non-goal-free requirement has an implement and a validate block, `driver validate` shows no `req.coverage` warning, the user replied confirming the block list. |
 | implement | Every implement block is `done` with artifacts, a Handoff and its acceptance criteria met. |
 | validate | Every validate block is `done` with test results recorded against the requirements, and no open `needs_rework`. |
 | evolve | The Evolve review block records what changed, what was learned and whether a replan is needed. |

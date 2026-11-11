@@ -55,6 +55,12 @@ export interface World {
   touch: () => void
   /** Where a path lands after symlinks; identity unless a test links something. */
   real: (path: string) => string
+  /** What session.root and session.cwd answer; a test moves it to mimic the app relocating the session. */
+  place: string
+  /** How many times the mod asked for its pane. */
+  opens: number
+  /** Prompts the mod submitted to start a turn. */
+  prompts: string[]
 }
 
 /** Drops --json, --root X, --actor X and --expect-revision N from a CLI argv. */
@@ -93,6 +99,9 @@ export function world(on: On, files: Record<string, string> = {}, store: Record<
       mtime++
     },
     real: (p) => p,
+    place: ROOT,
+    opens: 0,
+    prompts: [],
   }
 
   on('fs.read', (_, e) => {
@@ -138,11 +147,18 @@ export function world(on: On, files: Record<string, string> = {}, store: Record<
       },
     }
   })
-  on('session.root', () => ({ value: ROOT }))
-  on('session.cwd', () => ({ value: ROOT }))
+  on('session.root', () => ({ value: w.place }))
+  on('session.cwd', () => ({ value: w.place }))
   on('agent.list', () => ({ value: w.agents.map((a) => ({ ...a, description: '', type: 'general-purpose' })) }))
   on('ui.panes', () => ({ value: [{ id: 'driver', title: 'DRIVER', isShown: true, isFocused: false, isPlaced: true }] }))
-  on('ui.open', () => ({ value: { isPlaced: true as const } }))
+  on('ui.open', () => {
+    w.opens++
+    return { value: { isPlaced: true as const } }
+  })
+  on('prompt.submit', (_, e) => {
+    w.prompts.push(e.text)
+    return { text: e.text }
+  })
   on('ui.toast', (_, e) => {
     w.toasts.push(e.text)
     return { value: undefined }

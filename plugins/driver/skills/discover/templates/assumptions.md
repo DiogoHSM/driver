@@ -1,23 +1,12 @@
-# Assumptions
+# assumptions.md (generated, read-only)
 
-Each assumption is a premise the project rests on that the user did not state. The log is a contract: the user reviews it at the play back, and Route marks blocks that depend on an assumption as high risk.
+Do not create or edit this file. `driver discover log` regenerates it from `.claude/driver/discover/interview.jsonl`. A node becomes an assumption when you log it with `status: "assumed"`, `source: "assumed"`, an `answer` (the choice) and a `why` (one line). The `A-nn` id is assigned automatically.
 
-## A-01 The project targets a single language (English)
+What it contains, one entry per assumption:
 
-- Why assumed: the user answered "Not sure" and the brief is in English
-- Source node: Q-06
-- Accepted: pending
-- Requirement: R-004
+- `A-nn` and the choice made.
+- Why it was assumed (the `why` field).
+- The source node (`Q-nn`) and its area.
+- The requirement id (`R-nnn`), once the exit batch has run and you sent `requirement` on the node.
 
-## A-03 Sign-ups are stored in a Supabase table
-
-- Why assumed: the user answered "Not sure"; Supabase credentials already exist in the environment
-- Source node: Q-04
-- Accepted: yes
-- Requirement: R-006
-
-Rules:
-
-- Number `A-nn` in creation order. Never renumber.
-- `Accepted` is `pending` until the user confirms it at the play back, then `yes`. A rejected assumption becomes a question again (reopen its node).
-- `Requirement` is filled in at the exit, after `req.add` returns the ids. Before that, write `-`.
+The user reviews the same list, grouped by area, in the summary. Route marks blocks that depend on an assumption as high risk.

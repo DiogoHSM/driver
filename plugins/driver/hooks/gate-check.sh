@@ -34,6 +34,15 @@ plan=""
 for root in "${DRIVER_ROOT:-}" "$main" "$cwd"; do
   if [ -n "$root" ] && [ -f "$root/.claude/driver/plan.json" ]; then plan="$root/.claude/driver/plan.json"; break; fi
 done
+# Outside git a shell that moved into a subdirectory still belongs to the project above it:
+# the nearest ancestor that holds a plan (same rule as resolveProjectRoot in src/store.ts).
+if [ -z "$plan" ] && [ -z "$main" ]; then
+  dir=$cwd
+  while [ -n "$dir" ] && [ "$dir" != "/" ]; do
+    if [ -f "$dir/.claude/driver/plan.json" ]; then plan="$dir/.claude/driver/plan.json"; break; fi
+    dir=$(dirname "$dir")
+  done
+fi
 [ -n "$plan" ] || exit 0
 
 [ "$have_jq" = 1 ] || deny "DRIVER: jq is not installed; cannot verify gates (fail closed)."

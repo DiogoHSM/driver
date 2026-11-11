@@ -1,11 +1,13 @@
 import type { Elements, On } from 'claude-code'
 
-import { PHASES, STATUS_LABEL, type PhaseId } from '../src/shared/phases.js'
+import { PHASES, STATUS_LABEL } from '../src/shared/phases.js'
 import { paneRows } from '../src/shared/rows.js'
 import type { DriverDetail, DriverGateName, DriverLoad, DriverPaths, DriverUi, DriverView } from '../types'
 import { approveViaMod } from './approve.js'
-import { refusal, runCli, type Dollar } from './cli.js'
+import { setAutopilot } from './autopilot.js'
+import { type Dollar } from './cli.js'
 import { exportMermaid, initPlan } from './command.js'
+import { advanceAndKickoff, afterApproval, kickoff, nextStep, primaryAction, type Primary } from './next.js'
 import { boardDetail, boardHeader, boardView, type BoardKit } from './render-board.js'
 import { diagramView, type SvgKit } from './render-svg.js'
 import { rowsView, type Kit } from './render-terminal.js'
@@ -70,10 +72,20 @@ function actionsOf($: Dollar) {
     primary: async (p: Primary) => {
       if (p.run === 'approve-route') return askApprove('route')
       if (p.run === 'approve-release') return askApprove('release')
-      const r = await runCli($, ['phase', 'advance'])
-      await setNotice($, r.ok ? null : refusal(r))
-      $.ui.toast(r.ok ? `Advanced to ${p.to}.` : refusal(r))
-      if (r.ok) await forceTick($)
+      const view = await getView($)
+      if (!view) return
+      if (p.run === 'continue') {
+        await kickoff($, p.phase, `pressed "${p.label}" in the pane`)
+        $.ui.toast(`Asked Claude to continue ${p.phase}.`)
+        return
+      }
+      const r = await advanceAndKickoff($, p.phase, view.currentPhase, `pressed "${p.label}" in the pane`)
+      await setNotice($, r.ok ? null : r.message)
+      $.ui.toast(r.message)
+    },
+    toggleAutopilot: async () => {
+      const ui = await getUi($)
+      $.ui.toast(await setAutopilot($, !ui.autopilot))
     },
     toggleDone: async () => {
       const ui = await getUi($)
@@ -118,9 +130,13 @@ function actionsOf($: Dollar) {
       const c = ui.confirm
       if (!c) return
       await setUi($, { confirm: null })
+      const before = await getView($)
       const r = await approveViaMod($, c.gate, c.revision)
       await setNotice($, r.ok ? null : r.message)
       $.ui.toast(r.message)
+      if (!r.ok || !before) return
+      const started = await afterApproval($, c.gate, before.currentPhase)
+      if (!started.ok) await setNotice($, started.message)
     },
   }
 }
@@ -138,19 +154,7 @@ const FOCUS_OPTIONS = [
   ...PHASES.map((p) => ({ value: p, label: p })),
 ]
 
-type Primary = { label: string; run: 'approve-route' | 'approve-release' | 'advance'; to?: PhaseId }
-
-/** The one contextual action: approve a gate where the method asks for it, or advance when the next phase is open. */
-export function primaryAction(view: DriverView): Primary | null {
-  const cur = view.currentPhase
-  if (cur === 'discover' && !view.gates.route.approved) return { label: 'Approve route gate', run: 'approve-route' }
-  if (cur === 'evolve' && !view.gates.release.approved) return { label: 'Approve release gate', run: 'approve-release' }
-  const next = PHASES[PHASES.indexOf(cur) + 1]
-  if (!next) return null
-  const guard = next === 'route' ? view.gates.route : next === 'release' ? view.gates.release : null
-  if (guard && !guard.approved) return null
-  return { label: `Advance to ${next}`, run: 'advance', to: next }
-}
+export { primaryAction }
 
 function headerView(kit: Kit, s: Snapshot) {
   const { Box, Text } = kit
@@ -228,6 +232,11 @@ function toolbar(kit: RichKit, s: Snapshot, a: Actions, canSelect: boolean, draw
           {picker && <Text dimColor>Open</Text>}
           {picker}
           <Box flexGrow={1} />
+          {view.currentPhase === 'implement' && (
+            <Button key="autopilot" variant="secondary" onPress={() => a.toggleAutopilot()}>
+              {s.ui.autopilot ? 'Autopilot: on' : 'Autopilot: off'}
+            </Button>
+          )}
           {primary && (
             <Button key="action" hotkey="g" variant="primary" onPress={() => a.primary(primary)}>
               {primary.label}
@@ -263,6 +272,11 @@ function controls(kit: RichKit, s: Snapshot, a: Actions, canSelect: boolean) {
       <Button key="export" onPress={() => a.exportPlan()}>
         Export Mermaid
       </Button>
+      {view.currentPhase === 'implement' && (
+        <Button key="autopilot" onPress={() => a.toggleAutopilot()}>
+          {s.ui.autopilot ? 'Autopilot: on' : 'Autopilot: off'}
+        </Button>
+      )}
       {primary && (
         <Button key="action" hotkey="g" variant="primary" onPress={() => a.primary(primary)}>
           {primary.label}
@@ -276,6 +290,7 @@ function notices(kit: Kit, s: Snapshot, a: Actions, surface: string) {
   const { Box, Text, Button } = kit
   return (
     <Box flexDirection="column">
+      {s.view && !s.ui.confirm && <Text key="next">{s.ui.autopilot ? 'Autopilot is on: Claude keeps Implement going until it is done, a block needs you, or you switch it off.' : nextStep(s.view)}</Text>}
       {s.ui.notice && <Text color="yellow">{s.ui.notice}</Text>}
       {s.ui.exportPath && (
         <Box flexDirection="row" gap={1}>
@@ -295,10 +310,10 @@ function confirmView(kit: Kit, s: Snapshot, a: Actions) {
   if (!c) return null
   return (
     <Box flexDirection="column">
-      <Text color="yellow">{`Approve ${c.gate} gate at revision ${c.revision} (baseline ${c.baseline})?`}</Text>
+      <Text color="yellow">{`Approve ${c.gate} gate at revision ${c.revision} (baseline ${c.baseline}) and start ${c.gate}?`}</Text>
       <Box flexDirection="row" gap={1}>
         <Button key="confirm-yes" variant="primary" onPress={() => a.confirmApprove()}>
-          Approve
+          Approve and start
         </Button>
         <Button key="confirm-no" hotkey="n" onPress={() => a.cancelApprove()}>
           Cancel

@@ -1,13 +1,7 @@
-# Non-goals
+# non-goals.md (generated, read-only)
 
-Things the project will not do. They are promises: the plan builds and tests none of them. Format: one line per item, `N-nn <statement> (reason) -> R-nnn`.
+Do not create or edit this file. `driver discover log` regenerates it from `.claude/driver/discover/interview.jsonl`. Add items through the `nonGoals` key of `mcp__driver__discover_log`: `statement`, `reason`, and later `requirement`. The `N-nn` id is assigned automatically.
 
-- N-01 No admin dashboard (sign-ups are read from the database directly) -> R-007
-- N-02 No referral links or invite codes (out of scope for this version) -> R-008
-- N-03 No payment handling (keeps the risk level low) -> R-009
+What it contains, one line per item: `N-nn <statement> (reason) -> R-nnn`. The requirement id appears after the exit batch, when you send `requirement` on the non-goal.
 
-Rules:
-
-- Number `N-nn` in creation order. Never renumber.
-- The `-> R-nnn` part is added at the exit, after `req.add` with `kind: "non-goal"` returns the ids. Before that, write `-> -`.
-- A non-goal that the user later wants is not edited away. Retire its requirement with `req.retire` citing a decision, then add a normal requirement.
+Non-goals are promises: the plan builds and tests none of them. A non-goal the user later wants is not edited away. Retire its requirement with `req.retire` citing a decision, then add a normal requirement.

@@ -110,6 +110,52 @@ describe('protectCommand', () => {
     "sed -i '' -e s/a/b/ -e s/c/d/ .claude/driver/plan.json",
     "sed -i 's/a/b/' .claude/driver/*.json",
     "perl -pi -e 's/.*/x/' .claude/driver/events.jsonl",
+    "cd .claude/driver && sed -i '' 's/a/b/' *.json",
+    "cd .claude/driver && sed -i '' 's/a/b/' log/REL-1.jsonl",
+    "cd .claude/driver && sed -i '' 's/a/b/' $F",
+    "cd .claude/driver && sed -i '' 's/a/b/'",
+    "cd .claude/driver/discover && sed -i '' 's/a/b/' ../plan.json",
+    "cd .claude/driver && perl -pi -e 's/a/b/' events.jsonl",
+    // a sed script can write files (w, s///w) and GNU sed can run commands (e)
+    "sed -i 's/a/b/w .claude/driver/plan.json' notes.md",
+    "cd .claude/driver && sed -i 'w plan.json' discover/interview.md",
+    "cd .claude/driver && sed -i -e 's/a/b/w events.jsonl' discover/interview.md",
+    "sed -n 'w .claude/driver/plan.json' /dev/null",
+    "sed -n '1e driver gate approve route' x",
+    "sed -n '1w .claude/driver/plan.json' x",
+    "sed -n '$w .claude/driver/plan.json' x",
+    "sed -n '1,3w .claude/driver/plan.json' x",
+    "cd .claude/driver && sed -i '$w events.jsonl' discover/interview.md",
+    "sed -n '1e x=dri; ${x}ver gate approve route' x",
+    "sed -n '/./e date' x",
+    "sed 's/.*/date/e' x",
+    'cd .claude/driver && sed -i "s/$X/b/" discover/interview.md',
+    "sed -l 5 'w .claude/driver/plan.json' x",
+    'rm .claude/driver/pl{a..a}n.json',
+    'cd .claude/skills && cd ../driver && rm *',
+    'D=.claude/driver; cd $D && rm *',
+    // perl and ruby code is arbitrary
+    `cd .claude/driver && perl -i -pe 'BEGIN{unlink "plan.json"}' discover/interview.md`,
+    // a script glued to its flag does not hide the target
+    'sed -i -es/a/b/ .claude/driver/plan.json',
+    'sed -i -fscript.sed .claude/driver/plan.json',
+    'perl -pi -es/a/b/ .claude/driver/plan.json',
+    'ruby -pi -es/a/b/ .claude/driver/plan.json',
+    // BSD -I and GNU --in-place=SUFFIX
+    "sed -I '' s/a/b/ .claude/driver/plan.json",
+    'sed -I.bak s/a/b/ .claude/driver/plan.json',
+    'sed --in-place=.bak s/a/b/ .claude/driver/plan.json',
+    // operands the shell expands
+    'cd .claude/driver && sed -i s/a/b/ {plan,x}.json',
+    'rm .claude/driver/{plan,x}.json',
+    'cd .claude/driver && sed -i s/a/b/ log/foo.jsonl',
+    // a cd that ends in the plan dir by another route
+    'cd .claude/driver/discover && cd .. && sed -i s/a/b/ *',
+    'pushd .claude/driver && sed -i s/a/b/ *',
+    'cd .claude/driver/discover && sed -i s/a/b/ ../*',
+    // bracket classes the glob translation does not model
+    'rm .claude/driver/pl[]a]n.json',
+    'rm .claude/driver/[[:lower:]]lan.json',
     'jq .revision=9 .claude/driver/plan.json > t && mv t .claude/driver/plan.json',
     'tee .claude/driver/events.jsonl < x',
     'cp /tmp/x .claude/driver/plan.json',
@@ -171,6 +217,9 @@ describe('protectCommand', () => {
     `node - <<EOF\nrequire('fs').unlinkSync('.claude/driver/events.jsonl')\nEOF`,
     `cd .claude/driver && python3 - <<'EOF'\nprint(1)\nEOF`,
     `cat <<'EOF' | node -\nfs.writeFileSync('plan.json', '{}')\nEOF`,
+    // perl and ruby take the code in a flag cluster
+    `perl -pe 'BEGIN{open F,">.claude/driver/plan.json"}' x`,
+    `ruby -i -pe 'File.write(".claude/driver/plan.json","")' x`,
   ])('inline script: %s', (c) => {
     expect(protectCommand(c)).toMatch(/inline script mentions/);
   });
@@ -398,6 +447,22 @@ describe('protectCommand', () => {
     "sed -i -e 's/.*/x/' .claude/docs/STACK.md",
     "perl -pi -e 's/.*/x/' .claude/GUARDRAILS.md",
     "ruby -i -pe 'gsub(/.*/, \"x\")' .claude/GUARDRAILS.md",
+    // after a cd into the plan dir, an in-place edit of a named unprotected file
+    "cd .claude/driver && sed -i '' 's/^a$/b/' discover/interview.md",
+    "cd .claude/driver/discover && sed -i '' 's/^round: 2$/round: 3/' interview.md",
+    "sed -n '/plan.json/p' notes.md",
+    "sed -n 's/plan.json/x/p;/where/p' docs/x.md",
+    "cd .claude/driver && sed -n '/wanted/p' discover/interview.md",
+    'mkdir -p src/{a,b}',
+    'rm -rf dist/{a,b}',
+    'git commit -m "fix(protect): x"',
+    'cd log && rm old.txt',
+    "sed -i '' 's/new world/x/' notes.md",
+    "sed -E 's/(a|b)+/x/' notes.md",
+    "perl -pe 's/a/b/' notes.md",
+    // a bracket that is no valid glob class used to throw inside the guard; the shell reads it literally
+    'rm .claude/driver/[p-a]lan.json',
+    String.raw`sed -n '/^## \[ADR-012\]/,/^### Contexto/p' /x/.claude/docs/DECISIONS.md | head -5`,
   ])('allows (PER-619): %s', (c) => {
     expect(protectCommand(c)).toBeNull();
   });
