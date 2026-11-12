@@ -25,6 +25,55 @@ Long agent sessions drift: the plan lives in the chat, "done" means "the model s
 | Evolve | A review of the cycle: what entered after the baseline, decisions taken on autopilot, requirement coverage, backlog. Recommends release or another round. | **Gate: release** (you approve) |
 | Release | Checklist (rollback, docs, observability, credentials), where the code goes, the release record, and the backlog for the next cycle. | Cycle closed |
 
+### The process at a glance
+
+```mermaid
+flowchart TD
+    idea([Project idea]) --> D
+
+    D["<b>DISCOVER</b><br/>interview, requirements,<br/>assumptions, non-goals"]
+    G1{{"Gate: route<br/>you approve"}}
+    R["<b>ROUTE</b><br/>block graph, dependencies,<br/>acceptance, risk · baseline 1"]
+    I["<b>IMPLEMENT</b><br/>build block by block,<br/>verify each one"]
+    V["<b>VALIDATE</b><br/>test layers, acceptance<br/>against requirements"]
+    T{"Triage"}
+    E["<b>EVOLVE</b><br/>cycle review, coverage,<br/>new baseline"]
+    G2{{"Gate: release<br/>you approve"}}
+    L["<b>RELEASE</b><br/>checklist, release record"]
+    B[("Backlog<br/>next cycle")]
+
+    D --> G1 --> R --> I --> V
+    V -- all passing --> E
+    V -- finding --> T
+    T -- "1 fix: rework the block" --> I
+    T -- "2 adjustment: new block +" --> I
+    T -- "3 scope: re-plan" --> R
+    T -- "3 scope: next cycle" --> B
+    E -- one more round --> I
+    E --> G2 --> L --> B
+    B -. "discover amend" .-> D
+
+    classDef discover fill:#7c3aed,stroke:#5b21b6,color:#ffffff
+    classDef route fill:#2563eb,stroke:#1e40af,color:#ffffff
+    classDef implement fill:#0d9488,stroke:#115e59,color:#ffffff
+    classDef validate fill:#d97706,stroke:#92400e,color:#ffffff
+    classDef evolve fill:#db2777,stroke:#9d174d,color:#ffffff
+    classDef release fill:#16a34a,stroke:#166534,color:#ffffff
+    classDef gate fill:#fde047,stroke:#a16207,color:#1f2937
+    classDef aux fill:#e5e7eb,stroke:#6b7280,color:#1f2937
+
+    class D discover
+    class R route
+    class I implement
+    class V validate
+    class E evolve
+    class L release
+    class G1,G2 gate
+    class T,B,idea aux
+```
+
+Yellow hexagons are the two points where only you can move the plan forward.
+
 ### Changes after the plan is approved
 
 Every change that shows up after the route gate is triaged into one of three levels, and none of them restarts the cycle on its own:
@@ -41,6 +90,10 @@ With the plugin loaded in the Claude desktop app or VS Code, a DRIVER pane opens
 - a **Next** line that always says what the next step is;
 - one main button that changes with the state: `Approve route gate`, `Start implement`, `Continue implement`, `Confirm baseline N`, `Approve release gate`;
 - an optional **Autopilot** for Implement and Validate, which keeps going block by block and stops on anything that needs you.
+
+This is the diagram for the `examples/web-waitlist` plan, drawn by the same renderer the pane uses:
+
+![DRIVER pane diagram for the web-waitlist example: blocks grouped by phase, colored by status, with the two gates](docs/assets/example-plan.svg)
 
 In a terminal the same plan is drawn as text rows.
 
