@@ -45,6 +45,6 @@ export interface PlanDoc {
   requirements: Record<string, { title: string; retired?: unknown }>;
   blocks: Record<string, PlanDocBlock>;
   decisions?: Record<string, { title: string }>;
-  baselines?: { n: number }[];
+  baselines?: { n: number; added: string[]; reqAdded: string[]; closedAt?: string; via?: string; ticket?: string }[];
   releases?: { id: string; version: string }[];
 }

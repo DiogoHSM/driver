@@ -2,7 +2,7 @@ import type { On } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 
-import { PANE, PLAN_FILE, ROOT, DRIVER_DIR, bigPlan, editPlan, whereReply, world } from './harness.js'
+import { PANE, PLAN_FILE, ROOT, DRIVER_DIR, bigPlan, editPlan, loopPlan, whereReply, world } from './harness.js'
 import { WAITLIST_B004_DOC, WAITLIST_PLAN } from './waitlist.js'
 
 const DOC_FILE = `${DRIVER_DIR}/blocks/B-004.md`
@@ -55,7 +55,7 @@ test('desktop and vscode draw the SVG diagram with a block picker', async ($, on
     const props = node!.props as { alt: string; isInteractive: boolean; width: number; height: number }
     expect(props.alt.startsWith('DRIVER plan web-waitlist')).toBe(true)
     expect(props.isInteractive).toBe(true)
-    expect(props.width).toBe(100 * 8 - 8)
+    expect(props.width).toBe(100 * 9 - 16)
     expect(Number.isInteger(props.height) && props.height > 0).toBe(true)
     for (const piece of ['<title>B-004 Signup API', 'IMPLEMENT', 'gate route · diogo', 'gate release · pending', 'font:13px']) expect(source).toContain(piece)
     // no card buttons any more
@@ -177,12 +177,19 @@ const discoverPlan = editPlan(WAITLIST_PLAN, (p) => {
   p.currentPhase = 'discover'
   p.gates.route = { approved: false }
 })
+const PHASE_ORDER = ['discover', 'route', 'implement', 'validate', 'evolve', 'release']
+/** Every block of an earlier phase is done, so nothing is left behind the current phase. */
+const finishBefore = (p: { blocks?: Record<string, { phase: string; status: string }> }, phase: string) => {
+  for (const b of Object.values(p.blocks ?? {})) if (PHASE_ORDER.indexOf(b.phase) < PHASE_ORDER.indexOf(phase)) b.status = 'done'
+}
 const evolvePlan = editPlan(WAITLIST_PLAN, (p) => {
   p.currentPhase = 'evolve'
+  finishBefore(p, 'evolve')
   p.gates.release = { approved: false }
 })
 const releasePlan = editPlan(WAITLIST_PLAN, (p) => {
   p.currentPhase = 'release'
+  finishBefore(p, 'release')
   p.gates.release = { approved: true, approvedBy: 'diogo', approvedAt: '2026-10-28T10:00:00Z', approvedVia: 'tty', atBaseline: 1 }
 })
 
@@ -337,7 +344,7 @@ test('an invalid plan shows the validation issues', async ($, on) => {
 })
 
 test('approving a gate takes two presses and sends the nonce on stdin only', async ($, on) => {
-  const w = world(on, { [PLAN_FILE]: editPlan(WAITLIST_PLAN, (p) => { p.currentPhase = 'evolve' }) })
+  const w = world(on, { [PLAN_FILE]: evolvePlan })
   w.cli = (args) => {
     if (args[0] === 'where') return whereReply()
     if (args[0] === 'gate') return { stdout: JSON.stringify({ ok: true, revision: 35 }) }
@@ -411,4 +418,195 @@ test('a plan created during the session opens the pane on the desktop', async ($
 
 test('a plan created during the session opens no pane on the terminal', async ($, on) => {
   expect(await planShowsUp($, on, 'terminal')).toBe(0)
+})
+
+const looped = loopPlan(WAITLIST_PLAN)
+
+test('after-baseline blocks carry a + on every surface and the header counts what was added', async ($, on) => {
+  await boot($, on, { [PLAN_FILE]: looped })
+
+  const terminal = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect((await terminal.find({ type: 'Text', text: /^DRIVER · web-waitlist/ }))?.text).toBe('DRIVER · web-waitlist · phase validate · rev 34 · baseline 1 · +1 since')
+  expect((await terminal.find({ key: 'B-009' }))?.text).toContain('Compact signup form')
+  expect((await terminal.find({ key: 'B-009' }))?.text).toContain(' +')
+  expect((await terminal.find({ key: 'B-003' }))?.text).not.toContain(' +')
+  await terminal.unmount()
+
+  const desktop = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  const { source } = await svgOf(desktop)
+  expect(source).toContain('<text class="ab"')
+  expect(source).toContain('added after baseline 1')
+  expect(source).toContain('+ added after baseline')
+  expect(source.match(/<text class="ab"/g)).toHaveLength(1)
+  expect(await desktop.find({ type: 'Text', text: /baseline 1 · \+1 since/ })).toBeDefined()
+  await desktop.unmount()
+
+  const mobile = await $.ui.mount({ ...PANE, surface: 'mobile' })
+  expect(await mobile.find({ type: 'Text', text: /baseline 1 · \+1 since/ })).toBeDefined()
+  expect(await mobile.find({ type: 'Text', text: '+' })).toBeDefined()
+  await mobile.unmount()
+})
+
+test('a plan with nothing after the baseline draws no + and a plain header', async ($, on) => {
+  await boot($, on, waitlist)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect((await svgOf(ui)).source).not.toContain('<text class="ab"')
+  expect(await ui.find({ type: 'Text', text: /\+\d+ since/ })).toBeUndefined()
+  await ui.unmount()
+})
+
+test('validate sending work back reopens implement: label, frame, loop arrow, waiting-on', async ($, on) => {
+  const w = await boot($, on, { [PLAN_FILE]: looped })
+
+  const terminal = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect((await terminal.find({ type: 'Text', text: /IMPLEMENT/ }))?.text).toBe('▾ IMPLEMENT  2/4 done  ↺ reopened')
+  expect((await terminal.find({ type: 'Text', text: /VALIDATE/ }))?.text).toBe('▾ VALIDATE  0/1 done  ● current')
+  expect((await terminal.find({ key: 'action' }))?.text).toBe('Continue implement')
+  expect((await terminal.find({ type: 'Text', text: /^Next: / }))?.text).toBe('Next: 2 implement blocks are not done yet (the plan is in validate). "Continue implement" hands them to Claude.')
+  await terminal.press({ key: 'B-006' })
+  expect((await terminal.find({ type: 'Text', text: /waiting on B-004/ }))?.text).toContain('waiting on B-004')
+  await terminal.unmount()
+
+  const desktop = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  const { source } = await svgOf(desktop)
+  expect(source).toContain('↺ reopened')
+  expect(source).toContain('waiting on: B-004')
+  expect(source).toMatch(/<rect class="l lc" x="12" y="\d+" width="\d+" height="\d+" rx="8"\/><text class="h hc" x="26" y="\d+">IMPLEMENT/)
+  expect(source.match(/<path class="eb" d="M\d+ \d+H\d+V\d+H\d+M\d+ \d+l8 -4v8z"\/>/g)).toHaveLength(1)
+  await desktop.unmount()
+
+  const mobile = await $.ui.mount({ ...PANE, surface: 'mobile' })
+  expect(await mobile.find({ type: 'Text', text: '  ↺ reopened' })).toBeDefined()
+  await mobile.unmount()
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  await ui.press({ key: 'action' })
+  expect(w.cliRuns().some((r) => r.args[0] === 'phase')).toBe(false)
+  expect(w.prompts).toHaveLength(1)
+  expect(w.prompts[0]).toContain('pressed "Continue implement" in the pane')
+  expect(w.prompts[0]).toContain('Phase implement.')
+  expect(w.prompts[0]).toContain('Run the driver:implement skill now.')
+  expect(w.prompts[0]).toContain('If that skill is not available, call mcp__driver__plan_status')
+  await ui.unmount()
+})
+
+test('the Next line does not count a block whose reason only mentions another block', async ($, on) => {
+  const held = editPlan(looped, (p) => {
+    p.blocks['B-004'].status = 'done'
+    p.blocks['B-009'].status = 'done'
+    p.blocks['B-006'].statusReason = 'missing STRIPE_KEY (needed by B-005 checkout)'
+  })
+  await boot($, on, { [PLAN_FILE]: held })
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect((await ui.find({ type: 'Text', text: /^Next: / }))?.text).toBe('Next: 1 of 1 validate blocks left. "Continue validate" asks Claude to pick up the next one.')
+  await ui.unmount()
+})
+
+test('the Next line counts blocks that can be resumed', async ($, on) => {
+  const resumed = editPlan(looped, (p) => {
+    p.blocks['B-004'].status = 'done'
+    p.blocks['B-009'].status = 'done'
+  })
+  await boot($, on, { [PLAN_FILE]: resumed })
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect((await ui.find({ type: 'Text', text: /^Next: / }))?.text).toBe('Next: 1 of 1 validate blocks left (1 ready to resume). "Continue validate" asks Claude to pick up the next one.')
+  await ui.unmount()
+})
+
+const baselineEvolve = editPlan(evolvePlan, (p) => {
+  p.baselines[0].closedAt = '2026-10-21T10:00:00Z'
+  p.blocks['B-009'] = { ...JSON.parse(looped).blocks['B-009'], status: 'done' }
+  p.requirements['R-004'] = { kind: 'functional', source: 'user', title: 'Compact form' }
+})
+
+const baselineLabel = async ($: Engine, on: On, plan: string, surface: 'terminal' | 'desktop') => {
+  await boot($, on, { [PLAN_FILE]: plan })
+  const ui = await $.ui.mount({ ...PANE, surface })
+  const text = (await ui.find({ key: 'baseline' }))?.text
+  await ui.unmount()
+  return text
+}
+
+test('Confirm baseline shows in evolve once something was added after the baseline', async ($, on) => {
+  expect(await baselineLabel($, on, baselineEvolve, 'terminal')).toBe('Confirm baseline 2')
+})
+test('Confirm baseline shows on the desktop toolbar too', async ($, on) => {
+  expect(await baselineLabel($, on, baselineEvolve, 'desktop')).toBe('Confirm baseline 2')
+})
+test('Confirm baseline is absent in evolve when nothing was added', async ($, on) => {
+  expect(await baselineLabel($, on, evolvePlan, 'terminal')).toBeUndefined()
+})
+test('Confirm baseline is absent outside evolve even with additions', async ($, on) => {
+  expect(await baselineLabel($, on, looped, 'desktop')).toBeUndefined()
+})
+test('Confirm baseline is absent in release', async ($, on) => {
+  const released = editPlan(baselineEvolve, (p) => {
+    p.currentPhase = 'release'
+    p.gates.release = { approved: true, approvedBy: 'd', approvedAt: '2026-10-28T10:00:00Z', approvedVia: 'tty', atBaseline: 1 }
+  })
+  expect(await baselineLabel($, on, released, 'terminal')).toBeUndefined()
+})
+
+test('in evolve with the release gate pending, Next says to confirm the baseline first', async ($, on) => {
+  await boot($, on, { [PLAN_FILE]: baselineEvolve })
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect((await ui.find({ key: 'action' }))?.text).toBe('Approve release gate')
+  expect((await ui.find({ type: 'Text', text: /^Next: / }))?.text).toBe(
+    'Next: 1 block and 1 requirement were added after baseline 1. Press "Confirm baseline 2" first, then review the plan and "Approve release gate". Approving starts release right away.',
+  )
+  await ui.unmount()
+})
+
+test('Confirm baseline says it revokes the release approval when the release gate is approved', async ($, on) => {
+  const approved = editPlan(baselineEvolve, (p) => {
+    p.gates.release = { approved: true, approvedBy: 'diogo', approvedAt: '2026-10-26T10:00:00Z', atBaseline: 1, approvedVia: 'tty' }
+  })
+  const w = world(on, { [PLAN_FILE]: approved })
+  w.cli = (args) => (args[0] === 'where' ? whereReply() : {})
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  mock.clock(on, { now: 1_000_000 })
+  await $.session.start({ cwd: ROOT, surface: 'terminal', isInteractive: true })
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  await ui.press({ key: 'baseline' })
+  expect((await ui.find({ type: 'Text', text: /^Confirm baseline 2:/ }))?.text).toBe(
+    'Confirm baseline 2: records the 1 block and 1 requirement added since baseline 1. This revokes the release approval, which then has to be given again.',
+  )
+  await ui.unmount()
+})
+
+test('Confirm baseline takes two presses and runs the baseline command through the ticket channel', async ($, on) => {
+  const w = world(on, { [PLAN_FILE]: baselineEvolve })
+  w.cli = (args) => {
+    if (args[0] === 'where') return whereReply()
+    if (args[0] === 'rebaseline') return { stdout: JSON.stringify({ ok: true, revision: 35 }) }
+    return {}
+  }
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  mock.clock(on, { now: 1_000_000 })
+  await $.session.start({ cwd: ROOT, surface: 'terminal', isInteractive: true })
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  await ui.press({ key: 'baseline' })
+  expect((await ui.find({ type: 'Text', text: /^Confirm baseline 2:/ }))?.text).toBe(
+    'Confirm baseline 2: records the 1 block and 1 requirement added since baseline 1. This does not approve the release.',
+  )
+  expect((await ui.find({ key: 'confirm-yes' }))?.text).toBe('Confirm baseline 2')
+  expect(w.writes).toHaveLength(0)
+  expect(w.cliRuns().some((r) => r.args[0] === 'rebaseline')).toBe(false)
+  await ui.press({ key: 'confirm-no' })
+  expect(await ui.find({ key: 'confirm-yes' })).toBeUndefined()
+
+  await ui.press({ key: 'baseline' })
+  await ui.press({ key: 'confirm-yes' })
+  const ticket = w.writes.find((x) => x.path === `${DRIVER_DIR}/.mod/ticket.json`)
+  const t = JSON.parse(ticket!.text) as { gate: string; revision: number; sha256: string; exp: number }
+  expect(t).toMatchObject({ gate: 'rebaseline', revision: 34, exp: 1_015_000 })
+  const call = w.cliRuns().find((r) => r.args[0] === 'rebaseline')!
+  expect(call.args).toEqual(['rebaseline', '--reason=Confirm baseline 2 from the DRIVER pane: records 1 block and 1 requirement added since baseline 1', '--via-mod'])
+  expect(call.stdin).toMatch(/^[0-9a-f]{64}$/)
+  expect(call.full.join(' ')).not.toContain(call.stdin!)
+  expect(call.actor).toMatch(/^user:/)
+  expect(w.prompts).toHaveLength(0)
+  expect(w.toasts.join('\n')).toContain('Confirmed baseline 2 at revision 34.')
+  await ui.unmount()
 })

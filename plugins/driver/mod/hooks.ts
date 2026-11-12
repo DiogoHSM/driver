@@ -2,6 +2,7 @@ import type { On } from 'claude-code'
 
 import { blockMarker, gateVerdict } from '../src/shared/gate.js'
 import { protectCommand, protectPath } from '../src/shared/protect.js'
+import { isResumable, project } from '../src/shared/view.js'
 import type { DriverClaim } from '../types'
 import { runCli, type Dollar } from './cli.js'
 import { ensurePoller, forceTick, getClaims, getPaths, getStoredPaths, getView, readPlanFresh, updateClaims } from './state.js'
@@ -67,6 +68,16 @@ export function registerSpawnGuard(on: On): void {
     if (block && block.status === 'in_progress' && block.owner && block.owner !== 'main' && block.owner !== e.parentAgentId) {
       if ((await runningAgents($)).has(block.owner))
         return { deny: `DRIVER: ${blockId} is already in progress under agent ${block.owner}, which is still running.` }
+    }
+
+    if (blockId && block?.status === 'blocked') {
+      const blocks = project(plan).blocks
+      const view = blocks.find((b) => b.id === blockId)
+      if (view && !isResumable(view, new Map(blocks.map((b) => [b.id, b])))) {
+        const why = view.reason ? ` (${view.reason})` : ''
+        const waiting = view.waitingOn?.length ? ` and waits on ${view.waitingOn.join(', ')}` : ''
+        return { deny: `DRIVER: ${blockId} is blocked${waiting}${why}; an agent cannot unblock it. Clear the cause first, or ask the user.` }
+      }
     }
 
     // Parallel spawns for one block (a Workflow's agent() calls) must not both pass the check above.

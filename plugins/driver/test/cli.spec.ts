@@ -596,3 +596,70 @@ describe('hook subagent-stop', () => {
     expect(r.stdout).toBe('');
   });
 });
+
+describe('backlog', () => {
+  const setup = () => {
+    const dir = tmp();
+    const g = ['--cwd', dir, '--root', dir, '--now', NOW];
+    const cli = (...a: string[]) => runCli([...g, ...a]);
+    const input = (stdin: unknown, ...a: string[]) => runCli([...g, ...a], { input: typeof stdin === 'string' ? stdin : JSON.stringify(stdin) });
+    expect(cli('init', 'demo').status).toBe(0);
+    const file = (f: string) => path.join(dir, '.claude', 'driver', f);
+    return { dir, cli, input, file };
+  };
+
+  it('add prints the created ids and show lists them, as text and as json', () => {
+    const { cli, input, file } = setup();
+    expect(cli('backlog', 'show').stdout.trim()).toBe('backlog: empty');
+    const r = input({ items: [{ title: 'Dark mode', origin: 'user' }, { title: 'Export CSV', origin: 'B-012', decision: 'D-004' }] }, 'backlog', 'add');
+    expect(r.status).toBe(0);
+    expect(r.stdout).toBe('ok; created L-01, L-02\nbacklog: 2 item(s)\n');
+    expect(cli('backlog', 'show').stdout).toBe('backlog: 2 item(s)\nL-01 Dark mode [user]\nL-02 Export CSV [B-012] (D-004)\n');
+    const j = JSON.parse(cli('backlog', 'show', '--json').stdout);
+    expect(j).toMatchObject({ ok: true, exists: true, count: 2 });
+    expect(j.entries[1]).toEqual({ id: 'L-02', title: 'Export CSV', origin: 'B-012', decision: 'D-004', at: NOW });
+    expect(JSON.parse(input({ items: [{ title: 'x' }] }, 'backlog', 'add', '--json').stdout)).toMatchObject({ ok: true, created: ['L-03'], count: 3 });
+    expect(existsSync(file('backlog.md'))).toBe(true);
+  });
+
+  it('does not change plan.json, its revision or the ledger', () => {
+    const { cli, input, file } = setup();
+    cli('block', 'add', 'A', '--phase', 'discover');
+    const before = [readFileSync(file('plan.json')), readFileSync(file('events.jsonl'))];
+    expect(input({ items: [{ title: 'later' }] }, 'backlog', 'add').status).toBe(0);
+    expect([readFileSync(file('plan.json')), readFileSync(file('events.jsonl'))].every((b, i) => b.equals(before[i]!))).toBe(true);
+    expect(cli('validate', '--replay').status).toBe(0);
+  });
+
+  it('a refusal exits 1 with the message and writes nothing; bad usage exits 2', () => {
+    const { cli, input, file } = setup();
+    const r = input({ items: [{ title: 'ok' }, { title: '' }] }, 'backlog', 'add');
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain('items.1.title');
+    expect(input({ items: Array.from({ length: 21 }, () => ({ title: 't' })) }, 'backlog', 'add').status).toBe(1);
+    expect(input({ items: [{ title: 't', extra: 1 }] }, 'backlog', 'add').status).toBe(1);
+    expect(existsSync(file('backlog.jsonl'))).toBe(false);
+    expect(input('not json', 'backlog', 'add').status).toBe(2);
+    expect(cli('backlog').status).toBe(2);
+    expect(cli('backlog', 'nope').status).toBe(2);
+  });
+
+  it('needs an initialized plan and is listed in the help', () => {
+    const empty = tmp();
+    const r = runCli(['--root', empty, 'backlog', 'show'], { cwd: empty });
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain('no plan');
+    const help = runCli(['--help']).stdout;
+    expect(help).toContain('backlog add');
+    expect(help).toContain('backlog show');
+    expect(help).toContain('--decision D-001] [--via-mod]');
+  });
+
+  it('a model-issued backlog call is not blocked by the plan guard (it never writes plan files)', () => {
+    const { dir } = setup();
+    const r = runCli(['hook', 'protect-plan'], {
+      input: JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'driver backlog add < items.json' }, cwd: dir }),
+    });
+    expect(r.stdout).toBe('');
+  });
+});

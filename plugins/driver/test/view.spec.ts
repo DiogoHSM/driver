@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { project, shapeCheck, summarize } from '../src/shared/view.js';
+import { baselineText, project, shapeCheck, sinceBaseline, summarize } from '../src/shared/view.js';
 import { clonePlan, loadExamplePlan, loadFixture, shuffleKeys } from './helpers.js';
-import { docBlock, docPlan } from './shared-helpers.js';
+import { docBlock, docPlan, loopedDoc } from './shared-helpers.js';
 
 describe('project', () => {
   it('projects a plan into sorted block views', () => {
@@ -94,5 +94,133 @@ describe('shapeCheck', () => {
       expect(r.ok).toBe(false);
       if (!r.ok) expect(r.message).toMatch(re);
     }
+  });
+});
+
+describe('ADR-016 derived fields', () => {
+  const baselines = [{ n: 1, added: ['B-001', 'B-002'], reqAdded: ['R-001'], closedAt: 't' }];
+  const retiredMark = { at: 't', decision: 'D-001', reason: 'r' };
+
+  it('marks blocks and counts requirements that entered after the baseline', () => {
+    const doc = docPlan(
+      {
+        'B-001': docBlock({ title: 'a', phase: 'implement', status: 'done' }),
+        'B-002': docBlock({ title: 'b', phase: 'implement' }),
+        'B-003': docBlock({ title: 'c', phase: 'implement' }),
+      },
+      {
+        baselines,
+        requirements: { 'R-001': { title: 'a' }, 'R-002': { title: 'b' }, 'R-003': { title: 'c', retired: {} } },
+      },
+    );
+    const v = project(doc);
+    expect(v.blocks.map((b) => b.afterBaseline)).toEqual([undefined, undefined, true]);
+    expect(v.reqsAfterBaseline).toBe(1);
+    // a later baseline folds the new ones in
+    const later = project({ ...doc, baseline: 2, baselines: [...baselines, { n: 2, added: ['B-003'], reqAdded: ['R-002'] }] });
+    expect(later.blocks.some((b) => b.afterBaseline)).toBe(false);
+    expect(later.reqsAfterBaseline).toBe(0);
+  });
+
+  it('marks nothing while baseline 1 is the only entry and has no closedAt', () => {
+    const blocks = { 'B-001': docBlock({ title: 'a', phase: 'implement' }), 'B-002': docBlock({ title: 'b', phase: 'implement' }) };
+    const open = [{ n: 1, added: ['B-001'], reqAdded: [] }];
+    const v = project(docPlan(blocks, { baselines: open, requirements: { 'R-001': { title: 'a' } } }));
+    expect(v.blocks.some((b) => b.afterBaseline)).toBe(false);
+    expect(v.reqsAfterBaseline).toBe(0);
+    expect(baselineText(v)).toBe('baseline 1');
+    // closed, or followed by a second entry, it marks as usual
+    expect(project(docPlan(blocks, { baselines: [{ ...open[0]!, closedAt: 't' }] })).blocks.map((b) => b.afterBaseline)).toEqual([undefined, true]);
+    const two = [...open, { n: 2, added: [], reqAdded: [] }];
+    expect(project(docPlan(blocks, { baseline: 2, baselines: two })).blocks.map((b) => b.afterBaseline)).toEqual([undefined, true]);
+  });
+
+  it('exposes the latest baseline entry with how it was confirmed', () => {
+    const blocks = { 'B-001': docBlock({ title: 'a', phase: 'implement' }) };
+    const base = { n: 1, added: ['B-001'], reqAdded: [], closedAt: 't' };
+    expect(project(docPlan(blocks, { baselines: [base] })).latestBaseline).toEqual({ n: 1 });
+    const v = project(docPlan(blocks, { baseline: 2, baselines: [base, { n: 2, added: [], reqAdded: [], via: 'mod', ticket: 'abc' }] }));
+    expect(v.latestBaseline).toEqual({ n: 2, via: 'mod', ticket: 'abc' });
+    expect(project(docPlan(blocks, { baseline: 0, baselines: [] })).latestBaseline).toBeUndefined();
+  });
+
+  it('marks nothing without a baseline or without a baselines array', () => {
+    const blocks = { 'B-001': docBlock({ title: 'a', phase: 'implement' }) };
+    for (const doc of [docPlan(blocks, { baseline: 0, baselines: [] }), docPlan(blocks)]) {
+      const v = project(doc);
+      expect('afterBaseline' in v.blocks[0]!).toBe(false);
+      expect(v.reqsAfterBaseline).toBe(0);
+    }
+    expect(project(loadExamplePlan('web-waitlist')).blocks.some((b) => b.afterBaseline)).toBe(false);
+  });
+
+  it('waitingOn lists the unfinished dependencies of a blocked block only', () => {
+    const v = project(docPlan({
+      'B-001': docBlock({ title: 'a', phase: 'implement', status: 'done' }),
+      'B-002': docBlock({ title: 'b', phase: 'implement', status: 'needs_rework', statusReason: 'r' }),
+      'B-003': docBlock({ title: 'c', phase: 'implement', retired: retiredMark }),
+      'B-004': docBlock({ title: 'd', phase: 'validate', status: 'blocked', statusReason: 'w', dependsOn: ['B-003', 'B-002', 'B-001'] }),
+      'B-005': docBlock({ title: 'e', phase: 'validate', status: 'blocked', statusReason: 'w', dependsOn: ['B-001'] }),
+      'B-006': docBlock({ title: 'f', phase: 'validate', dependsOn: ['B-002'] }),
+    }));
+    const by = (id: string) => v.blocks.find((b) => b.id === id)!;
+    expect(by('B-004').waitingOn).toEqual(['B-002']);
+    expect('waitingOn' in by('B-005')).toBe(false);
+    expect('waitingOn' in by('B-006')).toBe(false);
+  });
+
+  it('openBehind lists earlier phases with unfinished active blocks, from validate onward', () => {
+    const blocks = {
+      'B-001': docBlock({ title: 'a', phase: 'route', status: 'done' }),
+      'B-002': docBlock({ title: 'b', phase: 'implement', status: 'needs_rework', statusReason: 'r' }),
+      'B-003': docBlock({ title: 'c', phase: 'validate', status: 'blocked', statusReason: 'w', dependsOn: ['B-002'] }),
+      'B-004': docBlock({ title: 'd', phase: 'discover', retired: retiredMark }),
+    };
+    expect(project(docPlan(blocks, { currentPhase: 'validate' })).openBehind).toEqual(['implement']);
+    expect(project(docPlan(blocks, { currentPhase: 'evolve' })).openBehind).toEqual(['implement', 'validate']);
+    expect(project(docPlan(blocks, { currentPhase: 'implement' })).openBehind).toEqual([]);
+    expect(project(docPlan({ ...blocks, 'B-002': docBlock({ title: 'b', phase: 'implement', status: 'done' }) }, { currentPhase: 'validate' })).openBehind).toEqual([]);
+  });
+
+  it('openBehind never lists discover or route, even with unfinished bookkeeping blocks there', () => {
+    const blocks = {
+      'B-001': docBlock({ title: 'a', phase: 'discover' }),
+      'B-002': docBlock({ title: 'b', phase: 'route', status: 'in_progress', owner: 'a' }),
+      'B-003': docBlock({ title: 'c', phase: 'implement', status: 'done' }),
+    };
+    for (const currentPhase of ['validate', 'evolve', 'release'] as const)
+      expect(project(docPlan(blocks, { currentPhase })).openBehind).toEqual([]);
+  });
+
+  it('summarize adds rework and resumable without touching ready', () => {
+    const doc = docPlan(
+      {
+        'B-001': docBlock({ title: 'a', phase: 'implement', status: 'done' }),
+        'B-002': docBlock({ title: 'b', phase: 'implement', status: 'needs_rework', statusReason: 'r' }),
+        'B-003': docBlock({ title: 'c', phase: 'validate', status: 'needs_rework', statusReason: 'r' }), // later phase
+        'B-004': docBlock({ title: 'd', phase: 'implement', status: 'needs_rework', statusReason: 'r', retired: retiredMark }),
+        'B-005': docBlock({ title: 'e', phase: 'implement', status: 'blocked', statusReason: 'w', dependsOn: ['B-001', 'B-004'] }), // resumable
+        'B-006': docBlock({ title: 'f', phase: 'implement', status: 'blocked', statusReason: 'w', dependsOn: ['B-002'] }), // still waiting
+        'B-007': docBlock({ title: 'g', phase: 'implement', status: 'blocked', statusReason: 'credential' }), // no dependency
+        'B-008': docBlock({ title: 'h', phase: 'implement' }),
+      },
+      { currentPhase: 'implement' },
+    );
+    const s = summarize(project(doc));
+    expect(s.rework).toEqual(['B-002']);
+    expect(s.resumable).toEqual(['B-005']);
+    expect(s.ready).toEqual(['B-008']);
+  });
+});
+
+describe('baselineText and sinceBaseline', () => {
+  it('count blocks and requirements that entered after the baseline, and say nothing when there are none', () => {
+    const plain = project(loopedDoc());
+    expect(sinceBaseline(plain)).toEqual({ blocks: 1, reqs: 0 });
+    expect(baselineText(plain)).toBe('baseline 1 · +1 since');
+    const none = project({ ...loopedDoc(), baselines: [{ n: 1, added: ['B-003', 'B-004', 'B-006', 'B-009'], reqAdded: [], closedAt: 't' }] });
+    expect(sinceBaseline(none)).toEqual({ blocks: 0, reqs: 0 });
+    expect(baselineText(none)).toBe('baseline 1');
+    expect(baselineText(project({ ...loopedDoc(), baseline: 0, baselines: [] }))).toBe('baseline 0');
   });
 });

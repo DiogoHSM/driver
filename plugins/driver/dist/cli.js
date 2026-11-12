@@ -8,8 +8,8 @@ var __export = (target, all) => {
 // src/cli.ts
 import { execFileSync as execFileSync2 } from "child_process";
 import { createHash, timingSafeEqual } from "crypto";
-import { closeSync as closeSync2, existsSync as existsSync6, mkdirSync as mkdirSync5, openSync as openSync2, readFileSync as readFileSync6, readSync as readSync2, rmSync as rmSync2, writeFileSync as writeFileSync5, writeSync as writeSync2 } from "fs";
-import path6 from "path";
+import { closeSync as closeSync2, existsSync as existsSync7, mkdirSync as mkdirSync5, openSync as openSync2, readFileSync as readFileSync7, readSync as readSync2, rmSync as rmSync2, writeFileSync as writeFileSync5, writeSync as writeSync2 } from "fs";
+import path7 from "path";
 import { parseArgs } from "util";
 
 // ../../node_modules/zod/v4/classic/external.js
@@ -829,10 +829,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path7) {
-  if (!path7)
+function getElementAtPath(obj, path8) {
+  if (!path8)
     return obj;
-  return path7.reduce((acc, key) => acc?.[key], obj);
+  return path8.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -1172,11 +1172,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path7, issues) {
+function prefixIssues(path8, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path7);
+    iss.path.unshift(path8);
     return iss;
   });
 }
@@ -1638,16 +1638,16 @@ function flattenError(error62, mapper = (issue2) => issue2.message) {
 }
 function formatError(error62, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error63, path7 = []) => {
+  const processError = (error63, path8 = []) => {
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path7, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path8, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path7, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path8, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path7, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path8, ...issue2.path]);
       } else {
-        const fullpath = [...path7, ...issue2.path];
+        const fullpath = [...path8, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -1686,17 +1686,17 @@ function formatError(error62, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error62, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error63, path7 = []) => {
+  const processError = (error63, path8 = []) => {
     var _a3;
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path7, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path8, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path7, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path8, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path7, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path8, ...issue2.path]);
       } else {
-        const fullpath = [...path7, ...issue2.path];
+        const fullpath = [...path8, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -1735,8 +1735,8 @@ function treeifyError(error62, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path7 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path7) {
+  const path8 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path8) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -9362,8 +9362,8 @@ function ko_default() {
 }
 
 // ../../node_modules/zod/v4/locales/lt.js
-var capitalizeFirstCharacter = (text) => {
-  return text.charAt(0).toUpperCase() + text.slice(1);
+var capitalizeFirstCharacter = (text2) => {
+  return text2.charAt(0).toUpperCase() + text2.slice(1);
 };
 function getUnitTypeFromNumber(number4) {
   const abs = Math.abs(number4);
@@ -18874,13 +18874,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path7 = ref.slice(1).split("/").filter(Boolean);
-  if (path7.length === 0) {
+  const path8 = ref.slice(1).split("/").filter(Boolean);
+  if (path8.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path7[0] === defsKey) {
-    const key = path7[1] === void 0 ? void 0 : decodeJSONPointerSegment(path7[1]);
+  if (path8[0] === defsKey) {
+    const key = path8[1] === void 0 ? void 0 : decodeJSONPointerSegment(path8[1]);
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -19930,10 +19930,10 @@ var ApplyInputError = class extends Error {
   }
   failedOp;
 };
-function parseApplyBody(text) {
+function parseApplyBody(text2) {
   let raw;
   try {
-    raw = JSON.parse(text);
+    raw = JSON.parse(text2);
   } catch (e) {
     throw new ApplyInputError(`stdin is not valid JSON: ${e.message}`);
   }
@@ -19983,9 +19983,33 @@ function toReducerOp(o) {
   }
 }
 
-// src/block-doc.ts
-import { existsSync as existsSync2, mkdirSync as mkdirSync2, readFileSync as readFileSync2, renameSync as renameSync2, writeFileSync as writeFileSync2 } from "fs";
+// src/backlog.ts
+import { appendFileSync as appendFileSync3, existsSync as existsSync3, readFileSync as readFileSync3 } from "fs";
+import path3 from "path";
+
+// src/discover-log.ts
+import { appendFileSync as appendFileSync2, existsSync as existsSync2, mkdirSync as mkdirSync2, readFileSync as readFileSync2, renameSync as renameSync2, writeFileSync as writeFileSync2 } from "fs";
 import path2 from "path";
+
+// src/store.ts
+import { execFileSync } from "child_process";
+import {
+  appendFileSync,
+  closeSync,
+  existsSync,
+  fsyncSync,
+  mkdirSync,
+  openSync,
+  readdirSync,
+  readFileSync,
+  readSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+  writeSync
+} from "fs";
+import path from "path";
 
 // src/md-sections.ts
 var BLOCK_HEADINGS = ["Spec", "Acceptance criteria", "Notes", "Handoff"];
@@ -20015,8 +20039,8 @@ function findOne(lines, headings, heading, fail) {
   if (all.length > 1) fail(`duplicate ## ${heading} heading`);
   return all[0];
 }
-function bodyProblem(text, headings) {
-  const lines = text.replace(/\r\n/g, "\n").split("\n");
+function bodyProblem(text2, headings) {
+  const lines = text2.replace(/\r\n/g, "\n").split("\n");
   const fenced = fenceFlags(lines);
   for (const [i, l] of lines.entries()) {
     if (fenced[i]) continue;
@@ -20028,7 +20052,7 @@ function bodyProblem(text, headings) {
   if (opens % 2 === 1) return "text has an unclosed code fence";
   return void 0;
 }
-var bodyOf = (text) => text.replace(/\r\n/g, "\n").replace(/^\n+|\n+$/g, "").split("\n");
+var bodyOf = (text2) => text2.replace(/\r\n/g, "\n").replace(/^\n+|\n+$/g, "").split("\n");
 function setSection(lines, headings, heading, body, fail) {
   const out = [...lines];
   const block = ["", ...body, ""];
@@ -20051,26 +20075,6 @@ function sectionText(content, headings, heading, fail) {
   const s = findOne(lines, headings, heading, fail);
   return s ? lines.slice(s.start + 1, s.end) : void 0;
 }
-
-// src/store.ts
-import { execFileSync } from "child_process";
-import {
-  appendFileSync,
-  closeSync,
-  existsSync,
-  fsyncSync,
-  mkdirSync,
-  openSync,
-  readdirSync,
-  readFileSync,
-  readSync,
-  renameSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-  writeSync
-} from "fs";
-import path from "path";
 
 // src/ids.ts
 function formatId(kind, n) {
@@ -20162,8 +20166,8 @@ function hasErrors(issues) {
 var isActive = (b) => b.retired === void 0;
 var idNumber = (id) => Number(id.slice(id.indexOf("-") + 1));
 var maxId = (ids) => ids.reduce((m, id) => Math.max(m, idNumber(id)), 0);
-function formatPath(path7) {
-  return path7.map(String).join(".");
+function formatPath(path8) {
+  return path8.map(String).join(".");
 }
 function dupes(values) {
   const seen = /* @__PURE__ */ new Set();
@@ -20209,7 +20213,7 @@ function validatePlan(plan, opts = {}) {
   }
   const p = parsed.data;
   const issues = [];
-  const add = (level, code, path7, message) => issues.push({ level, code, path: path7, message });
+  const add = (level, code, path8, message) => issues.push({ level, code, path: path8, message });
   const blockIds = Object.keys(p.blocks);
   const reqIds = Object.keys(p.requirements);
   for (const d of dupes(p.releases.map((r) => r.id)))
@@ -20228,8 +20232,8 @@ function validatePlan(plan, opts = {}) {
       ...blockIds.flatMap((id) => p.blocks[id].retired ? [[`blocks.${id}.retired.decision`, p.blocks[id].retired.decision]] : []),
       ...reqIds.flatMap((id) => p.requirements[id].retired ? [[`requirements.${id}.retired.decision`, p.requirements[id].retired.decision]] : [])
     ];
-    for (const [path7, d] of cited)
-      if (!(d in p.decisions)) add("error", "ref.decision", path7, `${d} is not registered in decisions`);
+    for (const [path8, d] of cited)
+      if (!(d in p.decisions)) add("error", "ref.decision", path8, `${d} is not registered in decisions`);
   }
   const counters = [
     ["R", maxId(reqIds)],
@@ -20284,6 +20288,14 @@ function validatePlan(plan, opts = {}) {
       add("warning", "phases.currentValid", `blocks.${id}.status`, `block in later phase ${b.phase} is ${b.status} while currentPhase is ${p.currentPhase}`);
   }
   const activeBlocks = blockIds.filter((id) => isActive(p.blocks[id]));
+  if (p.currentPhase === "evolve" || p.currentPhase === "release") {
+    const behind = activeBlocks.filter((id) => {
+      const b = p.blocks[id];
+      return (b.phase === "implement" || b.phase === "validate") && b.status !== "done";
+    });
+    if (behind.length > 0)
+      add("warning", "phases.openBehind", "blocks", `currentPhase is ${p.currentPhase} but work is still open in implement or validate: ${behind.join(", ")}`);
+  }
   const coverageLevel = p.currentPhase === "release" ? "error" : "warning";
   for (const rid of reqIds) {
     const r = p.requirements[rid];
@@ -20391,10 +20403,20 @@ function registerDecision(d, id, title, reason) {
     [id]: { title, at: d.ctx.now, ...reason ? { reason } : {}, by: d.ctx.actor }
   };
 }
-function setPhase(d, to, reason) {
+function setPhase(d, to, reason, data) {
   const from = d.plan.currentPhase;
   d.plan.currentPhase = to;
-  emit(d, { type: "phase.change", from, to, ...reason ? { reason } : {} });
+  emit(d, { type: "phase.change", from, to, ...reason ? { reason } : {}, ...data ? { data } : {} });
+}
+var hasOpenBaseline = (plan) => plan.baselines.length === 1 && plan.baselines[0].closedAt === void 0;
+function closeBaseline(d, added, reqAdded, at) {
+  const entry = d.plan.baselines[0];
+  const foldedBlocks = [...new Set(added)].filter((id) => !entry.added.includes(id)).sort();
+  const foldedReqs = [...new Set(reqAdded)].filter((id) => !entry.reqAdded.includes(id)).sort();
+  entry.added = [...entry.added, ...foldedBlocks];
+  entry.reqAdded = [...entry.reqAdded, ...foldedReqs];
+  entry.closedAt = at;
+  return { added: foldedBlocks, reqAdded: foldedReqs };
 }
 function handle(d, op) {
   const { plan, ctx } = d;
@@ -20443,6 +20465,16 @@ function handle(d, op) {
       const unknown2 = Object.keys(op.patch).filter((k) => !PATCH_KEYS.has(k));
       if (unknown2.length > 0) return refuse(`block.set cannot change: ${unknown2.join(", ")}`, true);
       const { addArtifacts, addTests, ...direct } = op.patch;
+      if (b.status === "done" && direct.dependsOn !== void 0) {
+        const unfinished = direct.dependsOn.filter((dep) => {
+          const x = plan.blocks[dep];
+          return !b.dependsOn.includes(dep) && x !== void 0 && !x.retired && x.status !== "done";
+        });
+        if (unfinished.length > 0)
+          return refuse(
+            `${op.id} is done and cannot wait on unfinished work (${unfinished.join(", ")}); move it to needs_rework or add a new block`
+          );
+      }
       const keys = [];
       for (const [k, v] of Object.entries(direct)) {
         if (v === void 0) continue;
@@ -20553,6 +20585,11 @@ function handle(d, op) {
       if (!to) return refuse("already at the last phase (release)");
       if (to === "route" && !plan.gates.route.approved) return refuse("gate route is not approved");
       if (to === "release" && !plan.gates.release.approved) return refuse("gate release is not approved");
+      if (to === "implement" && hasOpenBaseline(d.plan)) {
+        const folded = closeBaseline(d, activeIds(d.plan.blocks), activeIds(d.plan.requirements), ctx.now);
+        setPhase(d, to, void 0, { baseline: 1, folded: folded.added, reqFolded: folded.reqAdded });
+        return;
+      }
       setPhase(d, to);
       return;
     }
@@ -20590,12 +20627,18 @@ function handle(d, op) {
         retired: retiredBlocks.filter((id) => !seenRetired.has(id)).sort(),
         changed,
         reqAdded: activeIds(d.plan.requirements).filter((id) => !seenReqs.has(id)),
-        reqRetired: retiredReqs.filter((id) => !seenReqRetired.has(id)).sort()
+        reqRetired: retiredReqs.filter((id) => !seenReqRetired.has(id)).sort(),
+        ...op.via ? { via: op.via } : {},
+        ...op.ticket ? { ticket: op.ticket } : {}
       });
       for (const id of changed)
         if (d.plan.blocks[id].status !== "not_started")
           transition(d, id, "not_started", { reason: `rebaseline ${decision}`, rebaseline: true });
-      emit(d, { type: "rebaseline", reason: op.reason, data: { n, decision, changed } });
+      emit(d, {
+        type: "rebaseline",
+        reason: op.reason,
+        data: { n, decision, changed, ...op.via ? { via: op.via } : {}, ...op.ticket ? { ticket: op.ticket } : {} }
+      });
       return;
     }
     case "release.add": {
@@ -20611,6 +20654,18 @@ function handle(d, op) {
       });
       d.created = id;
       emit(d, { type: "release", data: { id, version: op.version, commit: op.commit } });
+      return;
+    }
+    case "baseline.close": {
+      if (ctx.actor.kind !== "hook") return refuse("baseline.close is internal", true);
+      if (!hasOpenBaseline(d.plan)) return refuse("baseline.close needs exactly one baseline without closedAt");
+      const folded = closeBaseline(
+        d,
+        op.added.filter((id) => id in d.plan.blocks),
+        op.reqAdded.filter((id) => id in d.plan.requirements),
+        op.at
+      );
+      emit(d, { type: "baseline.close", data: { baseline: 1, folded: folded.added, reqFolded: folded.reqAdded, at: op.at } });
       return;
     }
     case "renumber": {
@@ -20816,10 +20871,10 @@ function tailSeq(file2) {
     for (; ; ) {
       const buf = Buffer.alloc(len);
       readSync(fd, buf, 0, len, size - len);
-      const text = buf.toString("utf8").trimEnd();
-      const nl = text.lastIndexOf("\n");
+      const text2 = buf.toString("utf8").trimEnd();
+      const nl = text2.lastIndexOf("\n");
       if (nl >= 0 || len === size) {
-        const seq = JSON.parse(text.slice(nl + 1)).seq;
+        const seq = JSON.parse(text2.slice(nl + 1)).seq;
         if (typeof seq !== "number") throw new Error(`${file2}: last line has no numeric seq`);
         return seq;
       }
@@ -20872,6 +20927,24 @@ function readEvents(driverDir) {
 }
 function readAllEvents(driverDir) {
   return [...rotatedLogs(driverDir).flatMap(parseLines), ...readEvents(driverDir)];
+}
+var BASELINE_CLOSER = { kind: "hook", id: "baseline-close" };
+function closeLegacyBaseline(driverDir, plan, now) {
+  if (comparePhase(plan.currentPhase, "route") <= 0) return void 0;
+  if (plan.baselines.length !== 1 || plan.baselines[0].closedAt !== void 0) return void 0;
+  let added = Object.keys(plan.blocks);
+  let reqAdded = Object.keys(plan.requirements);
+  try {
+    const events = readAllEvents(driverDir);
+    const cut = events.findIndex((e) => e.type === "phase.change" && e.to === "implement");
+    if (cut >= 0) {
+      const before = events.slice(0, cut);
+      added = before.filter((e) => e.type === "block.add" && e.block).map((e) => e.block);
+      reqAdded = before.flatMap((e) => e.type === "req.add" && typeof e.data?.id === "string" ? [e.data.id] : []);
+    }
+  } catch {
+  }
+  return applyOp(plan, { type: "baseline.close", added, reqAdded, at: now }, { actor: BASELINE_CLOSER, now });
 }
 var yamlString = (s) => JSON.stringify(s);
 function writeNew(file2, content) {
@@ -20950,13 +21023,14 @@ function mutate(driverDir, op, ctx, opts = {}) {
       throw new RevisionConflictError(opts.expectedRevision, current.revision);
     if (op.type === "block.status" && op.to === "in_review" && current.blocks[op.id]?.status === "in_progress" && !(op.force && ctx.actor.kind === "user"))
       checkHandoff(driverDir, op.id);
-    const r = applyOp(current, op, ctx);
+    const closed = closeLegacyBaseline(driverDir, current, ctx.now);
+    const r = applyOp(closed?.plan ?? current, op, ctx);
     const plan = { ...r.plan, revision: current.revision + 1 };
     writeDocs(driverDir, op, r.created, plan, opts);
     writePlan(driverDir, plan);
     const events = appendEvents(
       driverDir,
-      r.events.map((e) => ({ ...e, revision: plan.revision }))
+      [...closed?.events ?? [], ...r.events].map((e) => ({ ...e, revision: plan.revision }))
     );
     if (op.type === "release.add" && r.created) {
       mkdirSync(path.join(driverDir, "log"), { recursive: true });
@@ -20995,9 +21069,10 @@ function mutateMany(driverDir, ops, ctx, opts = {}) {
     const current = readPlan(driverDir);
     if (opts.expectedRevision !== void 0 && current.revision !== opts.expectedRevision)
       throw new RevisionConflictError(opts.expectedRevision, current.revision);
-    let working = current;
+    const closed = closeLegacyBaseline(driverDir, current, ctx.now);
+    let working = closed?.plan ?? current;
     const created = [];
-    const events = [];
+    const events = [...closed?.events ?? []];
     const docs = [];
     ops.forEach((raw, index) => {
       try {
@@ -21040,203 +21115,7 @@ function initDriverDir(driverDir, name, packs, now) {
   return plan;
 }
 
-// src/block-doc.ts
-var SECTIONS = [
-  { key: "spec", heading: "Spec" },
-  { key: "acceptance", heading: "Acceptance criteria" },
-  { key: "notes", heading: "Notes" },
-  { key: "handoff", heading: "Handoff" }
-];
-var Entry = external_exports.strictObject({
-  id: external_exports.string().regex(/^B-\d+$/, "must look like B-004"),
-  spec: external_exports.string().optional(),
-  acceptance: external_exports.array(external_exports.string()).optional(),
-  notes: external_exports.string().optional(),
-  handoff: external_exports.string().optional()
-});
-var BlockDocInputSchema = external_exports.strictObject({ blocks: external_exports.array(Entry).min(1).max(30) });
-var BlockDocRefusedError = class extends Error {
-  constructor(message) {
-    super(message);
-    this.name = "BlockDocRefusedError";
-  }
-};
-var refuse2 = (m) => {
-  throw new BlockDocRefusedError(m);
-};
-var CHECKBOX = /^- \[[ xX]\]/;
-var checklist = (items) => items.map((i) => i.replace(/[\r\n\u2028\u2029\u0085]+/g, " ").trim()).map((i) => CHECKBOX.test(i) ? i : `- [ ] ${i}`);
-function renderDoc(current, e, fail = refuse2) {
-  let lines = current.replace(/\r\n/g, "\n").split("\n");
-  const H = BLOCK_HEADINGS;
-  if (e.spec !== void 0) lines = setSection(lines, H, "Spec", bodyOf(e.spec), fail);
-  if (e.acceptance !== void 0) lines = setSection(lines, H, "Acceptance criteria", checklist(e.acceptance), fail);
-  if (e.notes !== void 0) lines = setSection(lines, H, "Notes", bodyOf(e.notes), fail);
-  if (e.handoff !== void 0) lines = setSection(lines, H, "Handoff", bodyOf(e.handoff), fail);
-  return `${lines.join("\n").replace(/\n+$/, "")}
-`;
-}
-function label(e) {
-  return SECTIONS.flatMap((s) => {
-    const v = e[s.key];
-    if (v === void 0) return [];
-    return [s.key === "acceptance" ? `acceptance (${v.length})` : s.key];
-  });
-}
-function writeBlockDocs(driverDir, raw) {
-  const parsed = BlockDocInputSchema.safeParse(raw);
-  if (!parsed.success) throw new BlockDocRefusedError(parsed.error.issues.map((i) => `${i.path.join(".") || "input"}: ${i.message}`).join("; "));
-  const entries = parsed.data.blocks;
-  return withLock(driverDir, () => {
-    const plan = readPlan(driverDir);
-    const seen = /* @__PURE__ */ new Set();
-    const staged = entries.map((e, i) => {
-      const where = `blocks[${i}] (${e.id})`;
-      const fail = (m) => refuse2(`${where}: ${m}`);
-      if (seen.has(e.id)) fail("listed twice");
-      seen.add(e.id);
-      const b = plan.blocks[e.id];
-      if (!b) return fail(`unknown block ${e.id}`);
-      if (b.retired) fail("block is retired");
-      if (b.status === "done") fail("block is done; its document is frozen");
-      if (b.status === "in_review" && e.handoff !== void 0) fail("block is in_review; the handoff cannot be rewritten (the path back is needs_rework)");
-      if (label(e).length === 0) fail("nothing to write (give spec, acceptance, notes or handoff)");
-      for (const key of ["spec", "notes", "handoff"]) {
-        const p = e[key] === void 0 ? void 0 : bodyProblem(e[key], BLOCK_HEADINGS);
-        if (p) fail(`${key}: ${p}`);
-      }
-      for (const item of e.acceptance ?? []) {
-        if (item.trim() === "") fail("acceptance entries cannot be empty");
-        const p = bodyProblem(item, BLOCK_HEADINGS);
-        if (p) fail(`acceptance: ${p}`);
-      }
-      const file2 = path2.join(driverDir, "blocks", `${e.id}.md`);
-      const existed = existsSync2(file2);
-      const current = existed ? readFileSync2(file2, "utf8") : blockDocTemplate(e.id, b.title);
-      return { id: e.id, file: file2, existed, content: renderDoc(current, e, fail), sections: label(e) };
-    });
-    mkdirSync2(path2.join(driverDir, "blocks"), { recursive: true });
-    mkdirSync2(path2.join(driverDir, ".tmp"), { recursive: true });
-    for (const s of staged) {
-      const tmp = path2.join(driverDir, ".tmp", `${s.id}.md.${process.pid}`);
-      writeFileSync2(tmp, s.content);
-      renameSync2(tmp, s.file);
-    }
-    const blocks = staged.map((s) => ({ id: s.id, sections: s.sections, created: !s.existed }));
-    return { blocks, text: blocks.map((b) => `${b.id}: ${b.sections.join(", ")}`).join("\n") };
-  });
-}
-
-// src/req-doc.ts
-import { existsSync as existsSync3, mkdirSync as mkdirSync3, readFileSync as readFileSync3, renameSync as renameSync3, writeFileSync as writeFileSync3 } from "fs";
-import path3 from "path";
-var SECTIONS2 = [
-  { key: "statement", heading: "Statement" },
-  { key: "acceptance", heading: "Acceptance signal" },
-  { key: "origin", heading: "Origin" },
-  { key: "notes", heading: "Notes" }
-];
-var Entry2 = external_exports.strictObject({
-  id: external_exports.string().regex(/^R-\d+$/, "must look like R-003"),
-  statement: external_exports.string().optional(),
-  acceptance: external_exports.string().optional(),
-  origin: external_exports.string().optional(),
-  notes: external_exports.string().optional()
-});
-var ReqDocInputSchema = external_exports.strictObject({ requirements: external_exports.array(Entry2).min(1).max(30) });
-var ReqDocRefusedError = class extends Error {
-  constructor(message) {
-    super(message);
-    this.name = "ReqDocRefusedError";
-  }
-};
-var refuse3 = (m) => {
-  throw new ReqDocRefusedError(m);
-};
-var unquote = (v) => {
-  const t = v.trim();
-  if (t.startsWith('"')) {
-    try {
-      return JSON.parse(t);
-    } catch {
-      return t;
-    }
-  }
-  return t.replace(/^'(.*)'$/, "$1");
-};
-function syncFrontmatter(content, want) {
-  const lines = content.split("\n");
-  const render = (k) => `${k}: ${k === "title" ? JSON.stringify(want[k]) : want[k]}`;
-  const keys = ["id", "title", "kind", "source"];
-  if (lines[0] !== "---") return `---
-${keys.map(render).join("\n")}
----
-
-${content.replace(/^\n+/, "")}`;
-  const close = lines.indexOf("---", 1);
-  if (close < 0) return content;
-  const fm = lines.slice(1, close);
-  for (const k of keys) {
-    const i = fm.findIndex((l) => l.startsWith(`${k}:`));
-    if (i < 0) fm.push(render(k));
-    else if (unquote(fm[i].slice(k.length + 1)) !== want[k]) fm[i] = render(k);
-  }
-  return [lines[0], ...fm, ...lines.slice(close)].join("\n");
-}
-function reqDocTemplate(id, title) {
-  return `# ${id} ${title}
-`;
-}
-function renderReqDoc(current, e, fail = refuse3) {
-  let lines = current.replace(/\r\n/g, "\n").split("\n");
-  const H = REQ_HEADINGS;
-  if (e.statement !== void 0) lines = setSection(lines, H, "Statement", bodyOf(e.statement), fail);
-  if (e.acceptance !== void 0) lines = setSection(lines, H, "Acceptance signal", bodyOf(e.acceptance), fail);
-  if (e.origin !== void 0) lines = setSection(lines, H, "Origin", bodyOf(e.origin), fail);
-  if (e.notes !== void 0) lines = setSection(lines, H, "Notes", bodyOf(e.notes), fail);
-  return `${lines.join("\n").replace(/\n+$/, "")}
-`;
-}
-var label2 = (e) => SECTIONS2.flatMap((s) => e[s.key] === void 0 ? [] : [s.key]);
-function writeReqDocs(driverDir, raw) {
-  const parsed = ReqDocInputSchema.safeParse(raw);
-  if (!parsed.success) throw new ReqDocRefusedError(parsed.error.issues.map((i) => `${i.path.join(".") || "input"}: ${i.message}`).join("; "));
-  return withLock(driverDir, () => {
-    const plan = readPlan(driverDir);
-    const seen = /* @__PURE__ */ new Set();
-    const staged = parsed.data.requirements.map((e, i) => {
-      const fail = (m) => refuse3(`requirements[${i}] (${e.id}): ${m}`);
-      if (seen.has(e.id)) fail("listed twice");
-      seen.add(e.id);
-      const r = plan.requirements[e.id];
-      if (!r) return fail(`unknown requirement ${e.id}`);
-      if (r.retired) fail("requirement is retired");
-      if (label2(e).length === 0) fail("nothing to write (give statement, acceptance, origin or notes)");
-      for (const s of SECTIONS2) {
-        const p = e[s.key] === void 0 ? void 0 : bodyProblem(e[s.key], REQ_HEADINGS);
-        if (p) fail(`${s.key}: ${p}`);
-      }
-      const file2 = path3.join(driverDir, "requirements", `${e.id}.md`);
-      const existed = existsSync3(file2);
-      const base = existed ? readFileSync3(file2, "utf8") : reqDocTemplate(e.id, r.title);
-      const content = syncFrontmatter(renderReqDoc(base, e, fail), { id: e.id, title: r.title, kind: r.kind, source: r.source });
-      return { id: e.id, file: file2, existed, content, sections: label2(e) };
-    });
-    mkdirSync3(path3.join(driverDir, "requirements"), { recursive: true });
-    mkdirSync3(path3.join(driverDir, ".tmp"), { recursive: true });
-    for (const s of staged) {
-      const tmp = path3.join(driverDir, ".tmp", `${s.id}.req.md.${process.pid}`);
-      writeFileSync3(tmp, s.content);
-      renameSync3(tmp, s.file);
-    }
-    const requirements = staged.map((s) => ({ id: s.id, sections: s.sections, created: !s.existed }));
-    return { requirements, text: requirements.map((b) => `${b.id}: ${b.sections.join(", ")}`).join("\n") };
-  });
-}
-
 // src/discover-log.ts
-import { appendFileSync as appendFileSync2, existsSync as existsSync4, mkdirSync as mkdirSync4, readFileSync as readFileSync4, renameSync as renameSync4, writeFileSync as writeFileSync4 } from "fs";
-import path4 from "path";
 var CLASSES = ["XS", "S", "M", "L"];
 var STAGES = ["core", "areas", "summary", "closed"];
 var CHECKPOINTS = ["none", "pre-mortem", "red-team", "socratic", "skipped"];
@@ -21294,7 +21173,7 @@ var emptyState = () => ({
   nodes: [],
   nonGoals: []
 });
-var refuse4 = (m) => {
+var refuse2 = (m) => {
   throw new DiscoverRefusedError(m);
 };
 function nextId2(prefix, used) {
@@ -21307,7 +21186,7 @@ function checkAcyclic(nodes) {
   const state = /* @__PURE__ */ new Map();
   const visit2 = (id, trail) => {
     if (state.get(id) === 2) return;
-    if (state.get(id) === 1) refuse4(`dependsOn cycle: ${[...trail, id].join(" -> ")}`);
+    if (state.get(id) === 1) refuse2(`dependsOn cycle: ${[...trail, id].join(" -> ")}`);
     state.set(id, 1);
     for (const d of byId.get(id)?.dependsOn ?? []) visit2(d, [...trail, id]);
     state.set(id, 2);
@@ -21328,10 +21207,10 @@ function applyInput(prev, input2, at, replay = false) {
     input2.nodes.forEach((n, i) => {
       const where = `nodes[${i}]`;
       let node2 = n.id ? state.nodes.find((x) => x.id === n.id) : void 0;
-      if (n.id && !node2 && !replay) refuse4(`${where}: unknown id ${n.id} (omit id to create a node)`);
+      if (n.id && !node2 && !replay) refuse2(`${where}: unknown id ${n.id} (omit id to create a node)`);
       if (!node2) {
-        if (!n.question?.trim()) refuse4(`${where}: creating a node needs a question`);
-        if (!n.kind) refuse4(`${where}: creating a node needs a kind (fact or decision)`);
+        if (!n.question?.trim()) refuse2(`${where}: creating a node needs a question`);
+        if (!n.kind) refuse2(`${where}: creating a node needs a kind (fact or decision)`);
         const id = n.id ?? nextId2("Q", state.nodes.map((x) => x.id));
         node2 = { id, question: "", area: "core", dependsOn: [], kind: n.kind, status: "open", options: [], at };
         state.nodes.push(node2);
@@ -21342,11 +21221,11 @@ function applyInput(prev, input2, at, replay = false) {
       resolved.nodes.push({ ...n, id: node2.id });
       const label3 = `${where} (${node2.id})`;
       for (const d of node2.dependsOn) {
-        if (d === node2.id) refuse4(`${label3}: a node cannot depend on itself`);
-        if (!state.nodes.some((x) => x.id === d)) refuse4(`${label3}: dependsOn ${d} does not exist`);
+        if (d === node2.id) refuse2(`${label3}: a node cannot depend on itself`);
+        if (!state.nodes.some((x) => x.id === d)) refuse2(`${label3}: dependsOn ${d} does not exist`);
       }
       if (node2.status === "assumed") {
-        if (!node2.why?.trim()) refuse4(`${label3}: status assumed needs a why`);
+        if (!node2.why?.trim()) refuse2(`${label3}: status assumed needs a why`);
         if (!node2.assumption) {
           node2.assumption = nextId2("A", state.nodes.flatMap((x) => x.assumption ? [x.assumption] : []));
           created.assumptions.push(node2.assumption);
@@ -21360,9 +21239,9 @@ function applyInput(prev, input2, at, replay = false) {
     input2.nonGoals.forEach((g, i) => {
       const where = `nonGoals[${i}]`;
       let item = g.id ? state.nonGoals.find((x) => x.id === g.id) : void 0;
-      if (g.id && !item && !replay) refuse4(`${where}: unknown id ${g.id} (omit id to create a non-goal)`);
+      if (g.id && !item && !replay) refuse2(`${where}: unknown id ${g.id} (omit id to create a non-goal)`);
       if (!item) {
-        if (!g.statement?.trim()) refuse4(`${where}: creating a non-goal needs a statement`);
+        if (!g.statement?.trim()) refuse2(`${where}: creating a non-goal needs a statement`);
         const id = g.id ?? nextId2("N", state.nonGoals.map((x) => x.id));
         item = { id, statement: "" };
         state.nonGoals.push(item);
@@ -21375,13 +21254,13 @@ function applyInput(prev, input2, at, replay = false) {
   }
   return { state, resolved, created };
 }
-var discoverDir = (driverDir) => path4.join(driverDir, "discover");
-var logFile = (driverDir) => path4.join(discoverDir(driverDir), "interview.jsonl");
+var discoverDir = (driverDir) => path2.join(driverDir, "discover");
+var logFile = (driverDir) => path2.join(discoverDir(driverDir), "interview.jsonl");
 function readState(driverDir) {
   const file2 = logFile(driverDir);
-  if (!existsSync4(file2)) return { state: emptyState(), exists: false, kept: [], repair: false, dropped: false };
+  if (!existsSync2(file2)) return { state: emptyState(), exists: false, kept: [], repair: false, dropped: false };
   let state = emptyState();
-  const lines = readFileSync4(file2, "utf8").split("\n");
+  const lines = readFileSync2(file2, "utf8").split("\n");
   const tail = lines[lines.length - 1];
   let dropped = false;
   let repair = false;
@@ -21488,11 +21367,11 @@ function renderNonGoals(state) {
 `;
 }
 function atomicWrite(driverDir, file2, content) {
-  const tmpDir = path4.join(driverDir, ".tmp");
-  mkdirSync4(tmpDir, { recursive: true });
-  const tmp = path4.join(tmpDir, `${path4.basename(file2)}.${process.pid}`);
-  writeFileSync4(tmp, content);
-  renameSync4(tmp, file2);
+  const tmpDir = path2.join(driverDir, ".tmp");
+  mkdirSync2(tmpDir, { recursive: true });
+  const tmp = path2.join(tmpDir, `${path2.basename(file2)}.${process.pid}`);
+  writeFileSync2(tmp, content);
+  renameSync2(tmp, file2);
 }
 function summaryText(state, created) {
   const c = countsByStatus(state);
@@ -21509,7 +21388,7 @@ function summaryText(state, created) {
   return lines.join("\n");
 }
 function logDiscover(driverDir, raw, now) {
-  if (!existsSync4(path4.join(driverDir, "plan.json"))) throw new NotInitializedError(driverDir);
+  if (!existsSync2(path2.join(driverDir, "plan.json"))) throw new NotInitializedError(driverDir);
   const parsed = DiscoverInputSchema.safeParse(raw);
   if (!parsed.success)
     throw new DiscoverRefusedError(parsed.error.issues.map((i) => `${i.path.join(".") || "input"}: ${i.message}`).join("; "));
@@ -21522,32 +21401,334 @@ function logDiscover(driverDir, raw, now) {
     const assumptions = renderAssumptions(state);
     const nonGoals = renderNonGoals(state);
     const dir = discoverDir(driverDir);
-    mkdirSync4(dir, { recursive: true });
+    mkdirSync2(dir, { recursive: true });
     const entry = `${JSON.stringify({ at: now, input: resolved, created })}
 `;
     if (repair) atomicWrite(driverDir, logFile(driverDir), `${kept.map((l) => `${l}
 `).join("")}${entry}`);
     else appendFileSync2(logFile(driverDir), entry);
-    atomicWrite(driverDir, path4.join(dir, "interview.md"), interview);
-    atomicWrite(driverDir, path4.join(dir, "assumptions.md"), assumptions);
-    atomicWrite(driverDir, path4.join(dir, "non-goals.md"), nonGoals);
+    atomicWrite(driverDir, path2.join(dir, "interview.md"), interview);
+    atomicWrite(driverDir, path2.join(dir, "assumptions.md"), assumptions);
+    atomicWrite(driverDir, path2.join(dir, "non-goals.md"), nonGoals);
     const warnings = dropped ? ["dropped a truncated last line of interview.jsonl"] : [];
-    const text = [summaryText(state, created), ...warnings.map((w) => `warning: ${w}`)].join("\n");
-    return { state, created, frontier: frontier(state), text, warnings };
+    const text2 = [summaryText(state, created), ...warnings.map((w) => `warning: ${w}`)].join("\n");
+    return { state, created, frontier: frontier(state), text: text2, warnings };
+  });
+}
+
+// src/backlog.ts
+var MAX_ITEMS = 20;
+var decisionId = external_exports.string().regex(/^D-\d{3,}$/, "must look like D-001");
+var text = external_exports.string().refine((s) => s.trim() !== "", "must not be empty");
+var ItemInput = external_exports.strictObject({
+  title: text,
+  detail: text.optional(),
+  origin: text.optional(),
+  decision: decisionId.optional()
+});
+var BacklogInputSchema = external_exports.strictObject({
+  items: external_exports.array(ItemInput).min(1).max(MAX_ITEMS)
+});
+var BacklogRefusedError = class extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "BacklogRefusedError";
+  }
+};
+var logFile2 = (driverDir) => path3.join(driverDir, "backlog.jsonl");
+var mdFile = (driverDir) => path3.join(driverDir, "backlog.md");
+function nextNumber(entries) {
+  let max = 0;
+  for (const e of entries) max = Math.max(max, Number(e.id.slice(2)) || 0);
+  return max + 1;
+}
+var idOf = (n) => `L-${String(n).padStart(2, "0")}`;
+function readBacklog(driverDir) {
+  const file2 = logFile2(driverDir);
+  if (!existsSync3(file2)) return { entries: [], exists: false, kept: [], repair: false, dropped: false };
+  const lines = readFileSync3(file2, "utf8").split("\n");
+  const tail = lines[lines.length - 1];
+  let dropped = false;
+  let repair = false;
+  if (tail.trim() !== "") {
+    try {
+      JSON.parse(tail);
+      repair = true;
+    } catch {
+      dropped = true;
+      repair = true;
+      lines.pop();
+    }
+  }
+  const kept = [];
+  const entries = [];
+  lines.forEach((l, i) => {
+    if (l.trim() === "") return;
+    kept.push(l);
+    try {
+      entries.push(JSON.parse(l));
+    } catch (e) {
+      throw new Error(`${file2}:${i + 1}: ${e.message}`);
+    }
+  });
+  return { entries, exists: true, kept, repair, dropped };
+}
+var GENERATED2 = "<!-- Generated from backlog.jsonl by `driver backlog add`. Do not edit by hand. -->";
+function renderBacklog(entries) {
+  const out = [GENERATED2, "", "# Backlog for the next cycle"];
+  if (!entries.length) out.push("", "(empty)");
+  for (const e of entries) {
+    out.push("", `## ${e.id} ${line1(e.title)}`, "");
+    out.push(`- Added: ${line1(e.at)}`);
+    out.push(`- Origin: ${e.origin ? line1(e.origin) : "-"}`);
+    out.push(`- Decision: ${e.decision ?? "-"}`);
+    if (e.detail) out.push("", line1(e.detail));
+  }
+  return `${out.join("\n")}
+`;
+}
+function showText(entries) {
+  if (!entries.length) return "backlog: empty";
+  return [`backlog: ${entries.length} item(s)`, ...entries.map((e) => `${e.id} ${line1(e.title)}${e.origin ? ` [${line1(e.origin)}]` : ""}${e.decision ? ` (${e.decision})` : ""}`)].join("\n");
+}
+function addBacklog(driverDir, raw, now) {
+  if (!existsSync3(path3.join(driverDir, "plan.json"))) throw new NotInitializedError(driverDir);
+  const parsed = BacklogInputSchema.safeParse(raw);
+  if (!parsed.success)
+    throw new BacklogRefusedError(parsed.error.issues.map((i) => `${i.path.join(".") || "input"}: ${i.message}`).join("; "));
+  return withLock(driverDir, () => {
+    const { entries: before, kept, repair, dropped } = readBacklog(driverDir);
+    let n = nextNumber(before);
+    const added = parsed.data.items.map((it) => ({
+      id: idOf(n++),
+      title: it.title,
+      ...it.detail !== void 0 ? { detail: it.detail } : {},
+      ...it.origin !== void 0 ? { origin: it.origin } : {},
+      ...it.decision !== void 0 ? { decision: it.decision } : {},
+      at: now
+    }));
+    const entries = [...before, ...added];
+    const md = renderBacklog(entries);
+    const lines = added.map((e) => `${JSON.stringify(e)}
+`).join("");
+    if (repair) atomicWrite(driverDir, logFile2(driverDir), `${kept.map((l) => `${l}
+`).join("")}${lines}`);
+    else appendFileSync3(logFile2(driverDir), lines);
+    atomicWrite(driverDir, mdFile(driverDir), md);
+    const created = added.map((e) => e.id);
+    const warnings = dropped ? ["dropped a truncated last line of backlog.jsonl"] : [];
+    const textOut = [`ok; created ${created.join(", ")}`, `backlog: ${entries.length} item(s)`, ...warnings.map((w) => `warning: ${w}`)].join("\n");
+    return { created, entries, text: textOut, warnings };
+  });
+}
+
+// src/block-doc.ts
+import { existsSync as existsSync4, mkdirSync as mkdirSync3, readFileSync as readFileSync4, renameSync as renameSync3, writeFileSync as writeFileSync3 } from "fs";
+import path4 from "path";
+var SECTIONS = [
+  { key: "spec", heading: "Spec" },
+  { key: "acceptance", heading: "Acceptance criteria" },
+  { key: "notes", heading: "Notes" },
+  { key: "handoff", heading: "Handoff" }
+];
+var Entry = external_exports.strictObject({
+  id: external_exports.string().regex(/^B-\d+$/, "must look like B-004"),
+  spec: external_exports.string().optional(),
+  acceptance: external_exports.array(external_exports.string()).optional(),
+  notes: external_exports.string().optional(),
+  handoff: external_exports.string().optional()
+});
+var BlockDocInputSchema = external_exports.strictObject({ blocks: external_exports.array(Entry).min(1).max(30) });
+var BlockDocRefusedError = class extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "BlockDocRefusedError";
+  }
+};
+var refuse3 = (m) => {
+  throw new BlockDocRefusedError(m);
+};
+var CHECKBOX = /^- \[[ xX]\]/;
+var checklist = (items) => items.map((i) => i.replace(/[\r\n\u2028\u2029\u0085]+/g, " ").trim()).map((i) => CHECKBOX.test(i) ? i : `- [ ] ${i}`);
+function renderDoc(current, e, fail = refuse3) {
+  let lines = current.replace(/\r\n/g, "\n").split("\n");
+  const H = BLOCK_HEADINGS;
+  if (e.spec !== void 0) lines = setSection(lines, H, "Spec", bodyOf(e.spec), fail);
+  if (e.acceptance !== void 0) lines = setSection(lines, H, "Acceptance criteria", checklist(e.acceptance), fail);
+  if (e.notes !== void 0) lines = setSection(lines, H, "Notes", bodyOf(e.notes), fail);
+  if (e.handoff !== void 0) lines = setSection(lines, H, "Handoff", bodyOf(e.handoff), fail);
+  return `${lines.join("\n").replace(/\n+$/, "")}
+`;
+}
+function label(e) {
+  return SECTIONS.flatMap((s) => {
+    const v = e[s.key];
+    if (v === void 0) return [];
+    return [s.key === "acceptance" ? `acceptance (${v.length})` : s.key];
+  });
+}
+function writeBlockDocs(driverDir, raw) {
+  const parsed = BlockDocInputSchema.safeParse(raw);
+  if (!parsed.success) throw new BlockDocRefusedError(parsed.error.issues.map((i) => `${i.path.join(".") || "input"}: ${i.message}`).join("; "));
+  const entries = parsed.data.blocks;
+  return withLock(driverDir, () => {
+    const plan = readPlan(driverDir);
+    const seen = /* @__PURE__ */ new Set();
+    const staged = entries.map((e, i) => {
+      const where = `blocks[${i}] (${e.id})`;
+      const fail = (m) => refuse3(`${where}: ${m}`);
+      if (seen.has(e.id)) fail("listed twice");
+      seen.add(e.id);
+      const b = plan.blocks[e.id];
+      if (!b) return fail(`unknown block ${e.id}`);
+      if (b.retired) fail("block is retired");
+      if (b.status === "done") fail("block is done; its document is frozen");
+      if (b.status === "in_review" && e.handoff !== void 0) fail("block is in_review; the handoff cannot be rewritten (the path back is needs_rework)");
+      if (label(e).length === 0) fail("nothing to write (give spec, acceptance, notes or handoff)");
+      for (const key of ["spec", "notes", "handoff"]) {
+        const p = e[key] === void 0 ? void 0 : bodyProblem(e[key], BLOCK_HEADINGS);
+        if (p) fail(`${key}: ${p}`);
+      }
+      for (const item of e.acceptance ?? []) {
+        if (item.trim() === "") fail("acceptance entries cannot be empty");
+        const p = bodyProblem(item, BLOCK_HEADINGS);
+        if (p) fail(`acceptance: ${p}`);
+      }
+      const file2 = path4.join(driverDir, "blocks", `${e.id}.md`);
+      const existed = existsSync4(file2);
+      const current = existed ? readFileSync4(file2, "utf8") : blockDocTemplate(e.id, b.title);
+      return { id: e.id, file: file2, existed, content: renderDoc(current, e, fail), sections: label(e) };
+    });
+    mkdirSync3(path4.join(driverDir, "blocks"), { recursive: true });
+    mkdirSync3(path4.join(driverDir, ".tmp"), { recursive: true });
+    for (const s of staged) {
+      const tmp = path4.join(driverDir, ".tmp", `${s.id}.md.${process.pid}`);
+      writeFileSync3(tmp, s.content);
+      renameSync3(tmp, s.file);
+    }
+    const blocks = staged.map((s) => ({ id: s.id, sections: s.sections, created: !s.existed }));
+    return { blocks, text: blocks.map((b) => `${b.id}: ${b.sections.join(", ")}`).join("\n") };
+  });
+}
+
+// src/req-doc.ts
+import { existsSync as existsSync5, mkdirSync as mkdirSync4, readFileSync as readFileSync5, renameSync as renameSync4, writeFileSync as writeFileSync4 } from "fs";
+import path5 from "path";
+var SECTIONS2 = [
+  { key: "statement", heading: "Statement" },
+  { key: "acceptance", heading: "Acceptance signal" },
+  { key: "origin", heading: "Origin" },
+  { key: "notes", heading: "Notes" }
+];
+var Entry2 = external_exports.strictObject({
+  id: external_exports.string().regex(/^R-\d+$/, "must look like R-003"),
+  statement: external_exports.string().optional(),
+  acceptance: external_exports.string().optional(),
+  origin: external_exports.string().optional(),
+  notes: external_exports.string().optional()
+});
+var ReqDocInputSchema = external_exports.strictObject({ requirements: external_exports.array(Entry2).min(1).max(30) });
+var ReqDocRefusedError = class extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "ReqDocRefusedError";
+  }
+};
+var refuse4 = (m) => {
+  throw new ReqDocRefusedError(m);
+};
+var unquote = (v) => {
+  const t = v.trim();
+  if (t.startsWith('"')) {
+    try {
+      return JSON.parse(t);
+    } catch {
+      return t;
+    }
+  }
+  return t.replace(/^'(.*)'$/, "$1");
+};
+function syncFrontmatter(content, want) {
+  const lines = content.split("\n");
+  const render = (k) => `${k}: ${k === "title" ? JSON.stringify(want[k]) : want[k]}`;
+  const keys = ["id", "title", "kind", "source"];
+  if (lines[0] !== "---") return `---
+${keys.map(render).join("\n")}
+---
+
+${content.replace(/^\n+/, "")}`;
+  const close = lines.indexOf("---", 1);
+  if (close < 0) return content;
+  const fm = lines.slice(1, close);
+  for (const k of keys) {
+    const i = fm.findIndex((l) => l.startsWith(`${k}:`));
+    if (i < 0) fm.push(render(k));
+    else if (unquote(fm[i].slice(k.length + 1)) !== want[k]) fm[i] = render(k);
+  }
+  return [lines[0], ...fm, ...lines.slice(close)].join("\n");
+}
+function reqDocTemplate(id, title) {
+  return `# ${id} ${title}
+`;
+}
+function renderReqDoc(current, e, fail = refuse4) {
+  let lines = current.replace(/\r\n/g, "\n").split("\n");
+  const H = REQ_HEADINGS;
+  if (e.statement !== void 0) lines = setSection(lines, H, "Statement", bodyOf(e.statement), fail);
+  if (e.acceptance !== void 0) lines = setSection(lines, H, "Acceptance signal", bodyOf(e.acceptance), fail);
+  if (e.origin !== void 0) lines = setSection(lines, H, "Origin", bodyOf(e.origin), fail);
+  if (e.notes !== void 0) lines = setSection(lines, H, "Notes", bodyOf(e.notes), fail);
+  return `${lines.join("\n").replace(/\n+$/, "")}
+`;
+}
+var label2 = (e) => SECTIONS2.flatMap((s) => e[s.key] === void 0 ? [] : [s.key]);
+function writeReqDocs(driverDir, raw) {
+  const parsed = ReqDocInputSchema.safeParse(raw);
+  if (!parsed.success) throw new ReqDocRefusedError(parsed.error.issues.map((i) => `${i.path.join(".") || "input"}: ${i.message}`).join("; "));
+  return withLock(driverDir, () => {
+    const plan = readPlan(driverDir);
+    const seen = /* @__PURE__ */ new Set();
+    const staged = parsed.data.requirements.map((e, i) => {
+      const fail = (m) => refuse4(`requirements[${i}] (${e.id}): ${m}`);
+      if (seen.has(e.id)) fail("listed twice");
+      seen.add(e.id);
+      const r = plan.requirements[e.id];
+      if (!r) return fail(`unknown requirement ${e.id}`);
+      if (r.retired) fail("requirement is retired");
+      if (label2(e).length === 0) fail("nothing to write (give statement, acceptance, origin or notes)");
+      for (const s of SECTIONS2) {
+        const p = e[s.key] === void 0 ? void 0 : bodyProblem(e[s.key], REQ_HEADINGS);
+        if (p) fail(`${s.key}: ${p}`);
+      }
+      const file2 = path5.join(driverDir, "requirements", `${e.id}.md`);
+      const existed = existsSync5(file2);
+      const base = existed ? readFileSync5(file2, "utf8") : reqDocTemplate(e.id, r.title);
+      const content = syncFrontmatter(renderReqDoc(base, e, fail), { id: e.id, title: r.title, kind: r.kind, source: r.source });
+      return { id: e.id, file: file2, existed, content, sections: label2(e) };
+    });
+    mkdirSync4(path5.join(driverDir, "requirements"), { recursive: true });
+    mkdirSync4(path5.join(driverDir, ".tmp"), { recursive: true });
+    for (const s of staged) {
+      const tmp = path5.join(driverDir, ".tmp", `${s.id}.req.md.${process.pid}`);
+      writeFileSync4(tmp, s.content);
+      renameSync4(tmp, s.file);
+    }
+    const requirements = staged.map((s) => ({ id: s.id, sections: s.sections, created: !s.existed }));
+    return { requirements, text: requirements.map((b) => `${b.id}: ${b.sections.join(", ")}`).join("\n") };
   });
 }
 
 // src/hooks.ts
-import { existsSync as existsSync5, readFileSync as readFileSync5, realpathSync } from "fs";
-import path5 from "path";
+import { existsSync as existsSync6, readFileSync as readFileSync6, realpathSync } from "fs";
+import path6 from "path";
 
 // src/shared/gate.ts
 var MARKER = /DRIVER-BLOCK:\s*(B-\d+)/;
-function blockMarker(text) {
-  return MARKER.exec(text ?? "")?.[1];
+function blockMarker(text2) {
+  return MARKER.exec(text2 ?? "")?.[1];
 }
-function gateVerdict(plan, text) {
-  const blockId = blockMarker(text);
+function gateVerdict(plan, text2) {
+  const blockId = blockMarker(text2);
   const block = blockId ? plan.blocks?.[blockId] : void 0;
   const phase = block && typeof block === "object" ? block.phase ?? null : plan.currentPhase ?? null;
   const where = block ? `block ${blockId} (${phase})` : `current phase (${phase})`;
@@ -21769,9 +21950,9 @@ var ShellScanner = class {
     return st;
   }
 };
-function hasExpansion(text) {
+function hasExpansion(text2) {
   const sc = new ShellScanner();
-  for (const line of text.split("\n")) {
+  for (const line of text2.split("\n")) {
     const st = sc.feed(line);
     for (let i = 0; i < line.length; i++) {
       if ((line[i] === "$" || line[i] === "`") && (isCode(st[i]) || st[i] === DQ || st[i] === PARAM || st[i] === ARITH)) return true;
@@ -21886,14 +22067,14 @@ function heredocOpens(line, st) {
 }
 function extractHeredocs(command) {
   const lines = command.split("\n");
-  const text = [];
+  const text2 = [];
   const docs = [];
   const sc = new ShellScanner();
   let pending = [];
   let logical = [];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    text.push(line);
+    text2.push(line);
     pending.push(...heredocOpens(line, sc.feed(line)));
     logical.push(line);
     if (sc.continues || pending.length === 0) {
@@ -21919,7 +22100,7 @@ function extractHeredocs(command) {
     logical = [];
     i = j - 1;
   }
-  return { text: text.join("\n"), docs };
+  return { text: text2.join("\n"), docs };
 }
 function substitutions(body, shellQuoting = false) {
   const out = [];
@@ -22174,6 +22355,26 @@ function isDriverInvocation(w) {
   if (isOpaqueName(w[0])) return true;
   return LAUNCHERS.has(first) && w.slice(1).some(isDriverToken);
 }
+var READ_ONLY_VERBS = /* @__PURE__ */ new Set(["status", "validate", "where"]);
+function firstOperandAt(w) {
+  return w.findIndex((t, i) => i > 0 && !t.startsWith("-"));
+}
+function launchesOpaqueOperand(w) {
+  if (!LAUNCHERS.has(baseName(w[0]).toLowerCase()) || !w.slice(1).some(isDriverToken)) return false;
+  const at = firstOperandAt(w);
+  return at > 0 && /[$`]/.test(w[at]);
+}
+function hasReadOnlyVerb(w) {
+  let at = -1;
+  if (isDriverToken(w[0])) at = 0;
+  else if (LAUNCHERS.has(baseName(w[0]).toLowerCase())) {
+    const first = firstOperandAt(w);
+    if (first > 0 && isDriverToken(w[first])) at = first;
+  }
+  if (at < 0 || w.slice(0, at).some((t) => /[$`]/.test(t))) return false;
+  const verb = w[at + 1];
+  return verb !== void 0 && READ_ONLY_VERBS.has(verb);
+}
 function userOnlyAction(w) {
   const toks = new Set(w.map((t) => t.replace(/\)+$/, "")).map((t) => t.startsWith("--") && t.includes("=") ? t.slice(0, t.indexOf("=")) : t));
   if (toks.has("rebaseline") || toks.has("via-mod") || toks.has("--via-mod") || toks.has("--force") || toks.has("-f")) return true;
@@ -22239,10 +22440,10 @@ function protectCommand(command) {
   return protect(command, null);
 }
 function protect(command, outer) {
-  const { text, docs } = extractHeredocs(command);
-  const norm = normalizeCommand(text);
+  const { text: text2, docs } = extractHeredocs(command);
+  const norm = normalizeCommand(text2);
   if (/via-mod/i.test(command) || /via-mod/i.test(norm)) return MSG_USER_ONLY;
-  const expands = hasExpansion(text);
+  const expands = hasExpansion(text2);
   const segs = commandWords(norm);
   const words = segs.flat();
   if (words.some((t) => SHELLS.has(baseName(t)) || CODE_RUNNERS.has(baseName(t)) || GIT_CODE_SETTING.test(t))) {
@@ -22264,7 +22465,8 @@ function protect(command, outer) {
     if (!isDriverInvocation(w)) continue;
     if (userOnlyAction(w)) return MSG_USER_ONLY;
     if (isOpaqueName(w[0])) return MSG_SUBST;
-    if (/[$`]/.test(w.join(" "))) return MSG_USER_ONLY;
+    if (launchesOpaqueOperand(w)) return MSG_USER_ONLY;
+    if (/[$`]/.test(w.join(" ")) && !hasReadOnlyVerb(w)) return MSG_USER_ONLY;
   }
   if (usesPty(norm)) return MSG_PTY;
   const own2 = contextOf(norm);
@@ -22272,7 +22474,7 @@ function protect(command, outer) {
   if (writesDriverDir(norm, ctx)) return MSG_FILES;
   if (inlineScriptMentions(norm, ctx)) return MSG_SCRIPT;
   if (rewritesWorkingTree(norm)) return MSG_GIT;
-  for (const s of substitutions(text, true)) {
+  for (const s of substitutions(text2, true)) {
     const reason = protect(s, ctx);
     if (reason) return reason;
   }
@@ -22303,23 +22505,23 @@ function denyOutput(reason) {
 }
 function findPlanFile(cwd) {
   const roots = [process.env.DRIVER_ROOT, resolveProjectRoot(cwd), cwd].filter((r) => !!r);
-  return roots.map((r) => path5.join(driverDirOf(r), "plan.json")).find((f) => existsSync5(f));
+  return roots.map((r) => path6.join(driverDirOf(r), "plan.json")).find((f) => existsSync6(f));
 }
 var firstPresent = (...vs) => vs.find((v) => v !== null && v !== void 0 && v !== false);
 function gateCheck(input2) {
-  const cwd = path5.resolve(input2?.cwd ?? process.cwd());
+  const cwd = path6.resolve(input2?.cwd ?? process.cwd());
   const file2 = findPlanFile(cwd);
   if (!file2) return null;
   let plan;
   try {
-    plan = JSON.parse(readFileSync5(file2, "utf8"));
+    plan = JSON.parse(readFileSync6(file2, "utf8"));
     if (plan === null || typeof plan !== "object" || Array.isArray(plan)) throw new Error("not an object");
   } catch {
     return "DRIVER: plan.json is unreadable; refusing to run agents (fail closed).";
   }
   if (!input2) return "DRIVER: hook input is not valid JSON; refusing (fail closed).";
-  const text = String(firstPresent(input2.tool_input?.prompt, input2.tool_input?.description, input2.tool_input?.message) ?? "");
-  const v = gateVerdict(plan, text);
+  const text2 = String(firstPresent(input2.tool_input?.prompt, input2.tool_input?.description, input2.tool_input?.message) ?? "");
+  const v = gateVerdict(plan, text2);
   return v.allow ? null : v.reason;
 }
 var FILE_TOOLS = /* @__PURE__ */ new Set(["Write", "Edit", "MultiEdit"]);
@@ -22328,23 +22530,23 @@ function resolveReal(p) {
   const tail = [];
   for (; ; ) {
     try {
-      return path5.join(realpathSync(cur), ...tail.reverse());
+      return path6.join(realpathSync(cur), ...tail.reverse());
     } catch {
-      const parent = path5.dirname(cur);
+      const parent = path6.dirname(cur);
       if (parent === cur) return p;
-      tail.push(path5.basename(cur));
+      tail.push(path6.basename(cur));
       cur = parent;
     }
   }
 }
 function protectPlan(input2) {
   if (!input2) return null;
-  if (!findPlanFile(path5.resolve(input2.cwd ?? process.cwd()))) return null;
+  if (!findPlanFile(path6.resolve(input2.cwd ?? process.cwd()))) return null;
   const tool = input2.tool_name ?? "";
   const ti = input2.tool_input ?? {};
   if (FILE_TOOLS.has(tool) && typeof ti.file_path === "string") {
-    const cwd = path5.resolve(input2.cwd ?? process.cwd());
-    const abs = path5.resolve(cwd, ti.file_path);
+    const cwd = path6.resolve(input2.cwd ?? process.cwd());
+    const abs = path6.resolve(cwd, ti.file_path);
     const direct = protectPath(abs);
     if (direct) return direct;
     const real = resolveReal(abs);
@@ -22408,7 +22610,7 @@ function toMermaid(plan) {
 // src/replay.ts
 function replayIssues(plan, events) {
   const issues = [];
-  const add = (code, path7, message) => issues.push({ level: "error", code, path: path7, message });
+  const add = (code, path8, message) => issues.push({ level: "error", code, path: path8, message });
   events.forEach((e, i) => {
     if (e.seq !== i + 1) add("replay.seq", `events.${i}`, `expected seq ${i + 1}, found ${String(e.seq)}`);
   });
@@ -22432,6 +22634,7 @@ function replayIssues(plan, events) {
 }
 
 // src/shared/view.ts
+var LOOP_PHASES = ["implement", "validate"];
 function compareIds(a, b) {
   const na = Number(a.slice(a.indexOf("-") + 1));
   const nb = Number(b.slice(b.indexOf("-") + 1));
@@ -22448,10 +22651,23 @@ function gateView(g) {
   };
 }
 function project(plan) {
+  const baselines = plan.baselines ?? [];
+  const inBaseline = /* @__PURE__ */ new Set();
+  const reqInBaseline = /* @__PURE__ */ new Set();
+  for (const bl of baselines) {
+    for (const id of bl.added ?? []) inBaseline.add(id);
+    for (const id of bl.reqAdded ?? []) reqInBaseline.add(id);
+  }
+  const unclosed = baselines.length === 1 && baselines[0].closedAt === void 0;
+  const marking = plan.baseline >= 1 && plan.baselines !== void 0 && !unclosed;
   const blocks = Object.keys(plan.blocks).sort(compareIds).map((id) => {
     const b = plan.blocks[id];
     const tests = { pass: 0, fail: 0, unknown: 0 };
     for (const t of b.tests ?? []) if (t.result in tests) tests[t.result]++;
+    const waiting = b.status === "blocked" ? [...b.dependsOn ?? []].filter((d) => {
+      const dep = plan.blocks[d];
+      return !!dep && !dep.retired && dep.status !== "done";
+    }).sort(compareIds) : [];
     return {
       id,
       title: b.title,
@@ -22465,16 +22681,27 @@ function project(plan) {
       ...b.verification ? { verified: b.verification.passes === true } : {},
       ...b.risk ? { risk: b.risk } : {},
       retired: !!b.retired,
-      since: b.statusSince
+      since: b.statusSince,
+      ...marking && !inBaseline.has(id) ? { afterBaseline: true } : {},
+      ...waiting.length ? { waitingOn: waiting } : {}
     };
   });
+  const cur = phaseIndex(plan.currentPhase);
+  const openBehind = cur < phaseIndex("validate") ? [] : LOOP_PHASES.filter(
+    (ph) => phaseIndex(ph) < cur && blocks.some((b) => b.phase === ph && !b.retired && b.status !== "done")
+  );
+  const reqsAfterBaseline = marking ? Object.entries(plan.requirements ?? {}).filter(([id, r]) => !r.retired && !reqInBaseline.has(id)).length : 0;
+  const latest = baselines[baselines.length - 1];
   return {
     project: plan.project?.name ?? "",
     revision: plan.revision,
     baseline: plan.baseline,
     currentPhase: plan.currentPhase,
     gates: { route: gateView(plan.gates?.route), release: gateView(plan.gates?.release) },
-    blocks
+    blocks,
+    reqsAfterBaseline,
+    openBehind,
+    ...latest ? { latestBaseline: { n: latest.n, ...latest.via ? { via: latest.via } : {}, ...latest.ticket ? { ticket: latest.ticket } : {} } } : {}
   };
 }
 function summarize(view) {
@@ -22490,6 +22717,8 @@ function summarize(view) {
   const nextGate = !view.gates.route.approved ? "route" : !view.gates.release.approved ? "release" : void 0;
   return {
     counts,
+    rework: active.filter((b) => b.status === "needs_rework" && phaseIndex(b.phase) <= cur).map((b) => b.id),
+    resumable: active.filter((b) => b.status === "blocked" && b.deps.length > 0 && b.deps.every(depMet)).map((b) => b.id),
     ready: active.filter((b) => b.status === "not_started" && phaseIndex(b.phase) <= cur && b.deps.every(depMet)).map((b) => b.id),
     inProgress: active.filter((b) => b.status === "in_progress").map((b) => ({ id: b.id, ...b.owner ? { owner: b.owner } : {} })),
     blocked: active.filter((b) => b.status === "blocked").map((b) => ({ id: b.id, ...b.reason ? { reason: b.reason } : {} })),
@@ -22522,14 +22751,16 @@ var HELP = `driver <command> [options]
   req retire <id> --decision D-001 --reason ..
   gate approve <route|release> [--via-mod] | gate revoke <route|release> --reason ..
   phase advance | phase back <phase> --reason ..
-  rebaseline --reason .. [--changed B-001,..] [--decision D-001]
+  rebaseline --reason .. [--changed B-001,..] [--decision D-001] [--via-mod]
+  backlog add                                (JSON on stdin: {"items":[{"title","detail"?,"origin"?,"decision"?}]}, 1..20; appends to backlog.jsonl, regenerates backlog.md; no plan change)
+  backlog show                               (backlog entries, no write)
   release add --version V --commit SHA [--blocks B-001,..]
   export mermaid [dir] [--out path] [--stdout]
   renumber
   hook gate-check | protect-plan | subagent-stop     (reads hook JSON on stdin)
 
 gate approve, rebaseline and --force ask for a typed "yes" on /dev/tty (user terminal only).
-gate approve --via-mod reads a one-shot nonce on stdin and checks .claude/driver/.mod/ticket.json (written by the mod).
+gate approve and rebaseline --via-mod read a one-shot nonce on stdin and check .claude/driver/.mod/ticket.json (written by the mod).
 values that start with "-" go as --reason=<v> / --owner=<v>.
 global: --cwd <dir>  --root <dir>  --actor <kind:id>  --json  --now <iso>  --expect-revision <n>
 exit codes: 0 ok, 1 validation or transition refused, 2 usage or forbidden`;
@@ -22611,11 +22842,11 @@ function parseTest(spec) {
 }
 function locateDriverDir(env, dirArg) {
   if (dirArg) {
-    const abs = path6.resolve(env.cwd, dirArg);
-    return existsSync6(path6.join(abs, "plan.json")) ? abs : driverDirOf(abs);
+    const abs = path7.resolve(env.cwd, dirArg);
+    return existsSync7(path7.join(abs, "plan.json")) ? abs : driverDirOf(abs);
   }
   const root = env.flags.root ?? process.env.DRIVER_ROOT;
-  return driverDirOf(root ? path6.resolve(env.cwd, root) : resolveProjectRoot(env.cwd));
+  return driverDirOf(root ? path7.resolve(env.cwd, root) : resolveProjectRoot(env.cwd));
 }
 function readLine(fd) {
   const one = Buffer.alloc(1);
@@ -22656,10 +22887,10 @@ function asUser(env) {
 }
 var TICKET_MAX_AGE_MS = 2e4;
 function consumeTicket(driverDir, gate, nonce) {
-  const file2 = path6.join(driverDir, ".mod", "ticket.json");
+  const file2 = path7.join(driverDir, ".mod", "ticket.json");
   let raw;
   try {
-    raw = readFileSync6(file2, "utf8");
+    raw = readFileSync7(file2, "utf8");
   } catch {
     throw new OpRefusedError('no approval ticket (approve through the mod, or run "driver gate approve" in your terminal)', true);
   }
@@ -22707,17 +22938,17 @@ function issueLines(issues) {
 }
 function validateCmd(env, dirArg) {
   const driverDir = locateDriverDir(env, dirArg);
-  const file2 = path6.join(driverDir, "plan.json");
-  if (!existsSync6(file2)) throw new NotInitializedError(driverDir);
+  const file2 = path7.join(driverDir, "plan.json");
+  if (!existsSync7(file2)) throw new NotInitializedError(driverDir);
   let issues;
   let raw;
   try {
-    raw = JSON.parse(readFileSync6(file2, "utf8"));
+    raw = JSON.parse(readFileSync7(file2, "utf8"));
   } catch (e) {
     issues = [{ level: "error", code: "parse", path: "plan.json", message: e.message }];
     return validateResult(issues);
   }
-  issues = validatePlan(raw, { fs: { exists: existsSync6 }, driverDir });
+  issues = validatePlan(raw, { fs: { exists: existsSync7 }, driverDir });
   if (env.flags.replay) {
     const parsed = PlanV1Schema.safeParse(raw);
     if (parsed.success) {
@@ -22751,14 +22982,14 @@ function statusCmd(env, dirArg) {
     const g = plan.gates[name];
     return g.approved ? `${name} approved (${g.approvedBy ?? "?"}, baseline ${g.atBaseline ?? "?"})` : `${name} not approved`;
   };
-  const text = [
+  const text2 = [
     `DRIVER ${plan.project.name}`,
     `phase: ${plan.currentPhase}   baseline: ${plan.baseline}   revision: ${plan.revision}`,
     `gates: ${gate("route")}; ${gate("release")}`,
     `blocks: ${active.length} active (${BLOCK_STATUSES.filter((s) => counts[s]).map((s) => `${s} ${counts[s]}`).join(", ") || "none"})`
   ].join("\n");
   return {
-    text,
+    text: text2,
     json: {
       project: view.project,
       currentPhase: view.currentPhase,
@@ -22774,8 +23005,8 @@ function statusCmd(env, dirArg) {
 }
 function whereCmd(env) {
   const driverDir = locateDriverDir(env);
-  const root = path6.dirname(path6.dirname(driverDir));
-  const planExists = existsSync6(path6.join(driverDir, "plan.json"));
+  const root = path7.dirname(path7.dirname(driverDir));
+  const planExists = existsSync7(path7.join(driverDir, "plan.json"));
   return { text: root, json: { root, driverDir, planExists } };
 }
 function applyCmd(env, driverDir) {
@@ -22797,7 +23028,7 @@ function applyCmd(env, driverDir) {
 }
 function discoverCmd(env, driverDir, sub) {
   if (sub !== "log" && sub !== "show") throw new UsageError('discover: expected "log" or "show"');
-  if (!existsSync6(path6.join(driverDir, "plan.json"))) throw new NotInitializedError(driverDir);
+  if (!existsSync7(path7.join(driverDir, "plan.json"))) throw new NotInitializedError(driverDir);
   if (sub === "log") {
     let raw;
     try {
@@ -22810,9 +23041,25 @@ function discoverCmd(env, driverDir, sub) {
   }
   const { state, exists } = readState(driverDir);
   const f = frontier(state);
-  const text = exists ? `${summaryText(state)}
+  const text2 = exists ? `${summaryText(state)}
 ${showNodes(state)}` : "no discovery interview yet";
-  return { text, json: { ok: true, exists, state, frontier: f } };
+  return { text: text2, json: { ok: true, exists, state, frontier: f } };
+}
+function backlogCmd(env, driverDir, sub) {
+  if (sub !== "add" && sub !== "show") throw new UsageError('backlog: expected "add" or "show"');
+  if (!existsSync7(path7.join(driverDir, "plan.json"))) throw new NotInitializedError(driverDir);
+  if (sub === "add") {
+    let raw;
+    try {
+      raw = JSON.parse(readStdin());
+    } catch {
+      throw new UsageError('backlog add: stdin must hold one JSON object {"items":[{"title","detail"?,"origin"?,"decision"?}]}');
+    }
+    const r = addBacklog(driverDir, raw, env.now);
+    return { text: r.text, json: { ok: true, text: r.text, created: r.created, count: r.entries.length, warnings: r.warnings } };
+  }
+  const { entries, exists } = readBacklog(driverDir);
+  return { text: showText(entries), json: { ok: true, exists, count: entries.length, entries } };
 }
 function showNodes(state) {
   const m = state.meta;
@@ -22864,6 +23111,8 @@ function runCommand(env0, pos) {
       return applyCmd(env, dir());
     case "discover":
       return discoverCmd(env, dir(), sub);
+    case "backlog":
+      return backlogCmd(env, dir(), sub);
     case "block": {
       switch (sub) {
         case "add":
@@ -22981,9 +23230,17 @@ function runCommand(env0, pos) {
       if (sub !== "add") break;
       return commit(env, dir(), { type: "decision.add", title: f.title ?? need(arg, "title"), reason: f.reason });
     }
-    case "rebaseline":
+    case "rebaseline": {
+      const reason = need(f.reason, "reason");
+      if (f["via-mod"]) {
+        const driverDir = dir();
+        const ticket = consumeTicket(driverDir, "rebaseline", readStdin().trim());
+        env = asUser(env);
+        return commit(env, driverDir, { type: "rebaseline", reason, changed: list(f.changed), decision: f.decision, via: "mod", ticket: ticket.sha256 }, { expectedRevision: ticket.revision });
+      }
       env = confirmAsUser(env, `rebaseline (new baseline, resets changed blocks, revokes release gate) in ${env.cwd}`);
-      return commit(env, dir(), { type: "rebaseline", reason: need(f.reason, "reason"), changed: list(f.changed), decision: f.decision });
+      return commit(env, dir(), { type: "rebaseline", reason, changed: list(f.changed), decision: f.decision, via: "tty" });
+    }
     case "release": {
       if (sub !== "add") break;
       const driverDir = dir();
@@ -22998,11 +23255,11 @@ function runCommand(env0, pos) {
     case "export": {
       if (sub !== "mermaid") break;
       const driverDir = locateDriverDir(env, arg);
-      const text = toMermaid(readPlan(driverDir));
-      if (f.stdout) return { text, json: { ok: true, mermaid: text } };
-      const out = f.out ? path6.resolve(env.cwd, f.out) : path6.join(driverDir, "exports", "plan.mmd");
-      mkdirSync5(path6.dirname(out), { recursive: true });
-      writeFileSync5(out, text);
+      const text2 = toMermaid(readPlan(driverDir));
+      if (f.stdout) return { text: text2, json: { ok: true, mermaid: text2 } };
+      const out = f.out ? path7.resolve(env.cwd, f.out) : path7.join(driverDir, "exports", "plan.mmd");
+      mkdirSync5(path7.dirname(out), { recursive: true });
+      writeFileSync5(out, text2);
       return { text: out, json: { ok: true, path: out } };
     }
     case "renumber": {
@@ -23022,7 +23279,7 @@ ${HELP}`);
 }
 function readStdin() {
   try {
-    return readFileSync6(0, "utf8");
+    return readFileSync7(0, "utf8");
   } catch {
     return "";
   }
@@ -23037,9 +23294,9 @@ function runHook(name) {
     } else if (name === "subagent-stop") {
       const agent = input2?.agent_id;
       if (!agent) return;
-      const planFile = findPlanFile(path6.resolve(input2?.cwd ?? process.cwd()));
+      const planFile = findPlanFile(path7.resolve(input2?.cwd ?? process.cwd()));
       if (!planFile) return;
-      const driverDir = path6.dirname(planFile);
+      const driverDir = path7.dirname(planFile);
       const owns = Object.values(readPlan(driverDir).blocks).some((b) => b.status === "in_progress" && b.owner === agent);
       if (!owns) return;
       mutate(driverDir, { type: "block.orphan", owner: agent }, { actor: { kind: "hook", id: "subagent-stop" }, now: (/* @__PURE__ */ new Date()).toISOString() });
@@ -23084,7 +23341,7 @@ function main(argv) {
   try {
     checkWordOrder(tokens ?? []);
     const env = {
-      cwd: path6.resolve(values.cwd ?? process.cwd()),
+      cwd: path7.resolve(values.cwd ?? process.cwd()),
       actor: parseActor(values.actor ?? process.env.DRIVER_ACTOR ?? "model:main"),
       now: values.now ?? (/* @__PURE__ */ new Date()).toISOString(),
       json: json2,
@@ -23106,7 +23363,7 @@ function main(argv) {
     if (err instanceof ApplyInputError) return fail(err.message, err.failedOp === void 0 ? {} : { failedOp: err.failedOp });
     if (err instanceof RevisionConflictError) return fail("revision conflict", { current: err.actual, expected: err.expected });
     const code = err instanceof UsageError || err instanceof OpRefusedError && err.forbidden ? 2 : 1;
-    const known = code === 2 || err instanceof OpRefusedError || err instanceof DiscoverRefusedError || err instanceof BlockDocRefusedError || err instanceof ReqDocRefusedError || err instanceof PlanInvariantError || err instanceof LockTimeoutError || err instanceof RevisionConflictError || err instanceof NotInitializedError;
+    const known = code === 2 || err instanceof OpRefusedError || err instanceof DiscoverRefusedError || err instanceof BacklogRefusedError || err instanceof BlockDocRefusedError || err instanceof ReqDocRefusedError || err instanceof PlanInvariantError || err instanceof LockTimeoutError || err instanceof RevisionConflictError || err instanceof NotInitializedError;
     const message = known ? err.message : `unexpected: ${err.stack ?? err.message}`;
     process.stderr.write(json2 ? `${JSON.stringify({ ok: false, error: message })}
 ` : `driver: ${message}

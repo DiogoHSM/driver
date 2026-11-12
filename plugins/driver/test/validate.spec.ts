@@ -36,6 +36,29 @@ describe('validatePlan', () => {
     expect(hasErrors(issues)).toBe(false);
   });
 
+  it('open-behind is a warning in evolve and release, naming the blocks, and silent earlier or when all is done', () => {
+    const plan = loadFixture('invalid', 'open-behind');
+    const issues = validatePlan(plan);
+    const w = issues.find((i) => i.code === 'phases.openBehind');
+    expect(w).toMatchObject({ level: 'warning' });
+    expect(w!.message).toContain('B-003, B-004, B-005');
+    expect(w!.message).not.toContain('B-006');
+    expect(hasErrors(issues)).toBe(false);
+    plan.currentPhase = 'release';
+    plan.gates.release = { approved: true, approvedAt: '2026-10-27T12:00:00Z', approvedBy: 'diogo', atBaseline: 1 };
+    const late = validatePlan(plan);
+    expect(late.find((i) => i.code === 'phases.openBehind')).toMatchObject({ level: 'warning' });
+    expect(late.find((i) => i.code === 'gate.releaseIncomplete')).toMatchObject({ level: 'error' });
+    plan.currentPhase = 'validate';
+    expect(validatePlan(plan).map((i) => i.code)).not.toContain('phases.openBehind');
+    plan.currentPhase = 'evolve';
+    for (const id of ['B-003', 'B-004', 'B-005']) {
+      plan.blocks[id].status = 'done';
+      delete plan.blocks[id].statusReason;
+    }
+    expect(validatePlan(plan).map((i) => i.code)).not.toContain('phases.openBehind');
+  });
+
   it('req.coverage is a warning everywhere except release', () => {
     const plan = loadFixture('invalid', 'req-uncovered');
     const early = validatePlan(plan);

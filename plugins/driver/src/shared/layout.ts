@@ -48,6 +48,8 @@ export interface LayoutLane {
   collapsed: boolean;
   current: boolean;
   later: boolean;
+  /** Earlier phase that still holds unfinished work (drawn as active, with a loop back from the current phase). */
+  reopened: boolean;
   /** Physical columns (0 when collapsed or empty). */
   cols: number;
   total: number;
@@ -116,6 +118,7 @@ const aggId = (p: PhaseId): string => `done:${p}`;
 
 export function layout(view: PlanView, opts: LayoutOpts): Layout {
   const cur = phaseIndex(view.currentPhase);
+  const reopenedSet = new Set<PhaseId>(view.openBehind ?? []);
   const blocks = view.blocks
     .filter((b) => opts.showRetired || !b.retired)
     .slice()
@@ -325,6 +328,7 @@ export function layout(view: PlanView, opts: LayoutOpts): Layout {
       collapsed: !isExpanded(p),
       current: i === cur,
       later: i > cur,
+      reopened: reopenedSet.has(p),
       cols: isExpanded(p) ? S(p) : 0,
       total: vis.length,
       done: counts.done,
@@ -425,6 +429,7 @@ export function layout(view: PlanView, opts: LayoutOpts): Layout {
       const i = phaseIndex(p);
       if (opts.focus === 'all') return true;
       if (opts.focus !== 'auto') return opts.focus === p;
+      if (reopenedSet.has(p)) return true;
       if (opts.collapseDone && items.get(p)!.every((it) => !it.block)) return false;
       return Math.abs(i - cur) <= 1;
     };
@@ -466,7 +471,7 @@ export function layout(view: PlanView, opts: LayoutOpts): Layout {
       }
       bandTop[i] = y;
       bands.push({
-        phase: p, x: M, w: availW, collapsed: !isOpen, current: i === cur, later: i > cur, cols: isOpen ? perRow : 0,
+        phase: p, x: M, w: availW, collapsed: !isOpen, current: i === cur, later: i > cur, reopened: reopenedSet.has(p), cols: isOpen ? perRow : 0,
         total: vis.length, done: counts.done, counts, y, h,
       });
       y += h;

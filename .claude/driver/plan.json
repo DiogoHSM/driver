@@ -18,6 +18,7 @@
       ],
       "at": "2026-10-28T04:19:33.563Z",
       "changed": [],
+      "closedAt": "2026-11-12T02:04:33.308Z",
       "decision": "D-001",
       "n": 1,
       "reason": "Gate 1: route approved",
@@ -169,38 +170,73 @@
       "dependsOn": [
         "B-004"
       ],
-      "owner": "main",
       "phase": "implement",
       "requirements": [
         "R-001",
         "R-005"
       ],
-      "status": "in_progress",
+      "status": "done",
       "statusBy": {
         "id": "main",
         "kind": "model"
       },
-      "statusSince": "2026-10-30T02:48:29.115Z",
-      "tests": [],
-      "title": "Skills Discover e Route"
+      "statusSince": "2026-11-12T15:40:16.354Z",
+      "tests": [
+        {
+          "at": "2026-11-12T15:40:14.042Z",
+          "layer": "manual",
+          "ref": "dogfooding no coffee-app em 2026-11-11 (Discover e Route aprovados) e captura do painel em 2026-11-12; modo amend do discover nao verificado",
+          "result": "pass"
+        }
+      ],
+      "title": "Skills Discover e Route",
+      "verification": {
+        "at": "2026-11-12T15:40:14.042Z",
+        "by": {
+          "id": "main",
+          "kind": "model"
+        },
+        "passes": true
+      }
     },
     "B-006": {
-      "artifacts": [],
+      "artifacts": [
+        "plugins/driver/skills/implement/SKILL.md",
+        "plugins/driver/skills/validate/SKILL.md",
+        "plugins/driver/skills/validate/templates/report.md",
+        "plugins/driver/references/triage.md",
+        "plugins/driver/references/driver-conventions.md",
+        "plugins/driver/test/skills.spec.ts"
+      ],
       "dependsOn": [
-        "B-005"
+        "B-005",
+        "B-013"
       ],
       "phase": "implement",
       "requirements": [
         "R-001"
       ],
-      "status": "not_started",
+      "status": "in_review",
       "statusBy": {
         "id": "main",
         "kind": "model"
       },
-      "statusSince": "2026-10-28T03:37:47.639Z",
-      "tests": [],
-      "title": "Skills Implement, Validate, Evolve e Release"
+      "statusSince": "2026-11-12T15:56:41.550Z",
+      "tests": [
+        {
+          "at": "2026-11-12T15:56:38.846Z",
+          "layer": "unit",
+          "ref": "npm --prefix plugins/driver test (1031)",
+          "result": "pass"
+        },
+        {
+          "at": "2026-11-12T15:56:38.846Z",
+          "layer": "integration",
+          "ref": "claude plugin test plugins/driver (98)",
+          "result": "pass"
+        }
+      ],
+      "title": "Skills Implement e Validate"
     },
     "B-007": {
       "artifacts": [],
@@ -244,7 +280,8 @@
       "dependsOn": [
         "B-006",
         "B-007",
-        "B-008"
+        "B-008",
+        "B-014"
       ],
       "phase": "validate",
       "requirements": [
@@ -324,6 +361,91 @@
         },
         "passes": true
       }
+    },
+    "B-013": {
+      "artifacts": [
+        "plugins/driver/src/shared/view.ts",
+        "plugins/driver/src/backlog.ts",
+        "plugins/driver/src/shared/protect.ts",
+        "plugins/driver/mod/next.ts",
+        "plugins/driver/mod/autopilot.ts",
+        "plugins/driver/mod/pane.tsx",
+        "plugins/driver/mod/tools.ts",
+        "plugins/driver/references/triage.md"
+      ],
+      "dependsOn": [
+        "B-004"
+      ],
+      "phase": "implement",
+      "requirements": [
+        "R-001"
+      ],
+      "risk": "medium",
+      "status": "done",
+      "statusBy": {
+        "id": "main",
+        "kind": "model"
+      },
+      "statusSince": "2026-11-12T15:39:52.216Z",
+      "tests": [
+        {
+          "at": "2026-11-12T01:45:06.772Z",
+          "layer": "unit",
+          "ref": "npm --prefix plugins/driver test (981)",
+          "result": "pass"
+        },
+        {
+          "at": "2026-11-12T01:45:06.772Z",
+          "layer": "integration",
+          "ref": "claude plugin test plugins/driver (88)",
+          "result": "pass"
+        },
+        {
+          "at": "2026-11-12T02:04:33.308Z",
+          "layer": "unit",
+          "ref": "npm --prefix plugins/driver test (1002, depois do retrabalho)",
+          "result": "pass"
+        },
+        {
+          "at": "2026-11-12T02:04:33.308Z",
+          "layer": "integration",
+          "ref": "claude plugin test plugins/driver (98, depois do retrabalho)",
+          "result": "pass"
+        },
+        {
+          "at": "2026-11-12T15:39:49.286Z",
+          "layer": "manual",
+          "ref": "captura do painel no coffee-app (rev 107) em 2026-11-12: + so em B-020 a B-026, faixa IMPLEMENT reopened com seta, Continue implement, baseline 1 +7 since. Botao Confirm baseline nao conferido no app (so aparece em evolve)",
+          "result": "pass"
+        }
+      ],
+      "title": "Motor e painel do ADR-016",
+      "verification": {
+        "at": "2026-11-12T15:39:49.286Z",
+        "by": {
+          "id": "main",
+          "kind": "model"
+        },
+        "passes": true
+      }
+    },
+    "B-014": {
+      "artifacts": [],
+      "dependsOn": [
+        "B-006"
+      ],
+      "phase": "implement",
+      "requirements": [
+        "R-001"
+      ],
+      "status": "not_started",
+      "statusBy": {
+        "id": "main",
+        "kind": "model"
+      },
+      "statusSince": "2026-11-12T01:20:52.606Z",
+      "tests": [],
+      "title": "Skills Evolve e Release"
     }
   },
   "currentPhase": "implement",
@@ -344,6 +466,24 @@
       },
       "reason": "B-007 (pack driver-web) precisa das convenções e das skills Discover e Route (B-005), não das skills de Implement a Release (B-006). B-009 passa a depender de B-006 diretamente, antes alcançado só via B-007. Pedido do Diogo em 2026-11-10.",
       "title": "Dependências só por artefato real: B-006 e B-007 em paralelo"
+    },
+    "D-003": {
+      "at": "2026-11-12T01:14:56.245Z",
+      "by": {
+        "id": "main",
+        "kind": "model"
+      },
+      "reason": "Segundo dogfooding (coffee-app): o Validate gerou blocos novos em implement sem marca nem aviso. Implementação fica em B-006. Texto completo em .claude/docs/DECISIONS.md.",
+      "title": "ADR-016: mudança depois do gate passa por triagem em três níveis; baseline sugerido no Evolve; piloto no laço Validate e Implement"
+    },
+    "D-004": {
+      "at": "2026-11-12T01:20:52.606Z",
+      "by": {
+        "id": "main",
+        "kind": "model"
+      },
+      "reason": "O bloco inteiro não cabe em uma sessão. Motor e painel do ADR-016 vira bloco próprio, pré-requisito do B-006; B-006 fica com Implement e Validate; Evolve e Release viram bloco próprio. Plano aprovado pelo usuário em 2026-11-11.",
+      "title": "B-006 dividido em três blocos (ajuste de nível 2 do ADR-016, mesmo requisito R-001)"
     }
   },
   "gates": {
@@ -360,8 +500,8 @@
     }
   },
   "nextId": {
-    "B": 13,
-    "D": 3,
+    "B": 15,
+    "D": 5,
     "R": 7,
     "REL": 1
   },
@@ -403,7 +543,7 @@
       "title": "Packs por domínio sugerem a stack ideal sob demanda"
     }
   },
-  "revision": 43,
+  "revision": 60,
   "schemaVersion": 1,
-  "updatedAt": "2026-11-10T18:21:32.526Z"
+  "updatedAt": "2026-11-12T15:56:41.550Z"
 }

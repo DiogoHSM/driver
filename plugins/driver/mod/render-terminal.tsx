@@ -32,7 +32,7 @@ export function rowsView(kit: Kit, rows: Row[], handlers: RowHandlers, isDim = f
       {rows.map((row, i) => {
         if (row.kind === 'phase') {
           const head = (
-            <Text bold={row.current} color={row.current ? 'permission' : undefined} dimColor={isDim || (!row.open && !row.current)}>
+            <Text bold={row.current || row.reopened} color={row.current || row.reopened ? 'permission' : undefined} dimColor={isDim || (!row.open && !row.current && !row.reopened)}>
               {row.text}
             </Text>
           )
@@ -75,6 +75,7 @@ export function rowsView(kit: Kit, rows: Row[], handlers: RowHandlers, isDim = f
               {row.unmet.length ? <Text dimColor>{depsText(row.unmet)}</Text> : null}
               {flag ? <Text color="error" bold>{' !'}</Text> : null}
               {row.risk === 'high' ? <Text color="warning">{' ▲'}</Text> : null}
+              {row.afterBaseline ? <Text color="permission">{' +'}</Text> : null}
             </Text>
           </Button>
         )

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { OpRefusedError, PlanInvariantError, applyOp, type Op } from '../src/reducer.js';
 import { emptyPlan, type Actor, type PlanV1 } from '../src/schema.js';
+import { project } from '../src/shared/view.js';
+import { gateRevocations } from '../src/state-machine.js';
 import { hasErrors, validatePlan } from '../src/validate.js';
 import { MODEL, NOW, USER, clonePlan, deepFreeze } from './helpers.js';
 
@@ -379,5 +381,118 @@ describe('applyOp: guards', () => {
   it('unknown ids are refused', () => {
     expect(() => run(clonePlan(), { type: 'block.set', id: 'B-099', patch: { title: 'x' } })).toThrow(OpRefusedError);
     expect(() => run(clonePlan(), { type: 'req.retire', id: 'R-099', decision: 'D-001', reason: 'x' })).toThrow(OpRefusedError);
+  });
+});
+
+describe('baseline 1 closes at the end of Route', () => {
+  const HOOK_ACTOR: Actor = { kind: 'hook', id: 'baseline-close' };
+  const afterRoute = () =>
+    chain(fresh(), [
+      [{ type: 'req.add', title: 'R', kind: 'functional', source: 'user' }],
+      [{ type: 'block.add', title: 'Interview', phase: 'discover', requirements: ['R-001'] }],
+      [{ type: 'gate.approve', gate: 'route' }, USER],
+      [{ type: 'phase.advance' }],
+    ]);
+
+  it('only the block added after Route has afterBaseline (flow built from ops)', () => {
+    let p = afterRoute();
+    expect(p.baselines[0]!.added).toEqual(['B-001']);
+    expect(p.baselines[0]!.closedAt).toBeUndefined();
+    p = chain(p, [
+      [{ type: 'req.add', title: 'R2', kind: 'functional', source: 'user' }],
+      [{ type: 'block.add', title: 'Build A', phase: 'implement', requirements: ['R-001'] }],
+      [{ type: 'block.add', title: 'Build B', phase: 'implement', requirements: ['R-002'] }],
+    ]);
+    // open: nothing is marked
+    expect(project(p).blocks.some((b) => b.afterBaseline)).toBe(false);
+    const adv = run(p, { type: 'phase.advance' });
+    expect(adv.plan.currentPhase).toBe('implement');
+    expect(adv.plan.baselines[0]).toMatchObject({ added: ['B-001', 'B-002', 'B-003'], reqAdded: ['R-001', 'R-002'], closedAt: NOW });
+    expect(adv.events[0]).toMatchObject({
+      type: 'phase.change',
+      from: 'route',
+      to: 'implement',
+      data: { baseline: 1, folded: ['B-002', 'B-003'], reqFolded: ['R-002'] },
+    });
+    const last = run(adv.plan, { type: 'block.add', title: 'Adjustment', phase: 'implement', requirements: ['R-001'] }).plan;
+    const v = project(last);
+    expect(v.blocks.filter((b) => b.afterBaseline).map((b) => b.id)).toEqual(['B-004']);
+    expect(v.reqsAfterBaseline).toBe(0);
+    const late = run(last, { type: 'req.add', title: 'R3', kind: 'functional', source: 'user' }).plan;
+    expect(project(late).reqsAfterBaseline).toBe(1);
+  });
+
+  it('later advances and a second pass through Route leave the closed entry alone', () => {
+    let p = afterRoute();
+    p = run(p, { type: 'phase.advance' }).plan;
+    const closed = structuredClone(p.baselines[0]);
+    p = run(p, { type: 'phase.back', to: 'route', reason: 'rethink' }).plan;
+    p = run(p, { type: 'block.add', title: 'Extra', phase: 'implement' }).plan;
+    p = run(p, { type: 'phase.advance' }).plan;
+    expect(p.baselines).toHaveLength(1);
+    expect(p.baselines[0]).toEqual(closed);
+  });
+
+  it('baseline.close is internal: hook actor only, one open entry, existing ids only', () => {
+    let p = afterRoute();
+    p = chain(p, [[{ type: 'block.add', title: 'A', phase: 'implement' }], [{ type: 'phase.advance' }]]);
+    const open = structuredClone(p);
+    delete open.baselines[0]!.closedAt;
+    open.baselines[0]!.added = ['B-001'];
+    const op: Op = { type: 'baseline.close', added: ['B-002', 'B-099'], reqAdded: ['R-001', 'R-404'], at: '2026-11-01T00:00:00Z' };
+    for (const actor of [USER, MODEL]) expect(() => run(open, op, actor)).toThrow(OpRefusedError);
+    const r = run(open, op, HOOK_ACTOR);
+    expect(r.plan.baselines[0]).toMatchObject({ added: ['B-001', 'B-002'], closedAt: '2026-11-01T00:00:00Z' });
+    expect(r.events.map((e) => e.type)).toEqual(['baseline.close']);
+    expect(() => run(r.plan, op, HOOK_ACTOR)).toThrow(/exactly one baseline/);
+    const two = structuredClone(open);
+    two.baseline = 2;
+    two.baselines.push({ ...two.baselines[0]!, n: 2 });
+    expect(() => run(two, op, HOOK_ACTOR)).toThrow(/exactly one baseline/);
+  });
+
+  it('baseline.close revokes no gate, even with release approved', () => {
+    const p = clonePlan();
+    p.currentPhase = 'evolve';
+    p.gates.release = { approved: true, approvedAt: '2026-10-27T12:00:00Z', approvedBy: 'diogo', atBaseline: 1 };
+    const op: Op = { type: 'baseline.close', added: Object.keys(p.blocks), reqAdded: Object.keys(p.requirements), at: NOW };
+    const r = run(p, op, HOOK_ACTOR);
+    expect(r.plan.baselines[0]!.closedAt).toBe(NOW);
+    expect(gateRevocations(p, r.plan)).toEqual([]);
+    expect(r.plan.gates.release.approved).toBe(true);
+    expect(r.plan.gates.route.approved).toBe(true);
+    expect(r.events.map((e) => e.type)).toEqual(['baseline.close']);
+  });
+});
+
+describe('block.set dependsOn on a done block', () => {
+  // mid-implement: B-002 is done and depends on B-001 (done); B-003 is in_review, B-004 blocked
+  it('refuses a dependency that is neither done nor retired', () => {
+    const p = clonePlan();
+    expect(() => run(p, { type: 'block.set', id: 'B-002', patch: { dependsOn: ['B-001', 'B-003'] } })).toThrow(/done and cannot wait on unfinished work \(B-003\)/);
+    expect(() => run(p, { type: 'block.set', id: 'B-002', patch: { dependsOn: ['B-004'] } })).toThrow(OpRefusedError);
+  });
+
+  it('allows done or retired additions, unchanged deps and other statuses', () => {
+    const p = clonePlan();
+    expect(run(p, { type: 'block.set', id: 'B-002', patch: { dependsOn: ['B-001'] } }).plan.blocks['B-002']!.dependsOn).toEqual(['B-001']);
+    expect(run(p, { type: 'block.set', id: 'B-002', patch: { dependsOn: [] } }).plan.blocks['B-002']!.dependsOn).toEqual([]);
+    // an existing unfinished dependency stays (a done block may legitimately depend on one that went to rework)
+    const later = chain(p, [[{ type: 'block.status', id: 'B-001', to: 'needs_rework', reason: 'r' }]]);
+    expect(run(later, { type: 'block.set', id: 'B-002', patch: { dependsOn: ['B-001'], title: 'x' } }).plan.blocks['B-002']!.title).toBe('x');
+    // not done: free to depend on unfinished work
+    expect(run(p, { type: 'block.set', id: 'B-004', patch: { dependsOn: ['B-002', 'B-003'] } }).plan.blocks['B-004']!.dependsOn).toEqual(['B-002', 'B-003']);
+  });
+});
+
+describe('rebaseline records how it was confirmed', () => {
+  it('writes via and ticket on the new entry, and only when given', () => {
+    const p = clonePlan();
+    const withTicket = run(p, { type: 'rebaseline', reason: 'scope', via: 'mod', ticket: 'abc123' }, USER).plan;
+    expect(withTicket.baselines[1]).toMatchObject({ n: 2, via: 'mod', ticket: 'abc123' });
+    const plain = run(p, { type: 'rebaseline', reason: 'scope' }, USER).plan;
+    expect('via' in plain.baselines[1]!).toBe(false);
+    expect('ticket' in plain.baselines[1]!).toBe(false);
+    expect(project(withTicket).latestBaseline).toEqual({ n: 2, via: 'mod', ticket: 'abc123' });
   });
 });

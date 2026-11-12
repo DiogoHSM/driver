@@ -84,6 +84,61 @@ test('agent.spawn leaves a done block alone and denies a running owner', async (
   expect(claims(w)[0]!.args).toEqual(['block', 'owner', 'B-004', 'a1', '--from', 'a0'])
 })
 
+test('agent.spawn denies a blocked block that waits on unfinished dependencies or is held by something else', async ($, on) => {
+  const plan = editPlan(WAITLIST_PLAN, (p: Plan) => {
+    p.blocks['B-006'].status = 'blocked'
+    p.blocks['B-006'].statusReason = 'waiting on B-004'
+  })
+  const { w } = await started($, on, plan)
+
+  const denied = await $.agent.spawn(spawn('DRIVER-BLOCK: B-006 run the e2e check'))
+  expect(denied.deny).toContain('B-006 is blocked and waits on B-004, B-005')
+  expect(claims(w)).toHaveLength(0)
+
+  // B-005 is blocked on a missing credential (not a named wait): its dependency B-003 is done, but an agent cannot supply the credential
+  const held = await $.agent.spawn(spawn('DRIVER-BLOCK: B-005 send the confirmation email'))
+  expect(held.deny).toContain('B-005 is blocked (Waiting for RESEND_API_KEY')
+  expect(held.deny).toContain('an agent cannot unblock it')
+  expect(claims(w)).toHaveLength(0)
+})
+
+test('agent.spawn denies a block blocked for a reason that only mentions another block, and claims one whose named wait is done', async ($, on) => {
+  const mentions = editPlan(WAITLIST_PLAN, (p: Plan) => {
+    p.blocks['B-006'].status = 'blocked'
+    p.blocks['B-006'].statusReason = 'missing STRIPE_KEY (needed by B-005 checkout)'
+    p.blocks['B-004'].status = 'done'
+    p.blocks['B-005'].status = 'done'
+  })
+  const first = await started($, on, mentions)
+  const denied = await $.agent.spawn(spawn('DRIVER-BLOCK: B-006 run the e2e check'))
+  expect(denied.deny).toContain('B-006 is blocked (missing STRIPE_KEY (needed by B-005 checkout))')
+  expect(claims(first.w)).toHaveLength(0)
+})
+
+test('agent.spawn claims a blocked block whose named dependency is done, and blocks that need rework or have not started as before', async ($, on) => {
+  const resumed = editPlan(WAITLIST_PLAN, (p: Plan) => {
+    p.blocks['B-006'].status = 'blocked'
+    p.blocks['B-006'].statusReason = 'waiting on B-004'
+    p.blocks['B-004'].status = 'done'
+    p.blocks['B-005'].status = 'done'
+  })
+  const { w } = await started($, on, resumed)
+  const ok = await $.agent.spawn(spawn('DRIVER-BLOCK: B-006 run the e2e check'))
+  expect(ok.agentId).toBe('a1')
+  expect(claims(w)[0]!.args).toEqual(['block', 'status', 'B-006', 'in_progress', '--owner', 'a1'])
+})
+
+test('agent.spawn claims a block that needs rework', async ($, on) => {
+  const rework = editPlan(WAITLIST_PLAN, (p: Plan) => {
+    p.blocks['B-005'].status = 'needs_rework'
+    p.blocks['B-005'].statusReason = 'criterion 2 fails'
+  })
+  const { w } = await started($, on, rework)
+  const ok = await $.agent.spawn(spawn('DRIVER-BLOCK: B-005 fix it'))
+  expect(ok.agentId).toBe('a1')
+  expect(claims(w)[0]!.args).toEqual(['block', 'status', 'B-005', 'in_progress', '--owner', 'a1'])
+})
+
 test('agent.spawn denies when the plan cannot be read, and passes when there is none', async ($, on) => {
   const { w } = await started($, on, '{ not json')
   const r = await $.agent.spawn(spawn('anything'))

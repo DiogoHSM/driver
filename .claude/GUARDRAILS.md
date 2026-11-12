@@ -2,7 +2,7 @@
 
 > **Sempre carregado.** Este arquivo é o único contrato de *lazy loading* do projeto: diz a Claude quais docs ler antes de tocar em cada área. Docs não listados aqui só são lidos quando Claude os abrir explicitamente.
 
-**Última revisão**: 2026-10-30 (skills discover e route, ADR-012)
+**Última revisão**: 2026-11-12 (seis skills, triagem do ADR-016)
 
 ---
 
@@ -20,7 +20,7 @@ Use esta tabela como checklist. Antes de modificar um arquivo que se encaixe num
 | `hooks/**` | `docs/research/03-plugin-infra.md` §3, `DECISIONS.md` (ADR-009, ADR-010 item 11) | gate por hook é a única garantia real; aprovação nunca pode vir do modelo |
 | `plugins/driver/mod/**`, `types/index.d.ts` | `DECISIONS.md` (ADR-011, ADR-014, ADR-015), `docs/research/05-mod-design.md`, `docs/research/03-plugin-infra.md` §2 | sem Node/DOM no mod; só importar `src/shared`; render nunca escreve estado; aprovação só por origem `composer`/`ui.press` + ticket; o painel sempre mostra o próximo passo e o botão principal aciona o Claude por `$.prompt.submit`, que nunca aprova nada |
 | `plugins/driver/src/shared/**` | `DECISIONS.md` (ADR-011 item 2) | sem dependências (nem zod, nem `node:*`): o mod importa daqui; mudança de layout/SVG tem golden test |
-| `plugins/driver/skills/**`, `plugins/driver/references/**` | `DECISIONS.md` (ADR-013, ADR-012, ADR-008, ADR-003), `docs/research/07-skills-design.md`, `docs/research/skills-landscape.md` §2 | skills escrevem no plano só pelas tools; nunca aprovam gate; entrevista por interesse com orçamento por classe; texto para o usuário nunca antes de chamada de ferramenta (resumo e lista de blocos são a mensagem final do turno); arquivos de `.claude/driver/` só pelas tools silenciosas; `test/skills.spec.ts` checa frontmatter, caminhos, ops citadas e travessão |
+| `plugins/driver/skills/**`, `plugins/driver/references/**` | `DECISIONS.md` (ADR-017, ADR-016, ADR-015, ADR-014, ADR-013, ADR-012, ADR-008, ADR-006, ADR-003), `plugins/driver/references/triage.md`, `docs/research/07-skills-design.md`, `docs/research/skills-landscape.md` §2 | skills escrevem no plano só pelas tools; nunca aprovam gate; entrevista por interesse com orçamento por classe; texto para o usuário nunca antes de chamada de ferramenta (resumo e lista de blocos são a mensagem final do turno); arquivos de `.claude/driver/` só pelas tools silenciosas; mudança depois do gate passa pela triagem e nunca recomeça o ciclo sozinha; skill só avança fase a partir da própria fase e sem trabalho aberto atrás; `allowed-tools` não pré-aprova terminal além da CLI do driver; `test/skills.spec.ts` checa frontmatter, caminhos, ops citadas e travessão |
 | `plugins/driver-*/` (packs) | `DECISIONS.md` (ADR-004, ADR-005), `docs/research/02-domain-packs.md` | core não conhece provedores; dados do pack em `ext` |
 | `.claude-plugin/*.json`, `package.json` | `STACK.md`, `DECISIONS.md` (ADR-003) | versões pinadas; `claude plugin validate` após editar |
 | Decisão arquitetural nova | `DECISIONS.md` (ler + adicionar ADR) | convenção do projeto: ADR antes do código |

@@ -1,9 +1,9 @@
 import type { On } from 'claude-code'
 
 import { BLOCK_STATUSES, STATUS_LABEL } from '../src/shared/phases.js'
-import { summarize } from '../src/shared/view.js'
+import { baselineText, sinceBaseline, summarize } from '../src/shared/view.js'
 import type { DriverGateName, DriverView } from '../types'
-import { approveViaMod } from './approve.js'
+import { approveViaMod, rebaselineViaMod } from './approve.js'
 import { setAutopilot } from './autopilot.js'
 import { afterApproval } from './next.js'
 import { refusal, runCli, type Dollar } from './cli.js'
@@ -41,7 +41,7 @@ export function statusText(view: DriverView | null, root?: string): string {
     .map((st) => `${STATUS_LABEL[st]} ${s.counts[st]}`)
     .join(', ')
   const lines = [
-    `DRIVER ${view.project}: phase ${view.currentPhase}, revision ${view.revision}, baseline ${view.baseline}`,
+    `DRIVER ${view.project}: phase ${view.currentPhase}, revision ${view.revision}, ${baselineText(view)}`,
     `gates: ${gate('route')}; ${gate('release')}`,
     `blocks: ${view.blocks.filter((b) => !b.retired).length} active${counts ? ` (${counts})` : ''}`,
   ]
@@ -50,8 +50,17 @@ export function statusText(view: DriverView | null, root?: string): string {
   return lines.join('\n')
 }
 
+/** Why the baseline is being confirmed, from what entered the plan since the last one. */
+export function baselineReason(baseline: number, since: { blocks: number; reqs: number }, via: 'the DRIVER pane' | '/driver'): string {
+  const n = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`
+  return `Confirm baseline ${baseline + 1} from ${via}: records ${n(since.blocks, 'block')} and ${n(since.reqs, 'requirement')} added since baseline ${baseline}`
+}
+
 const NOT_TYPED =
   'DRIVER: approval must be typed by you at the prompt (/driver approve <route|release>). If you did type it, use the Approve button in the DRIVER pane instead.'
+
+const NOT_TYPED_BASELINE =
+  'DRIVER: a new baseline must be confirmed by you (type /driver baseline, or use the Confirm baseline button in the DRIVER pane).'
 
 export function registerCommand(on: On): void {
   on('command.run', { command: 'driver' }, async ($, e) => {
@@ -89,12 +98,22 @@ export function registerCommand(on: On): void {
         context: [`User approved gate ${gate} via /driver at rev ${r.seenRevision ?? '?'}`],
       }
     }
+    if (sub === 'baseline') {
+      // Same rule as approve: only the person's own Enter at the prompt confirms a baseline.
+      if (e.origin.kind !== 'composer') return { text: NOT_TYPED_BASELINE }
+      const before = await getView($)
+      if (!before) return { text: 'DRIVER: no plan here.' }
+      const since = sinceBaseline(before)
+      if (since.blocks + since.reqs === 0) return { text: `Nothing was added since baseline ${before.baseline}.` }
+      const r = await rebaselineViaMod($, baselineReason(before.baseline, since, '/driver'), before.revision)
+      return { text: r.message, ...(r.ok ? { context: [`User confirmed baseline ${before.baseline + 1} via /driver at rev ${r.seenRevision ?? '?'}`] } : {}) }
+    }
     if (sub === 'auto') {
       // Like approval, the autopilot is the person's switch: the model cannot turn it on for itself.
       if (e.origin.kind !== 'composer') return { text: 'DRIVER: the autopilot is switched by you (/driver auto on|off, or the Autopilot button in the pane).' }
       if (rest[0] !== 'on' && rest[0] !== 'off') return { text: 'Usage: /driver auto <on|off>' }
       return { text: await setAutopilot($, rest[0] === 'on') }
     }
-    return { text: 'Usage: /driver [status|export|init <name>|approve <route|release>|auto <on|off>]' }
+    return { text: 'Usage: /driver [status|export|init <name>|approve <route|release>|baseline|auto <on|off>]' }
   }).catch(($, e, next) => (next.called ? next(e) : { text: 'DRIVER: the command failed unexpectedly.' }))
 }

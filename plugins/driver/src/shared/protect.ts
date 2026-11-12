@@ -794,6 +794,37 @@ function isDriverInvocation(w: string[]): boolean {
   return LAUNCHERS.has(first) && w.slice(1).some(isDriverToken);
 }
 
+/** Verbs that only read: no argument, however it is spelled, turns them into a gate approval, a rebaseline or a forced move. */
+const READ_ONLY_VERBS = new Set(['status', 'validate', 'where']);
+
+/** Index of the first operand of a launcher (`node X`, `npx -y X`): the first word after it that is not an option. */
+function firstOperandAt(w: string[]): number {
+  return w.findIndex((t, i) => i > 0 && !t.startsWith('-'));
+}
+
+/** A launcher runs whatever its first operand names, so an opaque one hides the real command. */
+function launchesOpaqueOperand(w: string[]): boolean {
+  if (!LAUNCHERS.has(baseName(w[0]!).toLowerCase()) || !w.slice(1).some(isDriverToken)) return false;
+  const at = firstOperandAt(w);
+  return at > 0 && /[$`]/.test(w[at]!);
+}
+
+/**
+ * The word right after the driver CLI is a literal read-only verb (so a variable later on cannot change what runs).
+ * The driver token must be the command itself or the first operand of a launcher, with nothing opaque before it.
+ */
+function hasReadOnlyVerb(w: string[]): boolean {
+  let at = -1;
+  if (isDriverToken(w[0]!)) at = 0;
+  else if (LAUNCHERS.has(baseName(w[0]!).toLowerCase())) {
+    const first = firstOperandAt(w);
+    if (first > 0 && isDriverToken(w[first]!)) at = first;
+  }
+  if (at < 0 || w.slice(0, at).some((t) => /[$`]/.test(t))) return false;
+  const verb = w[at + 1];
+  return verb !== undefined && READ_ONLY_VERBS.has(verb);
+}
+
 function userOnlyAction(w: string[]): boolean {
   const toks = new Set(w.map((t) => t.replace(/\)+$/, '')).map((t) => (t.startsWith('--') && t.includes('=') ? t.slice(0, t.indexOf('=')) : t)));
   if (toks.has('rebaseline') || toks.has('via-mod') || toks.has('--via-mod') || toks.has('--force') || toks.has('-f')) return true;
@@ -911,8 +942,10 @@ function protect(command: string, outer: Ctx | null): string | null {
     if (!isDriverInvocation(w)) continue;
     if (userOnlyAction(w)) return MSG_USER_ONLY;
     if (isOpaqueName(w[0]!)) return MSG_SUBST;
-    // a driver call whose arguments come from substitution may hide a user-only verb
-    if (/[$`]/.test(w.join(' '))) return MSG_USER_ONLY;
+    // a driver call whose arguments come from substitution may hide a user-only verb,
+    // unless the verb is written out and reads only (`status --block $b`)
+    if (launchesOpaqueOperand(w)) return MSG_USER_ONLY;
+    if (/[$`]/.test(w.join(' ')) && !hasReadOnlyVerb(w)) return MSG_USER_ONLY;
   }
   if (usesPty(norm)) return MSG_PTY;
   const own = contextOf(norm);

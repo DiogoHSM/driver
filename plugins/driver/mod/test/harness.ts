@@ -214,3 +214,30 @@ export function bigPlan(n: number): string {
     blocks,
   })
 }
+
+/**
+ * The web-waitlist plan sent back by validate: B-004 reopened (needs_rework), B-006 (validate) blocked waiting on it,
+ * B-009 added to implement after the baseline.
+ */
+export function loopPlan(base: string): string {
+  return editPlan(base, (p) => {
+    p.currentPhase = 'validate'
+    p.baselines[0].closedAt = '2026-10-21T10:00:00Z'
+    p.blocks['B-004'].status = 'needs_rework'
+    p.blocks['B-004'].statusReason = 'validate/B-006.md: criterion 3 fails, signup drops the last row'
+    p.blocks['B-005'].status = 'done'
+    p.blocks['B-006'].status = 'blocked'
+    p.blocks['B-006'].statusReason = 'waiting on B-004'
+    p.blocks['B-009'] = {
+      title: 'Compact signup form',
+      phase: 'implement',
+      status: 'not_started',
+      statusSince: '2026-10-25T09:00:00Z',
+      statusBy: { kind: 'model', id: 'main' },
+      dependsOn: ['B-003'],
+      requirements: ['R-001'],
+      artifacts: [],
+      tests: [],
+    }
+  })
+}

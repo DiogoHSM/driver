@@ -71,24 +71,61 @@ export async function approveViaMod($: Dollar, gate: DriverGateName, expectRevis
     return { ok: false, message: `The plan changed (revision ${expectRevision} -> ${revision}); review it and approve again.` }
   if (read.plan.gates[gate].approved) return { ok: false, message: `Gate ${gate} is already approved.` }
 
-  const ticketFile = `${paths.driverDir}/.mod/ticket.json`
+  const r = await runWithTicket($, paths.driverDir, gate, revision, ['gate', 'approve', gate, '--via-mod'])
+  if (!r.ok) return { ok: false, message: r.message }
+  await forceTick($)
+  return { ok: true, message: `Approved gate ${gate} at revision ${revision}.`, seenRevision: revision, ...(r.revision !== undefined ? { revision: r.revision } : {}) }
+}
+
+/**
+ * Confirms the next baseline on behalf of the person, with the same checks and the same ticket channel
+ * as a gate approval. Same caller rule: person-initiated only (a composer `command.run` or a `ui.press`),
+ * never a tool call. `expectRevision` is the revision the person was shown.
+ */
+export async function rebaselineViaMod($: Dollar, reason: string, expectRevision?: number): Promise<ApproveResult> {
+  const paths = await getPaths($)
+  if (!paths) return { ok: false, message: 'DRIVER: project root is unknown' }
+  const read = await readPlanFresh($, paths.driverDir)
+  if (read.kind === 'missing') return { ok: false, message: 'DRIVER: no plan here' }
+  if (read.kind === 'bad') return { ok: false, message: `DRIVER: ${read.message}` }
+  const revision = read.plan.revision
+  if (expectRevision !== undefined && expectRevision !== revision)
+    return { ok: false, message: `The plan changed (revision ${expectRevision} -> ${revision}); review it and confirm again.` }
+  if (read.plan.baseline === 0) return { ok: false, message: 'No baseline yet: approve gate route first.' }
+  if (!reason.trim()) return { ok: false, message: 'A rebaseline needs a reason.' }
+
+  const r = await runWithTicket($, paths.driverDir, 'rebaseline', revision, ['rebaseline', `--reason=${reason}`, '--via-mod'])
+  if (!r.ok) return { ok: false, message: r.message }
+  await forceTick($)
+  const next = read.plan.baseline + 1
+  return { ok: true, message: `Confirmed baseline ${next} at revision ${revision}.`, seenRevision: revision, ...(r.revision !== undefined ? { revision: r.revision } : {}) }
+}
+
+/** Writes a one-shot ticket for `kind`, runs the CLI with the nonce on stdin and reports the outcome. */
+async function runWithTicket(
+  $: Dollar,
+  driverDir: string,
+  kind: string,
+  revision: number,
+  args: string[],
+): Promise<{ ok: true; revision?: number } | { ok: false; message: string }> {
+  const ticketFile = `${driverDir}/.mod/ticket.json`
   let secret: Secret
   try {
     secret = await makeSecret($)
     const now = await $.clock.now()
     await recordIssued($, secret.sha256)
-    await $.fs.write(ticketFile, JSON.stringify({ gate, revision, sha256: secret.sha256, iat: now, exp: now + TICKET_TTL_MS }))
+    await $.fs.write(ticketFile, JSON.stringify({ gate: kind, revision, sha256: secret.sha256, iat: now, exp: now + TICKET_TTL_MS }))
   } catch (e) {
     return { ok: false, message: `DRIVER: approval failed: ${(e as Error).message}` }
   }
   const name = await userName($)
-  const r = await runCli($, ['gate', 'approve', gate, '--via-mod', '--actor', `user:${name}`], { stdin: secret.nonce })
+  const r = await runCli($, [...args, '--actor', `user:${name}`], { stdin: secret.nonce })
   if (!r.ok) {
     // The CLI consumes the ticket first; if it never ran, void it.
     if (r.isUnavailable) await $.fs.write(ticketFile, '{}').catch(() => undefined)
     return { ok: false, message: `DRIVER refused: ${r.error}` }
   }
-  await forceTick($)
   const newRev = (r.json as { revision?: number } | undefined)?.revision
-  return { ok: true, message: `Approved gate ${gate} at revision ${revision}.`, seenRevision: revision, ...(typeof newRev === 'number' ? { revision: newRev } : {}) }
+  return { ok: true, ...(typeof newRev === 'number' ? { revision: newRev } : {}) }
 }

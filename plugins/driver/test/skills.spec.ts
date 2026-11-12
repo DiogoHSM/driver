@@ -52,12 +52,34 @@ const guarded = [...walk(SKILLS_DIR), ...walk(REFERENCES_DIR)].filter((p) => p.e
 const mdFiles = guarded.map((p) => ({ rel: path.relative(PKG_ROOT, p), text: readFileSync(p, 'utf8') }));
 
 describe('skills', () => {
-  it('ships discover and route', () => {
-    expect(skillDirs).toEqual(expect.arrayContaining(['discover', 'route']));
+  it('ships all six phase skills', () => {
+    expect(skillDirs).toEqual(expect.arrayContaining(['discover', 'route', 'implement', 'validate', 'evolve', 'release']));
   });
 
-  it('ships the shared conventions file', () => {
+  it('ships the shared conventions and triage files', () => {
     expect(existsSync(path.join(REFERENCES_DIR, 'driver-conventions.md'))).toBe(true);
+    expect(existsSync(path.join(REFERENCES_DIR, 'triage.md'))).toBe(true);
+  });
+
+  describe('references/triage.md', () => {
+    const triage = readFileSync(path.join(REFERENCES_DIR, 'triage.md'), 'utf8');
+
+    it('defers to the shared conventions', () => {
+      expect(triage).toContain('driver-conventions.md');
+    });
+
+    it('names only registered mcp__driver__ tools', () => {
+      const registered = registeredTools();
+      const used = [...triage.matchAll(/mcp__driver__([a-z_]+)/g)].map((m) => m[1]!);
+      expect(used.length).toBeGreaterThan(0);
+      for (const u of used) expect(registered, `mcp__driver__${u}`).toContain(u);
+    });
+  });
+
+  it('names only registered mcp__driver__ tools in the conventions', () => {
+    const registered = registeredTools();
+    const text = readFileSync(path.join(REFERENCES_DIR, 'driver-conventions.md'), 'utf8');
+    for (const m of text.matchAll(/mcp__driver__([a-z_]+)/g)) expect(registered, `mcp__driver__${m[1]}`).toContain(m[1]);
   });
 
   describe.each(skillDirs)('%s', (name) => {
@@ -81,6 +103,12 @@ describe('skills', () => {
 
     it('opens by reading the shared conventions', () => {
       expect(text).toContain('${CLAUDE_SKILL_DIR}/../../references/driver-conventions.md');
+    });
+
+    it('does not pre-approve unrestricted shell commands', () => {
+      const tools = fm['allowed-tools'] ?? '';
+      expect(tools).not.toMatch(/(^|,\s*)Bash(\s*,|\s*$)/);
+      expect(tools).not.toMatch(/Bash\((git|gh)\b/);
     });
 
     it('resolves every CLAUDE_SKILL_DIR path', () => {

@@ -4,6 +4,7 @@ import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, rmS
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { ApplyInputError, parseApplyBody } from './apply.js';
+import { BacklogRefusedError, addBacklog, readBacklog, showText as backlogText } from './backlog.js';
 import { BlockDocRefusedError, writeBlockDocs } from './block-doc.js';
 import { ReqDocRefusedError, writeReqDocs } from './req-doc.js';
 import { DiscoverRefusedError, countsByStatus, frontier, line1, logDiscover, readState, summaryText, type DiscoverState } from './discover-log.js';
@@ -63,14 +64,16 @@ const HELP = `driver <command> [options]
   req retire <id> --decision D-001 --reason ..
   gate approve <route|release> [--via-mod] | gate revoke <route|release> --reason ..
   phase advance | phase back <phase> --reason ..
-  rebaseline --reason .. [--changed B-001,..] [--decision D-001]
+  rebaseline --reason .. [--changed B-001,..] [--decision D-001] [--via-mod]
+  backlog add                                (JSON on stdin: {"items":[{"title","detail"?,"origin"?,"decision"?}]}, 1..20; appends to backlog.jsonl, regenerates backlog.md; no plan change)
+  backlog show                               (backlog entries, no write)
   release add --version V --commit SHA [--blocks B-001,..]
   export mermaid [dir] [--out path] [--stdout]
   renumber
   hook gate-check | protect-plan | subagent-stop     (reads hook JSON on stdin)
 
 gate approve, rebaseline and --force ask for a typed "yes" on /dev/tty (user terminal only).
-gate approve --via-mod reads a one-shot nonce on stdin and checks .claude/driver/.mod/ticket.json (written by the mod).
+gate approve and rebaseline --via-mod read a one-shot nonce on stdin and check .claude/driver/.mod/ticket.json (written by the mod).
 values that start with "-" go as --reason=<v> / --owner=<v>.
 global: --cwd <dir>  --root <dir>  --actor <kind:id>  --json  --now <iso>  --expect-revision <n>
 exit codes: 0 ok, 1 validation or transition refused, 2 usage or forbidden`;
@@ -412,6 +415,23 @@ function discoverCmd(env: Env, driverDir: string, sub: string | undefined): Out 
   return { text, json: { ok: true, exists, state, frontier: f } };
 }
 
+function backlogCmd(env: Env, driverDir: string, sub: string | undefined): Out {
+  if (sub !== 'add' && sub !== 'show') throw new UsageError('backlog: expected "add" or "show"');
+  if (!existsSync(path.join(driverDir, 'plan.json'))) throw new NotInitializedError(driverDir);
+  if (sub === 'add') {
+    let raw: unknown;
+    try {
+      raw = JSON.parse(readStdin());
+    } catch {
+      throw new UsageError('backlog add: stdin must hold one JSON object {"items":[{"title","detail"?,"origin"?,"decision"?}]}');
+    }
+    const r = addBacklog(driverDir, raw, env.now);
+    return { text: r.text, json: { ok: true, text: r.text, created: r.created, count: r.entries.length, warnings: r.warnings } };
+  }
+  const { entries, exists } = readBacklog(driverDir);
+  return { text: backlogText(entries), json: { ok: true, exists, count: entries.length, entries } };
+}
+
 function showNodes(state: DiscoverState): string {
   const m = state.meta;
   const lines = [`goal: ${line1(m.goal) || '-'}`, `class: ${m.class ?? '-'}; domain: ${line1(m.domain) || '-'}; language: ${line1(m.language) || '-'}; checkpoint: ${m.checkpoint}; accepted: ${m.accepted ? 'yes' : 'no'}`];
@@ -465,6 +485,8 @@ function runCommand(env0: Env, pos: string[]): Out {
       return applyCmd(env, dir());
     case 'discover':
       return discoverCmd(env, dir(), sub);
+    case 'backlog':
+      return backlogCmd(env, dir(), sub);
     case 'block': {
       switch (sub) {
         case 'add':
@@ -582,9 +604,17 @@ function runCommand(env0: Env, pos: string[]): Out {
       if (sub !== 'add') break;
       return commit(env, dir(), { type: 'decision.add', title: f.title ?? need(arg, 'title'), reason: f.reason });
     }
-    case 'rebaseline':
+    case 'rebaseline': {
+      const reason = need(f.reason, 'reason');
+      if (f['via-mod']) {
+        const driverDir = dir();
+        const ticket = consumeTicket(driverDir, 'rebaseline', readStdin().trim());
+        env = asUser(env);
+        return commit(env, driverDir, { type: 'rebaseline', reason, changed: list(f.changed), decision: f.decision, via: 'mod', ticket: ticket.sha256 }, { expectedRevision: ticket.revision });
+      }
       env = confirmAsUser(env, `rebaseline (new baseline, resets changed blocks, revokes release gate) in ${env.cwd}`);
-      return commit(env, dir(), { type: 'rebaseline', reason: need(f.reason, 'reason'), changed: list(f.changed), decision: f.decision });
+      return commit(env, dir(), { type: 'rebaseline', reason, changed: list(f.changed), decision: f.decision, via: 'tty' });
+    }
     case 'release': {
       if (sub !== 'add') break;
       const driverDir = dir();
@@ -724,6 +754,7 @@ function main(argv: string[]): number {
       code === 2 ||
       err instanceof OpRefusedError ||
       err instanceof DiscoverRefusedError ||
+      err instanceof BacklogRefusedError ||
       err instanceof BlockDocRefusedError ||
       err instanceof ReqDocRefusedError ||
       err instanceof PlanInvariantError ||

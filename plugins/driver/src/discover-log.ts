@@ -352,7 +352,7 @@ export function renderNonGoals(state: DiscoverState): string {
   return `${out.join('\n')}\n`;
 }
 
-function atomicWrite(driverDir: string, file: string, content: string): void {
+export function atomicWrite(driverDir: string, file: string, content: string): void {
   const tmpDir = path.join(driverDir, '.tmp');
   mkdirSync(tmpDir, { recursive: true });
   const tmp = path.join(tmpDir, `${path.basename(file)}.${process.pid}`);

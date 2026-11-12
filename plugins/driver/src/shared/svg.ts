@@ -32,7 +32,7 @@ function css(): string {
     st +
     `.sel rect{stroke:${ACCENT};stroke-width:3}.ret{opacity:.35}.ret .t{text-decoration:line-through}` +
     `.i{font:700 10px ui-monospace,Menlo,monospace}.g{font-size:12px;text-anchor:end}.o{font-size:9px;text-anchor:middle}` +
-    `.p{fill:#fff;stroke:#6b7280;stroke-width:.5}.bg{font-weight:700;fill:#dc2626;text-anchor:end}.rk{fill:#b45309;font-size:10px;text-anchor:end}` +
+    `.p{fill:#fff;stroke:#6b7280;stroke-width:.5}.bg{font-weight:700;fill:#dc2626;text-anchor:end}.rk{fill:#b45309;font-size:10px;text-anchor:end}.ab{font-weight:700;fill:#1d4ed8;font-size:12px;text-anchor:end}` +
     `.e,.ed,.eb,.es{fill:none}.e{stroke:${EDGE_PENDING};stroke-width:1.5}.ed{stroke:${EDGE_DONE};stroke-width:1;opacity:.5}` +
     `.eb{stroke:${EDGE_BACK};stroke-width:1.5;stroke-dasharray:4 3}.es{stroke:${ACCENT};stroke-width:2}` +
     `.gk{stroke:${GATE_OK};stroke-width:1.5}.gp{stroke:${GATE_PENDING};stroke-width:1.5;stroke-dasharray:4 3}` +
@@ -45,7 +45,7 @@ function pillWidth(text: string): number {
   return Math.round(Array.from(text).length * 5.8 + 12);
 }
 
-function tooltip(n: LayoutNode, mode: Tooltips): string {
+function tooltip(n: LayoutNode, mode: Tooltips, baseline: number): string {
   if (mode === 'none') return '';
   if (n.kind === 'agg') return `<title>${esc(`${n.count} done blocks (${n.phase})`)}</title>`;
   const b = n.block!;
@@ -57,16 +57,18 @@ function tooltip(n: LayoutNode, mode: Tooltips): string {
   lines.push(`requirements: ${b.reqs}; tests: ${b.tests.pass} pass, ${b.tests.fail} fail, ${b.tests.unknown} unknown`);
   if (b.verified !== undefined) lines.push(`verified: ${b.verified ? 'yes' : 'no'}`);
   if (b.reason) lines.push(`reason: ${b.reason}`);
+  if (b.waitingOn?.length) lines.push(`waiting on: ${b.waitingOn.join(', ')}`);
+  if (b.afterBaseline) lines.push(`added after baseline ${baseline}`);
   return `<title>${esc(lines.join('\n'))}</title>`;
 }
 
-function nodeSvg(n: LayoutNode, later: boolean, selected: string | undefined, mode: Tooltips): string {
+function nodeSvg(n: LayoutNode, later: boolean, selected: string | undefined, mode: Tooltips, baseline: number): string {
   const { x, y } = n;
   if (n.kind === 'agg')
-    return `<g class="n s-done${later ? ' lt' : ''}">${tooltip(n, mode)}<rect x="${x}" y="${y}" width="${NW}" height="${NH}" rx="6"/><text class="a" x="${x + 12}" y="${y + 27}">✓ ${n.count} done</text></g>`;
+    return `<g class="n s-done${later ? ' lt' : ''}">${tooltip(n, mode, baseline)}<rect x="${x}" y="${y}" width="${NW}" height="${NH}" rx="6"/><text class="a" x="${x + 12}" y="${y + 27}">✓ ${n.count} done</text></g>`;
   const b: BlockView = n.block!;
   const cls = ['n', `s-${b.status}`, ...(b.id === selected ? ['sel'] : []), ...(b.retired ? ['ret'] : []), ...(later ? ['lt'] : [])].join(' ');
-  let s = `<g class="${cls}">${tooltip(n, mode)}<rect x="${x}" y="${y}" width="${NW}" height="${NH}" rx="6"/>`;
+  let s = `<g class="${cls}">${tooltip(n, mode, baseline)}<rect x="${x}" y="${y}" width="${NW}" height="${NH}" rx="6"/>`;
   s += `<text class="i" x="${x + 8}" y="${y + 16}">${esc(b.id)}</text>`;
   s += `<text class="g" x="${x + NW - 8}" y="${y + 17}">${STATUS_GLYPH[b.status]}</text>`;
   if (b.owner) {
@@ -81,7 +83,11 @@ function nodeSvg(n: LayoutNode, later: boolean, selected: string | undefined, mo
     s += `<text class="bg" x="${bx}" y="${y + 34}">!</text>`;
     bx -= 12;
   }
-  if (b.risk === 'high') s += `<text class="rk" x="${bx}" y="${y + 34}">▲</text>`;
+  if (b.risk === 'high') {
+    s += `<text class="rk" x="${bx}" y="${y + 34}">▲</text>`;
+    bx -= 12;
+  }
+  if (b.afterBaseline) s += `<text class="ab" x="${bx}" y="${y + 34}">+</text>`;
   return `${s}</g>`;
 }
 
@@ -107,7 +113,7 @@ function legend(l: Layout): string {
     s += `<rect x="${x}" y="${y}" width="10" height="10" rx="2" fill="${c.fill}" stroke="${c.stroke}"/><text class="lg" x="${x + 14}" y="${y + 9}">${STATUS_GLYPH[st]} ${STATUS_LABEL[st]}</text>`;
     x += 14 + Math.round((STATUS_LABEL[st].length + 2) * 5.6) + 12;
   }
-  return `${s}<text class="lg" x="${x}" y="${y + 9}">! needs attention   ▲ high risk</text>`;
+  return `${s}<text class="lg" x="${x}" y="${y + 9}">! needs attention   ▲ high risk   + added after baseline</text>`;
 }
 
 function collapsedLane(l: Layout['lanes'][number], l0: Layout): string {
@@ -137,14 +143,14 @@ export function toSvg(l: Layout, view: PlanView, opts: { selected?: string; tool
   parts.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${l.width} ${l.height}" role="img"><style>${css()}</style>`);
 
   for (const ln of l.lanes) {
-    const cls = ['l', ...(ln.current ? ['lc'] : []), ...(ln.later ? ['lt'] : [])].join(' ');
+    const cls = ['l', ...(ln.current || ln.reopened ? ['lc'] : []), ...(ln.later ? ['lt'] : [])].join(' ');
     parts.push(`<rect class="${cls}" x="${ln.x}" y="${M}" width="${ln.w}" height="${l.bodyBottom - M}" rx="8"/>`);
-    const hc = `h${ln.current ? ' hc' : ''}${ln.later ? ' lt' : ''}`;
+    const hc = `h${ln.current || ln.reopened ? ' hc' : ''}${ln.later ? ' lt' : ''}`;
     const name = ln.phase.toUpperCase();
     if (ln.collapsed) {
-      parts.push(`<text class="${hc}" x="${ln.x + LP}" y="${M + 16}">${name}</text><text class="hn" x="${ln.x + LP}" y="${M + 29}">${ln.done}/${ln.total}</text>`);
+      parts.push(`<text class="${hc}" x="${ln.x + LP}" y="${M + 16}">${name}</text><text class="hn" x="${ln.x + LP}" y="${M + 29}">${ln.done}/${ln.total}${ln.reopened ? ' ↺' : ''}</text>`);
       parts.push(collapsedLane(ln, l));
-    } else parts.push(`<text class="${hc}" x="${ln.x + LP}" y="${M + 22}">${name} ${ln.done}/${ln.total}</text>`);
+    } else parts.push(`<text class="${hc}" x="${ln.x + LP}" y="${M + 22}">${name} ${ln.done}/${ln.total}${ln.reopened ? ' ↺ reopened' : ''}</text>`);
   }
 
   for (const g of l.gates) {
@@ -161,11 +167,10 @@ export function toSvg(l: Layout, view: PlanView, opts: { selected?: string; tool
   for (const e of ordered) parts.push(`<path class="${edgeClass(e)}" d="${edgePath(e)}"/>`);
 
   const later = new Map(l.lanes.map((ln) => [ln.phase, ln.later]));
-  for (const n of l.nodes) parts.push(nodeSvg(n, later.get(n.phase) === true, opts.selected, opts.tooltips));
+  for (const n of l.nodes) parts.push(nodeSvg(n, later.get(n.phase) === true, opts.selected, opts.tooltips, view.baseline));
 
   parts.push(legend(l));
   parts.push('</svg>');
-  void view;
   return parts.join('');
 }
 
@@ -187,7 +192,7 @@ function cssVertical(): string {
     st +
     `.n:hover rect.c{stroke:${ACCENT};stroke-width:3}.sel rect.c{stroke:${ACCENT};stroke-width:3}.ret{opacity:.35}.ret .t{text-decoration:line-through}` +
     `.i{font:700 12px ui-monospace,Menlo,monospace}.g{font-size:15px;text-anchor:end}.o{font-size:11px;text-anchor:middle}` +
-    `.p{fill:#fff;stroke:#6b7280;stroke-width:.5}.bg{font-weight:700;fill:#dc2626;text-anchor:end}.rk{fill:#b45309;font-size:12px;text-anchor:end}` +
+    `.p{fill:#fff;stroke:#6b7280;stroke-width:.5}.bg{font-weight:700;fill:#dc2626;text-anchor:end}.rk{fill:#b45309;font-size:12px;text-anchor:end}.ab{font-weight:700;fill:#1d4ed8;text-anchor:end}` +
     `.e,.ed,.eb,.es{fill:none}.e{stroke:${EDGE_PENDING};stroke-width:1.5}.ed{stroke:${EDGE_DONE};stroke-width:1;opacity:.5}` +
     `.eb{stroke:${EDGE_BACK};stroke-width:1.5;stroke-dasharray:4 3}.es{stroke:${ACCENT};stroke-width:2.5}` +
     `.gk{stroke:${GATE_OK};stroke-width:2}.gp{stroke:${GATE_PENDING};stroke-width:2;stroke-dasharray:6 4}` +
@@ -196,13 +201,13 @@ function cssVertical(): string {
   );
 }
 
-function nodeVertical(n: LayoutNode, later: boolean, selected: string | undefined, mode: Tooltips): string {
+function nodeVertical(n: LayoutNode, later: boolean, selected: string | undefined, mode: Tooltips, baseline: number): string {
   const { x, y, w, h } = n;
   if (n.kind === 'agg')
-    return `<g class="n s-done${later ? ' lt' : ''}">${tooltip(n, mode)}<rect class="c" x="${x}" y="${y}" width="${w}" height="${h}" rx="8"/><text class="a" x="${x + 12}" y="${y + Math.round(h / 2) + 5}">✓ ${n.count} done</text></g>`;
+    return `<g class="n s-done${later ? ' lt' : ''}">${tooltip(n, mode, baseline)}<rect class="c" x="${x}" y="${y}" width="${w}" height="${h}" rx="8"/><text class="a" x="${x + 12}" y="${y + Math.round(h / 2) + 5}">✓ ${n.count} done</text></g>`;
   const b: BlockView = n.block!;
   const cls = ['n', `s-${b.status}`, ...(b.id === selected ? ['sel'] : []), ...(b.retired ? ['ret'] : []), ...(later ? ['lt'] : [])].join(' ');
-  let s = `<g class="${cls}">${tooltip(n, mode)}<rect class="c" x="${x}" y="${y}" width="${w}" height="${h}" rx="8"/>`;
+  let s = `<g class="${cls}">${tooltip(n, mode, baseline)}<rect class="c" x="${x}" y="${y}" width="${w}" height="${h}" rx="8"/>`;
   s += `<text class="i" x="${x + 10}" y="${y + 20}">${esc(b.id)}</text>`;
   s += `<text class="g" x="${x + w - 10}" y="${y + 21}">${STATUS_GLYPH[b.status]}</text>`;
   if (b.owner) {
@@ -212,7 +217,7 @@ function nodeVertical(n: LayoutNode, later: boolean, selected: string | undefine
     s += `<rect class="p" x="${px}" y="${y + 8}" width="${pw}" height="16" rx="8"/><text class="o" x="${px + Math.round(pw / 2)}" y="${y + 20}">${esc(label)}</text>`;
   }
   const flag = b.status === 'blocked' || b.status === 'needs_rework';
-  const badges = (flag ? 1 : 0) + (b.risk === 'high' ? 1 : 0);
+  const badges = (flag ? 1 : 0) + (b.risk === 'high' ? 1 : 0) + (b.afterBaseline ? 1 : 0);
   const maxChars = Math.max(8, Math.floor((w - 20 - badges * 16) / CHAR_W));
   s += `<text class="t" x="${x + 10}" y="${y + 42}">${esc(cut(b.title, maxChars))}</text>`;
   let bx = x + w - 10;
@@ -220,7 +225,11 @@ function nodeVertical(n: LayoutNode, later: boolean, selected: string | undefine
     s += `<text class="bg" x="${bx}" y="${y + 42}">!</text>`;
     bx -= 14;
   }
-  if (b.risk === 'high') s += `<text class="rk" x="${bx}" y="${y + 42}">▲</text>`;
+  if (b.risk === 'high') {
+    s += `<text class="rk" x="${bx}" y="${y + 42}">▲</text>`;
+    bx -= 14;
+  }
+  if (b.afterBaseline) s += `<text class="ab" x="${bx}" y="${y + 42}">+</text>`;
   return `${s}</g>`;
 }
 
@@ -243,18 +252,22 @@ function edgePathVertical(e: LayoutEdge): string {
 function bandVertical(ln: Layout['lanes'][number]): string {
   const y = ln.y!;
   const h = ln.h!;
-  const cls = ['l', ...(ln.current ? ['lc'] : []), ...(ln.later ? ['lt'] : [])].join(' ');
+  const cls = ['l', ...(ln.current || ln.reopened ? ['lc'] : []), ...(ln.later ? ['lt'] : [])].join(' ');
   let s = `<rect class="${cls}" x="${ln.x}" y="${y}" width="${ln.w}" height="${h}" rx="8"/>`;
   const name = ln.phase.toUpperCase();
   const hx = ln.x + LP;
   const hy = y + 21;
   const dim = ln.later ? ' lt' : '';
-  s += `<text class="h${ln.current ? ' hc' : ''}${dim}" x="${hx}" y="${hy}">${name}</text>`;
+  s += `<text class="h${ln.current || ln.reopened ? ' hc' : ''}${dim}" x="${hx}" y="${hy}">${name}</text>`;
   let cx = hx + Math.round(Array.from(name).length * 8.8) + 10;
   const count = ln.total === 0 ? 'no blocks' : `${ln.done}/${ln.total} done`;
   s += `<text class="hn${dim}" x="${cx}" y="${hy}">${count}</text>`;
   cx += Math.round(count.length * 6.6) + 12;
-  if (ln.current) s += `<text class="cur" x="${cx}" y="${hy}">● current</text>`;
+  if (ln.current) {
+    s += `<text class="cur" x="${cx}" y="${hy}">● current</text>`;
+    cx += Math.round('● current'.length * 6.6) + 12;
+  }
+  if (ln.reopened) s += `<text class="cur" x="${cx}" y="${hy}">↺ reopened</text>`;
   if (ln.collapsed && ln.total > 0) {
     const present = BLOCK_STATUSES.filter((st) => ln.counts[st] > 0);
     s += `<text class="cn${dim}" x="${ln.x + ln.w - LP}" y="${hy}">${present.map((st) => `${STATUS_GLYPH[st]} ${ln.counts[st]}`).join('  ')}</text>`;
@@ -272,7 +285,24 @@ function bandVertical(ln: Layout['lanes'][number]): string {
   return s;
 }
 
-/** Status swatches, then the two marks; items wrap to a new row when the next would cross the right margin. */
+/** One dashed arrow on the right margin from the current band's header up to each reopened band's header. */
+function loopsVertical(l: Layout): string {
+  const from = l.lanes.find((ln) => ln.current);
+  if (!from || from.y === undefined) return '';
+  let s = '';
+  l.lanes
+    .filter((ln) => ln.reopened && ln.y !== undefined)
+    .forEach((to, i) => {
+      const right = from.x + from.w;
+      const x = right - 6 - i * 5;
+      const y1 = from.y! + 16;
+      const y2 = to.y! + 16;
+      s += `<path class="eb" d="M${right - 14} ${y1}H${x}V${y2}H${right - 12}M${right - 12} ${y2}l8 -4v8z"/>`;
+    });
+  return s;
+}
+
+/** Status swatches, then the marks; items wrap to a new row when the next would cross the right margin. */
 function legendVertical(l: Layout): string {
   let y = l.bodyBottom + 16;
   let x = M;
@@ -290,7 +320,7 @@ function legendVertical(l: Layout): string {
     s += `<rect x="${x}" y="${y}" width="12" height="12" rx="3" fill="${c.fill}" stroke="${c.stroke}"/><text class="lg" x="${x + 16}" y="${y + 10}">${STATUS_GLYPH[st]} ${STATUS_LABEL[st]}</text>`;
     x += w;
   }
-  const marks = '! needs attention   ▲ high risk';
+  const marks = '! needs attention   ▲ high risk   + added after baseline';
   place(Math.round(marks.length * 6.6));
   return `${s}<text class="lg" x="${x}" y="${y + 10}">${marks}</text>`;
 }
@@ -314,11 +344,11 @@ export function toSvgVertical(l: Layout, view: PlanView, opts: { selected?: stri
   for (const e of ordered) parts.push(`<path class="${edgeClass(e)}" d="${edgePathVertical(e)}"/>`);
 
   const later = new Map(l.lanes.map((ln) => [ln.phase, ln.later]));
-  for (const n of l.nodes) parts.push(nodeVertical(n, later.get(n.phase) === true, opts.selected, opts.tooltips));
+  for (const n of l.nodes) parts.push(nodeVertical(n, later.get(n.phase) === true, opts.selected, opts.tooltips, view.baseline));
+  parts.push(loopsVertical(l));
 
   parts.push(legendVertical(l));
   parts.push('</svg>');
-  void view;
   return parts.join('');
 }
 

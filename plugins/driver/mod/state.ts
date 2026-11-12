@@ -209,6 +209,7 @@ async function invalidIssues($: Dollar, message: string): Promise<DriverIssue[]>
 // Tamper evidence, not proof: whoever can write plan.json can also write approvedVia.
 type Seen = { approved: boolean; at?: string; ticket?: string }
 let prev: Record<string, Seen> | undefined
+let prevBaseline: number | undefined
 const flagged = new Map<string, string>()
 const warned = new Set<string>()
 
@@ -239,6 +240,21 @@ async function checkApprovals($: Dollar, view: DriverView): Promise<void> {
     }
   }
   prev = next
+  // A new baseline arrives the way a gate approval does: typed in a terminal, or through this mod's ticket.
+  const latest = view.latestBaseline
+  if (latest) {
+    if (prevBaseline !== undefined && latest.n > prevBaseline) {
+      if (latest.via === 'tty') {
+        flagged.delete('baseline')
+        toasts.push(`DRIVER: baseline ${latest.n} confirmed in a terminal`)
+      } else if (latest.via === 'mod' && latest.ticket && (await wasIssued($, latest.ticket))) {
+        flagged.delete('baseline')
+      } else {
+        flagged.set('baseline', `DRIVER: baseline ${latest.n} confirmation not issued by this session (via: ${latest.via ?? 'none'})`)
+      }
+    }
+    prevBaseline = latest.n
+  }
   const alerts = [...flagged.values()]
   const cur = await read($, alertsAtom)
   if (JSON.stringify(cur) !== JSON.stringify(alerts)) await update($, alertsAtom, () => alerts)
@@ -349,6 +365,7 @@ export function resetPoller(): void {
   sawPlan = undefined
   opensOnAppear = false
   prev = undefined
+  prevBaseline = undefined
   flagged.clear()
   warned.clear()
 }

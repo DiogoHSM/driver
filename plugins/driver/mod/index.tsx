@@ -21,8 +21,8 @@ export const register: Register = (on, options) => {
       await registerTools($)
       await $.command.register({
         name: 'driver',
-        description: 'DRIVER plan: open the pane, show status, export the diagram, init a plan, approve a gate',
-        argumentHint: '[status|export|init <name>|approve <route|release>|auto <on|off>]',
+        description: 'DRIVER plan: open the pane, show status, export the diagram, init a plan, approve a gate, confirm a baseline',
+        argumentHint: '[status|export|init <name>|approve <route|release>|baseline|auto <on|off>]',
       })
       const paths = (await refreshPaths($)) ?? (await getPaths($))
       // A plan created later in the session (or found once the app moves the session into the

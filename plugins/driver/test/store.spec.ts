@@ -16,10 +16,15 @@ import {
   checkHandoff,
   readPlan,
   resolveProjectRoot,
+  mutateMany,
   serializePlan,
   withLock,
+  writePlan,
 } from '../src/store.js';
+import { replayIssues } from '../src/replay.js';
 import { emptyPlan, type Actor } from '../src/schema.js';
+import { project } from '../src/shared/view.js';
+import { validatePlan } from '../src/validate.js';
 import { OpRefusedError as Refused } from '../src/reducer.js';
 import { CLI, MODEL, NOW, USER, tmp } from './helpers.js';
 
@@ -421,5 +426,85 @@ describe('main worktree resolution', () => {
     const env = { ...process.env, DRIVER_ROOT: d };
     expect(spawnSync('bash', [path.join(__dirname, '..', 'hooks', 'gate-check.sh')], { input, env, encoding: 'utf8' }).stdout).toContain('deny');
     expect(spawnSync('node', [CLI, 'hook', 'gate-check'], { input, env, encoding: 'utf8' }).stdout).toContain('deny');
+  });
+});
+
+describe('lazy close of baseline 1 on a plan that is already past Route', () => {
+  const user = { actor: USER, now: NOW };
+  /** Ops up to Implement, then the plan is rewritten the way it was before the close existed (baseline 1 open, only what Discover held). */
+  function legacy(): string {
+    const dir = setup();
+    mutate(dir, { type: 'req.add', title: 'R', kind: 'functional', source: 'user' }, ctx);
+    mutate(dir, { type: 'block.add', title: 'Interview', phase: 'discover', requirements: ['R-001'] }, ctx);
+    mutate(dir, { type: 'gate.approve', gate: 'route' }, user);
+    mutate(dir, { type: 'phase.advance' }, ctx);
+    mutate(dir, { type: 'block.add', title: 'Built in route', phase: 'implement', requirements: ['R-001'] }, ctx);
+    mutate(dir, { type: 'phase.advance' }, ctx);
+    mutate(dir, { type: 'block.add', title: 'Built later', phase: 'implement', requirements: ['R-001'] }, ctx);
+    const plan = readPlan(dir);
+    delete plan.baselines[0]!.closedAt;
+    plan.baselines[0]!.added = ['B-001'];
+    plan.baselines[0]!.reqAdded = ['R-001'];
+    writePlan(dir, plan);
+    return dir;
+  }
+
+  it('folds what existed when Implement started, from the ledger, and nothing later', () => {
+    const dir = legacy();
+    const before = readPlan(dir);
+    const r = mutate(dir, { type: 'block.add', title: 'After', phase: 'implement' }, ctx);
+    expect(r.plan.baselines[0]).toMatchObject({ added: ['B-001', 'B-002'], reqAdded: ['R-001'], closedAt: NOW });
+    expect(r.plan.revision).toBe(before.revision + 1);
+    expect(project(r.plan).blocks.filter((b) => b.afterBaseline).map((b) => b.id)).toEqual(['B-003', 'B-004']);
+    const events = readEvents(dir).slice(-2);
+    expect(events.map((e) => e.type)).toEqual(['baseline.close', 'block.add']);
+    expect(events[0]).toMatchObject({ actor: { kind: 'hook', id: 'baseline-close' }, data: { baseline: 1, folded: ['B-002'] } });
+    expect(r.plan.gates.route.approved).toBe(true);
+    // closed once: the next write adds no second event
+    mutate(dir, { type: 'block.add', title: 'Again', phase: 'implement' }, ctx);
+    expect(readEvents(dir).filter((e) => e.type === 'baseline.close')).toHaveLength(1);
+    expect(replayIssues(readPlan(dir), readAllEvents(dir))).toEqual([]);
+    expect(validatePlan(readPlan(dir)).filter((i) => i.level === 'error')).toEqual([]);
+  });
+
+  it('closes only when the write goes through', () => {
+    const dir = legacy();
+    expect(() => mutate(dir, { type: 'block.status', id: 'B-002', to: 'done' }, ctx)).toThrow(OpRefusedError);
+    expect(readPlan(dir).baselines[0]!.closedAt).toBeUndefined();
+  });
+
+  it('closes inside a batch too, and ahead of a rebaseline', () => {
+    const dir = legacy();
+    mutateMany(dir, [{ type: 'block.add', title: 'X', phase: 'implement' }], ctx);
+    expect(readPlan(dir).baselines[0]).toMatchObject({ added: ['B-001', 'B-002'] });
+    expect(readEvents(dir).slice(-2).map((e) => e.type)).toEqual(['baseline.close', 'block.add']);
+    const dir2 = legacy();
+    const r = mutate(dir2, { type: 'rebaseline', reason: 'scope' }, user);
+    expect(r.plan.baselines[0]).toMatchObject({ added: ['B-001', 'B-002'], closedAt: NOW });
+    expect(r.plan.baselines[1]).toMatchObject({ n: 2, added: ['B-003'] });
+    expect(replayIssues(r.plan, readAllEvents(dir2))).toEqual([]);
+  });
+
+  it('folds every existing id when the ledger is missing or never saw Implement start', () => {
+    const dir = legacy();
+    rmSync(path.join(dir, 'events.jsonl'));
+    const r = mutate(dir, { type: 'block.add', title: 'After', phase: 'implement' }, ctx);
+    expect(r.plan.baselines[0]).toMatchObject({ added: ['B-001', 'B-002', 'B-003'], reqAdded: ['R-001'], closedAt: NOW });
+    expect(project(r.plan).blocks.filter((b) => b.afterBaseline).map((b) => b.id)).toEqual(['B-004']);
+    expect(replayIssues(r.plan, readAllEvents(dir))).toEqual([]);
+
+    const dir2 = legacy();
+    writeFileSync(path.join(dir2, 'events.jsonl'), '');
+    expect(mutate(dir2, { type: 'block.add', title: 'After', phase: 'implement' }, ctx).plan.baselines[0]!.added).toEqual(['B-001', 'B-002', 'B-003']);
+  });
+
+  it('leaves a plan still in Route or earlier alone', () => {
+    const dir = setup();
+    mutate(dir, { type: 'block.add', title: 'Interview', phase: 'discover' }, ctx);
+    mutate(dir, { type: 'gate.approve', gate: 'route' }, user);
+    mutate(dir, { type: 'phase.advance' }, ctx);
+    mutate(dir, { type: 'block.add', title: 'In route', phase: 'implement' }, ctx);
+    expect(readPlan(dir).baselines[0]!.closedAt).toBeUndefined();
+    expect(readEvents(dir).some((e) => e.type === 'baseline.close')).toBe(false);
   });
 });

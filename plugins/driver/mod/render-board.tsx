@@ -2,6 +2,7 @@ import type { Elements } from 'claude-code'
 
 import type { BlockStatus, PhaseId } from '../src/shared/phases.js'
 import { depsText, docSections, type Row } from '../src/shared/rows.js'
+import { baselineText } from '../src/shared/view.js'
 import type { DriverDetail, DriverGateName, DriverView } from '../types'
 
 export type BoardKit = Pick<Elements['desktop'], 'Box' | 'Text' | 'Button' | 'Markdown'>
@@ -73,7 +74,7 @@ function card(kit: BoardKit, r: BlockRow, hd: BoardHandlers) {
           {`\n${r.retired ? '(retired) ' : ''}${r.cardTitle}`}
         </Text>
       </Button>
-      {(meta || flag || r.risk === 'high') && (
+      {(meta || flag || r.risk === 'high' || r.afterBaseline) && (
         <Box flexDirection="row" gap="xs">
           {meta ? (
             <Text size="caption" dimColor>
@@ -88,6 +89,11 @@ function card(kit: BoardKit, r: BlockRow, hd: BoardHandlers) {
           {r.risk === 'high' ? (
             <Text size="caption" color="warning">
               ▲
+            </Text>
+          ) : null}
+          {r.afterBaseline ? (
+            <Text size="caption" color="permission" weight="semibold">
+              +
             </Text>
           ) : null}
         </Box>
@@ -113,7 +119,7 @@ function aggCard(kit: BoardKit, r: Extract<Row, { kind: 'agg' }>, hd: BoardHandl
 function phaseHeader(kit: BoardKit, head: PhaseRow, hd: BoardHandlers, isDim: boolean) {
   const { Box, Text, Button } = kit
   const name = (
-    <Text weight="semibold" color={head.current ? 'permission' : undefined} dimColor={isDim || (!head.open && !head.current)}>
+    <Text weight="semibold" color={head.current || head.reopened ? 'permission' : undefined} dimColor={isDim || (!head.open && !head.current && !head.reopened)}>
       {`${head.open ? '▾' : '▸'} ${head.phase.toUpperCase()}`}
     </Text>
   )
@@ -127,6 +133,11 @@ function phaseHeader(kit: BoardKit, head: PhaseRow, hd: BoardHandlers, isDim: bo
       {'  ● current'}
     </Text>
   ) : null
+  const reopened = head.reopened ? (
+    <Text size="caption" color="permission">
+      {'  ↺ reopened'}
+    </Text>
+  ) : null
   const attention =
     !head.open && head.attention ? (
       <Text size="caption" color="error">
@@ -138,6 +149,7 @@ function phaseHeader(kit: BoardKit, head: PhaseRow, hd: BoardHandlers, isDim: bo
       {name}
       {count}
       {current}
+      {reopened}
       {attention}
     </Button>
   ) : (
@@ -145,6 +157,7 @@ function phaseHeader(kit: BoardKit, head: PhaseRow, hd: BoardHandlers, isDim: bo
       {name}
       {count}
       {current}
+      {reopened}
       {attention}
     </Box>
   )
@@ -194,7 +207,7 @@ export function boardHeader(kit: BoardKit, view: DriverView, onExport: () => voi
         <Text size="heading" weight="semibold">
           {view.project}
         </Text>
-        <Text dimColor>{`phase ${view.currentPhase} · rev ${view.revision} · baseline ${view.baseline}`}</Text>
+        <Text dimColor>{`phase ${view.currentPhase} · rev ${view.revision} · ${baselineText(view)}`}</Text>
       </Box>
       <Button key="export" variant="secondary" onPress={onExport}>
         Export Mermaid
@@ -212,6 +225,8 @@ export function boardDetail(kit: BoardKit, view: DriverView, d: DriverDetail | n
     `${b.status.replace('_', ' ')} since ${b.since}`,
     b.owner ? `owner ${b.owner}` : '',
     b.deps.length ? `depends on ${b.deps.join(', ')}` : '',
+    b.waitingOn?.length ? `waiting on ${b.waitingOn.join(', ')}` : '',
+    b.afterBaseline ? `added after baseline ${view.baseline}` : '',
     `${b.reqs} req, tests ${b.tests.pass} pass / ${b.tests.fail} fail / ${b.tests.unknown} unknown`,
   ].filter(Boolean)
   const parts = docSections(d.doc)

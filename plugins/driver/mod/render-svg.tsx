@@ -5,12 +5,15 @@ import type { DriverUi, DriverView } from '../types'
 
 export type SvgKit = Pick<Elements['desktop'], 'Box' | 'Text' | 'Svg'>
 
-/** The remote surfaces report the pane in cells of their code font; this is that font's advance, in CSS pixels. */
-export const PX_PER_COLUMN = 8
+/**
+ * The remote surfaces report the pane in cells of their code font; this is that cell in CSS pixels.
+ * Measured on the Desktop app (2026-11-11): a drawing sized at 8 left a ninth of the pane empty.
+ */
+export const PX_PER_COLUMN = 9
 
-/** The drawing's width: the pane's body less a small margin, never under 320px. */
+/** The drawing's width: the pane's body less a margin that absorbs a slightly narrower cell, never under 320px. */
 export function diagramWidth(bodyColumns: number): number {
-  return Math.max(320, bodyColumns * PX_PER_COLUMN - 8)
+  return Math.max(320, bodyColumns * PX_PER_COLUMN - 16)
 }
 
 const DEGRADED_NOTE: Record<string, string> = {

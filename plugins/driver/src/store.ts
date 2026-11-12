@@ -17,8 +17,8 @@ import {
 } from 'node:fs';
 import path from 'node:path';
 import { BLOCK_HEADINGS, sectionText } from './md-sections.js';
-import { OpRefusedError, applyOp, type Event, type Op, type OpContext } from './reducer.js';
-import { PlanV1Schema, emptyPlan, type PlanV1 } from './schema.js';
+import { OpRefusedError, applyOp, type Event, type Op, type OpContext, type OpResult } from './reducer.js';
+import { PlanV1Schema, comparePhase, emptyPlan, type PlanV1 } from './schema.js';
 
 export class LockTimeoutError extends Error {
   constructor(lockDir: string) {
@@ -285,6 +285,32 @@ export function readAllEvents(driverDir: string): Event[] {
   return [...rotatedLogs(driverDir).flatMap(parseLines), ...readEvents(driverDir)];
 }
 
+const BASELINE_CLOSER = { kind: 'hook', id: 'baseline-close' } as const;
+
+/**
+ * A plan that is past Route with baseline 1 still open (it predates the close at the end of Route) is closed
+ * once, before any other write: the ids come from the ledger (what existed when Implement started), or are all
+ * the ids there are when the ledger cannot say.
+ */
+function closeLegacyBaseline(driverDir: string, plan: PlanV1, now: string): OpResult | undefined {
+  if (comparePhase(plan.currentPhase, 'route') <= 0) return undefined;
+  if (plan.baselines.length !== 1 || plan.baselines[0]!.closedAt !== undefined) return undefined;
+  let added = Object.keys(plan.blocks);
+  let reqAdded = Object.keys(plan.requirements);
+  try {
+    const events = readAllEvents(driverDir);
+    const cut = events.findIndex((e) => e.type === 'phase.change' && e.to === 'implement');
+    if (cut >= 0) {
+      const before = events.slice(0, cut);
+      added = before.filter((e) => e.type === 'block.add' && e.block).map((e) => e.block!);
+      reqAdded = before.flatMap((e) => (e.type === 'req.add' && typeof e.data?.id === 'string' ? [e.data.id] : []));
+    }
+  } catch {
+    // an unreadable ledger cannot say: everything that exists counts as part of baseline 1
+  }
+  return applyOp(plan, { type: 'baseline.close', added, reqAdded, at: now }, { actor: BASELINE_CLOSER, now });
+}
+
 export interface MutateOptions {
   expectedRevision?: number;
   /** Also create requirements/<id>.md on req.add. */
@@ -349,14 +375,15 @@ export function mutate(driverDir: string, op: Op, ctx: OpContext, opts: MutateOp
       !(op.force && ctx.actor.kind === 'user')
     )
       checkHandoff(driverDir, op.id);
-    const r = applyOp(current, op, ctx);
+    const closed = closeLegacyBaseline(driverDir, current, ctx.now);
+    const r = applyOp(closed?.plan ?? current, op, ctx);
     const plan: PlanV1 = { ...r.plan, revision: current.revision + 1 };
     // Docs first: a crash leaves an unreferenced file, never a plan without its doc.
     writeDocs(driverDir, op, r.created, plan, opts);
     writePlan(driverDir, plan);
     const events = appendEvents(
       driverDir,
-      r.events.map((e) => ({ ...e, revision: plan.revision })),
+      [...(closed?.events ?? []), ...r.events].map((e) => ({ ...e, revision: plan.revision })),
     );
     if (op.type === 'release.add' && r.created) {
       // Ledger rotation (ADR-010 item 6); seq continues from the rotated file.
@@ -411,9 +438,10 @@ export function mutateMany(driverDir: string, ops: Op[], ctx: OpContext, opts: M
     const current = readPlan(driverDir);
     if (opts.expectedRevision !== undefined && current.revision !== opts.expectedRevision)
       throw new RevisionConflictError(opts.expectedRevision, current.revision);
-    let working = current;
+    const closed = closeLegacyBaseline(driverDir, current, ctx.now);
+    let working = closed?.plan ?? current;
     const created: string[] = [];
-    const events: Event[] = [];
+    const events: Event[] = [...(closed?.events ?? [])];
     const docs: { op: Op; id: string }[] = [];
     ops.forEach((raw, index) => {
       try {

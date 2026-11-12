@@ -3,7 +3,7 @@ import { CG, COLLAPSED_H, HBAND, LEG_ROW, LP, MAXR, MINW, NW, layout, legendRows
 import { PHASES } from '../src/shared/phases.js';
 import { project } from '../src/shared/view.js';
 import { loadExamplePlan, shuffleKeys } from './helpers.js';
-import { docBlock, docPlan, generatedPlan } from './shared-helpers.js';
+import { docBlock, docPlan, generatedPlan, loopedDoc } from './shared-helpers.js';
 
 const OPTS: LayoutOpts = { bodyColumns: 100, focus: 'auto', collapseDone: false, showRetired: false };
 
@@ -266,5 +266,27 @@ describe('vertical', () => {
   it('the legend wraps to two rows under 760px', () => {
     expect(legendRows(568)).toBe(2);
     expect(legendRows(1592)).toBe(1);
+  });
+});
+
+describe('the reopened phase', () => {
+  const V: LayoutOpts = { bodyColumns: 72, widthPx: 568, orientation: 'vertical', focus: 'auto', collapseDone: false, showRetired: false };
+
+  it('flags the phase that validate sent work back to, in both orientations', () => {
+    const view = project(loopedDoc());
+    for (const o of [V, { ...OPTS, orientation: 'horizontal' as const }]) {
+      const lanes = layout(view, o).lanes;
+      expect(lanes.filter((l) => l.reopened).map((l) => l.phase)).toEqual(['implement']);
+      expect(lanes.find((l) => l.phase === 'validate')).toMatchObject({ current: true, reopened: false });
+    }
+  });
+
+  it('keeps a reopened band open on auto focus even when it is far from the current phase', () => {
+    const view = project({ ...loopedDoc(), currentPhase: 'release' });
+    const lanes = layout(view, V).lanes;
+    expect(lanes.find((l) => l.phase === 'implement')).toMatchObject({ reopened: true, collapsed: false });
+    const calm = project({ ...loopedDoc(), blocks: { ...loopedDoc().blocks, 'B-004': { ...loopedDoc().blocks['B-004']!, status: 'done' }, 'B-006': { ...loopedDoc().blocks['B-006']!, status: 'done' }, 'B-009': { ...loopedDoc().blocks['B-009']!, status: 'done' } }, currentPhase: 'release' });
+    expect(layout(calm, V).lanes.some((l) => l.reopened)).toBe(false);
+    expect(layout(calm, V).lanes.find((l) => l.phase === 'implement')!.collapsed).toBe(true);
   });
 });

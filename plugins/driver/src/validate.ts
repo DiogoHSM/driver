@@ -158,6 +158,14 @@ export function validatePlan(plan: unknown, opts: ValidateOptions = {}): Issue[]
   }
 
   const activeBlocks = blockIds.filter((id) => isActive(p.blocks[id]!));
+  if (p.currentPhase === 'evolve' || p.currentPhase === 'release') {
+    const behind = activeBlocks.filter((id) => {
+      const b = p.blocks[id]!;
+      return (b.phase === 'implement' || b.phase === 'validate') && b.status !== 'done';
+    });
+    if (behind.length > 0)
+      add('warning', 'phases.openBehind', 'blocks', `currentPhase is ${p.currentPhase} but work is still open in implement or validate: ${behind.join(', ')}`);
+  }
   // Requirements may enter at any phase before release (gate.releaseIncomplete re-checks at Gate 2).
   const coverageLevel: Issue['level'] = p.currentPhase === 'release' ? 'error' : 'warning';
   for (const rid of reqIds) {

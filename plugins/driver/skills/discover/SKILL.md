@@ -4,7 +4,7 @@ description: Run the DRIVER Discover phase. A short interview about the product,
 user-invocable: true
 argument-hint: "[one-line project idea | amend <topic>]"
 disable-model-invocation: false
-allowed-tools: AskUserQuestion, Read, Write, Edit, Glob, Grep, Agent, Skill, Bash(driver *), mcp__driver__plan_ops, mcp__driver__set_block_state, mcp__driver__plan_status, mcp__driver__discover_log, mcp__driver__block_doc, mcp__driver__req_doc
+allowed-tools: AskUserQuestion, Read, Write, Edit, Glob, Grep, Agent, Skill, Bash(driver *), mcp__driver__plan_ops, mcp__driver__set_block_state, mcp__driver__plan_status, mcp__driver__discover_log, mcp__driver__block_doc, mcp__driver__req_doc, mcp__driver__backlog
 ---
 
 # Discover
@@ -214,10 +214,11 @@ On the user's next message (or when step 0.4 sends you here), call `plan_status`
 
 - **Resume**: step 0.4. Continue from the frontier.
 - **Amend** (phase past discover, or `amend <topic>`): a scoped interview on one topic, with the same log (new `Q-nn`, `A-nn`, `N-nn` are appended). The Discovery block is `done` and is never reopened. Instead:
-  1. Create a new block titled `Discovery amend: <topic>` with `block.add` (phase discover, no `dependsOn`) and put it `in_progress`. Look it up by title with `plan_status` `scope: "phase"` first, so a resumed amend does not create a second one. Log `meta.stage: "core"` and `meta.accepted: false`.
-  2. Run steps 3 to 9, scoped to that topic (core questions only about the topic; `summary.md` is rewritten after Reading it). New `req.add` ops only. To change an existing requirement, retire it with `req.retire` plus a `decision.add`, then add the new one. The existence check of step 9 applies.
-  3. Close the amend block exactly like the Discovery block: `addArtifacts`, `## Handoff`, `in_review`, verification, `done`.
-  4. Tell the user Route must re-plan (`/driver:route replan <reason>`). Gates stay as they are.
+  1. Read the backlog with `mcp__driver__backlog` (no items). If it has entries, offer them as the starting topics (with `amend` and no topic, or as suggestions next to the given one).
+  2. Create a new block titled `Discovery amend: <topic>` with `block.add` (phase discover, no `dependsOn`) and put it `in_progress`. Look it up by title with `plan_status` `scope: "phase"` first, so a resumed amend does not create a second one. Log `meta.stage: "core"` and `meta.accepted: false`.
+  3. Run steps 3 to 9, scoped to that topic (core questions only about the topic; `summary.md` is rewritten after Reading it). New `req.add` ops only. To change an existing requirement, retire it with `req.retire` plus a `decision.add`, then add the new one. The existence check of step 9 applies.
+  4. Close the amend block exactly like the Discovery block: `addArtifacts`, `## Handoff`, `in_review`, verification, `done`.
+  5. Tell the user Route must re-plan (`/driver:route replan <reason>`). Gates stay as they are.
 
 ## Red flags
 

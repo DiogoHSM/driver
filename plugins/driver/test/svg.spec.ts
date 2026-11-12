@@ -3,7 +3,7 @@ import { layout, type LayoutOpts } from '../src/shared/layout.js';
 import { renderSvgWithinBudget, svgAlt, toSvg, toSvgVertical } from '../src/shared/svg.js';
 import { project } from '../src/shared/view.js';
 import { loadExamplePlan } from './helpers.js';
-import { docBlock, docPlan, generatedPlan } from './shared-helpers.js';
+import { docBlock, docPlan, generatedPlan, loopedDoc } from './shared-helpers.js';
 
 const OPTS: LayoutOpts = { bodyColumns: 100, focus: 'auto', collapseDone: false, showRetired: false };
 
@@ -195,5 +195,55 @@ describe('control characters in titles', () => {
     // eslint-disable-next-line no-control-regex
     expect(s).not.toMatch(/[\x00-\x08\x0B\x0C\x0E-\x1F]/);
     expect(s).toContain('badtitle');
+  });
+});
+
+describe('after the baseline and the loop', () => {
+  const view = project(loopedDoc());
+  const V: LayoutOpts = { bodyColumns: 72, widthPx: 568, orientation: 'vertical', focus: 'auto', collapseDone: false, showRetired: false };
+  const nodeOf = (s: string, id: string): string => s.split('<g class="n ').find((g) => g.includes(`>${id}</text>`))!;
+
+  it('draws the + on the card that entered after the baseline, with a tooltip line, and lists it in the legend', () => {
+    for (const s of [toSvg(layout(view, V), view, { tooltips: 'full' }), toSvg(layout(view, { ...V, bodyColumns: 200, orientation: 'horizontal' }), view, { tooltips: 'full' })]) {
+      expect(nodeOf(s, 'B-009')).toContain('class="ab"');
+      expect(nodeOf(s, 'B-009')).toContain('added after baseline 1');
+      expect(nodeOf(s, 'B-003')).not.toContain('class="ab"');
+      expect(s.match(/class="ab"/g)).toHaveLength(1);
+      expect(s).toContain('+ added after baseline');
+    }
+  });
+
+  it('counts the + in the badge row, so the title is cut sooner and the glyphs do not overlap', () => {
+    const s = toSvg(layout(view, V), view, { tooltips: 'none' });
+    const title = (id: string) => /class="t"[^>]*>([^<]*)</.exec(nodeOf(s, id).slice(nodeOf(s, id).indexOf('class="t"') - 1))![1]!;
+    const plain = project({ ...loopedDoc(), baselines: undefined });
+    const p = toSvg(layout(plain, V), plain, { tooltips: 'none' });
+    const plainTitle = /class="t"[^>]*>([^<]*)</.exec(nodeOf(p, 'B-009').slice(nodeOf(p, 'B-009').indexOf('class="t"') - 1))![1]!;
+    expect(title('B-009').length).toBeLessThan(plainTitle.length);
+    expect(nodeOf(s, 'B-004')).toContain('class="bg"');
+  });
+
+  it('shows what a blocked card waits on in its tooltip', () => {
+    const s = toSvg(layout(view, V), view, { tooltips: 'full' });
+    expect(nodeOf(s, 'B-006')).toContain('waiting on: B-004');
+  });
+
+  it('frames the reopened band like the current one, labels it, and draws a single dashed arrow up to it', () => {
+    const s = toSvg(layout(view, V), view, { tooltips: 'full' });
+    expect(s).toContain('↺ reopened');
+    expect(s.match(/<rect class="l lc"/g)).toHaveLength(2);
+    expect(s.match(/<text class="h hc"/g)).toHaveLength(2);
+    expect(s.match(/<path class="eb" d="M\d+ \d+H\d+V\d+H\d+M\d+ \d+l8 -4v8z"\/>/g)).toHaveLength(1);
+    const calm = project(docPlan({ 'B-003': docBlock({ title: 'x', phase: 'implement', status: 'done' }) }, { currentPhase: 'validate' }));
+    const c = toSvg(layout(calm, V), calm, { tooltips: 'full' });
+    expect(c).not.toContain('↺ reopened');
+    expect(c).not.toMatch(/<path class="eb" d="M\d+ \d+H/);
+  });
+
+  it('keeps every coordinate inside the width and stays within the SVG budget', () => {
+    const r = renderSvgWithinBudget(view, V);
+    expect(r.degraded).toBe('none');
+    const xs = [...r.source.matchAll(/ x="(\d+)"/g)].map((m) => Number(m[1]));
+    expect(Math.max(...xs)).toBeLessThanOrEqual(r.width);
   });
 });

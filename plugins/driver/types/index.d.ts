@@ -39,6 +39,8 @@ export type DriverBlockView = {
   risk?: 'low' | 'medium' | 'high'
   retired: boolean
   since: string
+  afterBaseline?: boolean
+  waitingOn?: string[]
 }
 
 export type DriverGateView = { approved: boolean; by?: string; at?: string; via?: string; ticket?: string }
@@ -50,9 +52,14 @@ export type DriverView = {
   currentPhase: DriverPhase
   gates: Record<DriverGateName, DriverGateView>
   blocks: DriverBlockView[]
+  reqsAfterBaseline: number
+  openBehind: DriverPhase[]
+  latestBaseline?: { n: number; via?: string; ticket?: string }
 }
 
-export type DriverConfirm = { gate: DriverGateName; revision: number; baseline: number }
+export type DriverConfirm =
+  | { gate: DriverGateName; revision: number; baseline: number }
+  | { gate: 'baseline'; revision: number; baseline: number; added: { blocks: number; reqs: number } }
 
 export type DriverUi = {
   focus: 'auto' | 'all' | DriverPhase
@@ -63,7 +70,7 @@ export type DriverUi = {
   initName: string
   exportPath: string | null
   notice: string | null
-  /** ADR-015: the person switched the Implement autopilot on for this session. */
+  /** ADR-015, ADR-016: the person switched the Implement and Validate autopilot on for this session. */
   autopilot: boolean
 }
 

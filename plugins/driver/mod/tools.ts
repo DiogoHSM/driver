@@ -1,6 +1,6 @@
 import type { On } from 'claude-code'
 
-import { summarize, type BlockView } from '../src/shared/view.js'
+import { isResumable, summarize, type BlockView } from '../src/shared/view.js'
 import { project } from '../src/shared/view.js'
 import { refusal, runCli, type CliResult, type Dollar } from './cli.js'
 import { ensurePoller, forceTick, getAlerts, getPaths, readPlanFresh } from './state.js'
@@ -16,6 +16,7 @@ const DISCOVER_STATUSES = ['open', 'researching', 'settled', 'assumed', 'deferre
 const DISCOVER_SOURCES = ['user', 'research', 'assumed'] as const
 const MAX_OPS = 25
 const MAX_DOCS = 30
+const MAX_BACKLOG = 20
 const DOC_EXCERPT = 1500
 
 export async function registerTools($: Dollar): Promise<void> {
@@ -71,7 +72,7 @@ export async function registerTools($: Dollar): Promise<void> {
     isDeferred: false,
     description:
       'Read the DRIVER plan without running anything: phase, gates, counts, ready blocks (not started, dependencies done, ' +
-      'phase reached), blocks in progress with owners, blocked blocks with reasons. scope=phase lists one phase; scope=block ' +
+      'phase reached), blocks in progress with owners, blocked blocks with reasons, blocks in rework, resumable blocks, phases with open work behind the current one, and what was added after the baseline. scope=phase lists one phase; scope=block ' +
       'returns one block record and an excerpt of its document.',
     inputSchema: {
       type: 'object',
@@ -209,6 +210,37 @@ export async function registerTools($: Dollar): Promise<void> {
               reason: { type: 'string' },
               requirement: { type: 'string', description: 'R-nnn, filled after the exit batch' },
             },
+            additionalProperties: false,
+          },
+        },
+      },
+      additionalProperties: false,
+    },
+  })
+  await $.tool.register({
+    name: 'backlog',
+    isDeferred: false,
+    description:
+      'Record items for the next cycle silently and read them back. With items it appends 1..20 entries to backlog.jsonl and ' +
+      'regenerates backlog.md (never edit those by hand); each item takes a title and optionally a detail, an origin (what ' +
+      'surfaced it) and the decision (D-nnn) that deferred it. With no items it returns the current backlog. ' +
+      'Does not change the plan or its revision.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        items: {
+          type: 'array',
+          minItems: 1,
+          maxItems: MAX_BACKLOG,
+          items: {
+            type: 'object',
+            properties: {
+              title: { type: 'string' },
+              detail: { type: 'string' },
+              origin: { type: 'string', description: 'What surfaced it, e.g. validate/B-015.md' },
+              decision: { type: 'string', description: 'The decision that deferred it, e.g. D-007' },
+            },
+            required: ['title'],
             additionalProperties: false,
           },
         },
@@ -363,6 +395,25 @@ async function discoverLog($: Dollar, e: DiscoverLogInput & { agentId?: string }
   return ok(typeof text === 'string' ? text : r.stdout.trim())
 }
 
+interface BacklogInput {
+  items?: unknown
+}
+
+/** Goes through the CLI; reading is open to subagents, writing is the main session's. */
+async function backlog($: Dollar, e: BacklogInput & { agentId?: string }): Promise<Answer> {
+  const { items } = e
+  if (items === undefined) {
+    const r = await runCli($, ['backlog', 'show'], { actor: actorOf(e.agentId) })
+    return r.ok ? ok(r.stdout.trim()) : deny(refusal(r))
+  }
+  if (e.agentId !== undefined) return deny(SUBAGENT_REFUSAL)
+  if (!Array.isArray(items) || items.length < 1 || items.length > MAX_BACKLOG) return deny(`DRIVER refused: items must hold 1 to ${MAX_BACKLOG} entries`)
+  const r = await runCli($, ['backlog', 'add'], { stdin: JSON.stringify({ items }), actor: actorOf(e.agentId) })
+  if (!r.ok) return deny(refusal(r))
+  const text = (r.json as { text?: unknown } | undefined)?.text
+  return ok(typeof text === 'string' ? text : r.stdout.trim())
+}
+
 interface PlanStatusInput {
   scope?: unknown
   phase?: unknown
@@ -377,6 +428,8 @@ const brief = (b: BlockView) => ({
   ...(b.owner ? { owner: b.owner } : {}),
   ...(b.reason ? { reason: b.reason } : {}),
   deps: b.deps,
+  ...(b.afterBaseline ? { afterBaseline: true } : {}),
+  ...(b.waitingOn?.length ? { waitingOn: b.waitingOn } : {}),
 })
 
 /** Reads plan.json through $.fs only: this tool never spawns a process. */
@@ -388,6 +441,7 @@ async function planStatus($: Dollar, e: PlanStatusInput): Promise<Answer> {
   if (read.kind === 'bad') return deny(`DRIVER: ${read.message}`)
   const view = project(read.plan)
   const sum = summarize(view)
+  const byId = new Map(view.blocks.map((b) => [b.id, b]))
   const head = {
     project: view.project,
     revision: view.revision,
@@ -419,6 +473,11 @@ async function planStatus($: Dollar, e: PlanStatusInput): Promise<Answer> {
       ready: sum.ready,
       inProgress: sum.inProgress,
       blocked: sum.blocked,
+      rework: sum.rework,
+      resumable: view.blocks.filter((b) => !b.retired && isResumable(b, byId)).map((b) => b.id),
+      openBehind: view.openBehind,
+      afterBaseline: view.blocks.filter((b) => !b.retired && b.afterBaseline).map((b) => b.id),
+      reqsAfterBaseline: view.reqsAfterBaseline,
       ...(sum.nextGate ? { nextGate: sum.nextGate } : {}),
       approvals: (await getAlerts($)).length ? 'unverified' : 'trusted',
     }),
@@ -450,6 +509,11 @@ export function registerToolHooks(on: On): void {
     ensurePoller($)
     return discoverLog($, e as DiscoverLogInput & { agentId?: string })
   }).catch(($, e, next) => (next.called ? next(e) : { deny: 'DRIVER: discover_log failed unexpectedly' }))
+
+  on('tool.call', { tool: 'mcp__driver__backlog' }, async ($, e) => {
+    ensurePoller($)
+    return backlog($, e as BacklogInput & { agentId?: string })
+  }).catch(($, e, next) => (next.called ? next(e) : { deny: 'DRIVER: backlog failed unexpectedly' }))
 
   on('tool.call', { tool: 'mcp__driver__plan_status' }, async ($, e) => {
     ensurePoller($)

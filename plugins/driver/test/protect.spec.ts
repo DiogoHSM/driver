@@ -542,4 +542,50 @@ describe('protectCommand', () => {
   ])('allows: %s', (c) => {
     expect(protectCommand(c)).toBeNull();
   });
+
+  // PER-669 dogfooding: a read-only verb with a variable argument runs nothing user-only
+  it.each([
+    'cd /Users/diogo/Developer/Github/coffee-app && for b in B-015 B-016 B-017 B-018 B-021 B-022 B-023 B-024; do node /Users/diogo/Developer/Github/driver/plugins/driver/dist/cli.js status --block $b 2>&1 | head -12; echo; done',
+    'for b in B-015 B-016; do node /p/driver/plugins/driver/dist/cli.js status --block "$b"; done',
+    'node /p/dist/cli.js status --block $b',
+    'driver status --block $b',
+    'for b in B-015; do driver status --block ${b}; done',
+    'for d in a b; do driver validate $d --replay; done',
+    'for d in a b; do driver where --cwd $d; done',
+    'driver status --block $(echo B-001)',
+  ])('allows a read-only verb with a variable argument: %s', (c) => {
+    expect(protectCommand(c)).toBeNull();
+  });
+
+  it.each([
+    'for v in approve; do driver gate $v route; done',
+    'for g in release; do node /p/dist/cli.js gate approve $g; done',
+    'for f in --force; do driver block status B-001 done $f; done',
+    'for f in -f; do node /p/dist/cli.js block status B-001 done $f; done',
+    'for x in status; do driver $x; done',
+    'driver $verb --block B-001',
+    'for r in route; do driver rebaseline --reason $r; done',
+    'for r in x; do driver --root $r gate $r route; done',
+    'for u in user:me; do driver --actor $u block status B-001 done; done',
+    'for v in --via-mod; do driver gate approve route $v; done',
+    'driver status --block $(driver gate approve route)',
+    'driver status --block `driver rebaseline --reason x`',
+    'driver block status B-001 done $FORCE',
+    'driver --root $r status',
+    'for b in B-001; do driver status $b && driver gate $b route; done',
+  ])('still denies a variable that may hide a user-only verb: %s', (c) => {
+    expect(protectCommand(c)).toMatch(/user-only|variable|substitution/);
+  });
+
+  // review: a launcher runs whatever its first operand expands to, whatever verb follows
+  it.each([
+    'node $A driver status',
+    'npx $A driver status',
+    'bash $A driver status',
+    'node --flag $A /p/dist/cli.js status',
+    'node `echo x` driver status',
+    'for a in x; do node $a /p/dist/cli.js status --block B-001; done',
+  ])('denies a launcher whose first operand is opaque even before a read-only verb: %s', (c) => {
+    expect(protectCommand(c)).toMatch(/user-only|variable|substitution/);
+  });
 });

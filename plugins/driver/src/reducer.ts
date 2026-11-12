@@ -46,9 +46,11 @@ export type Op =
   | { type: 'gate.revoke'; gate: GateName; reason: string }
   | { type: 'phase.advance' }
   | { type: 'phase.back'; to: PhaseId; reason: string }
-  | { type: 'rebaseline'; decision?: string; reason: string; changed?: string[] }
+  | { type: 'rebaseline'; decision?: string; reason: string; changed?: string[]; via?: 'mod' | 'tty'; ticket?: string }
   | { type: 'release.add'; version: string; commit: string; blocks: string[] }
-  | { type: 'renumber' };
+  | { type: 'renumber' }
+  /** Internal: hook actor only, never parsed from user or model input. Closes a legacy baseline 1 that never was. */
+  | { type: 'baseline.close'; added: string[]; reqAdded: string[]; at: string };
 
 export type EventType =
   | 'block.status'
@@ -58,6 +60,7 @@ export type EventType =
   | 'gate.approve'
   | 'gate.revoke'
   | 'phase.change'
+  | 'baseline.close'
   | 'rebaseline'
   | 'release'
   | 'retire'
@@ -190,10 +193,24 @@ function registerDecision(d: Draft, id: string, title: string, reason?: string):
   };
 }
 
-function setPhase(d: Draft, to: PhaseId, reason?: string): void {
+function setPhase(d: Draft, to: PhaseId, reason?: string, data?: Record<string, unknown>): void {
   const from = d.plan.currentPhase;
   d.plan.currentPhase = to;
-  emit(d, { type: 'phase.change', from, to, ...(reason ? { reason } : {}) });
+  emit(d, { type: 'phase.change', from, to, ...(reason ? { reason } : {}), ...(data ? { data } : {}) });
+}
+
+/** Baseline 1 is open until Route ends: one entry, no `closedAt`. */
+const hasOpenBaseline = (plan: PlanV1): boolean => plan.baselines.length === 1 && plan.baselines[0]!.closedAt === undefined;
+
+/** Folds the ids into baseline 1 (the first entry) and stamps `closedAt`. Returns what was newly folded. */
+function closeBaseline(d: Draft, added: string[], reqAdded: string[], at: string): { added: string[]; reqAdded: string[] } {
+  const entry = d.plan.baselines[0]!;
+  const foldedBlocks = [...new Set(added)].filter((id) => !entry.added.includes(id)).sort();
+  const foldedReqs = [...new Set(reqAdded)].filter((id) => !entry.reqAdded.includes(id)).sort();
+  entry.added = [...entry.added, ...foldedBlocks];
+  entry.reqAdded = [...entry.reqAdded, ...foldedReqs];
+  entry.closedAt = at;
+  return { added: foldedBlocks, reqAdded: foldedReqs };
 }
 
 function handle(d: Draft, op: Op): void {
@@ -243,6 +260,16 @@ function handle(d: Draft, op: Op): void {
       const unknown = Object.keys(op.patch).filter((k) => !PATCH_KEYS.has(k));
       if (unknown.length > 0) return refuse(`block.set cannot change: ${unknown.join(', ')}`, true);
       const { addArtifacts, addTests, ...direct } = op.patch;
+      if (b.status === 'done' && direct.dependsOn !== undefined) {
+        const unfinished = direct.dependsOn.filter((dep) => {
+          const x = plan.blocks[dep];
+          return !b.dependsOn.includes(dep) && x !== undefined && !x.retired && x.status !== 'done';
+        });
+        if (unfinished.length > 0)
+          return refuse(
+            `${op.id} is done and cannot wait on unfinished work (${unfinished.join(', ')}); move it to needs_rework or add a new block`,
+          );
+      }
       const keys: string[] = [];
       for (const [k, v] of Object.entries(direct)) {
         if (v === undefined) continue;
@@ -355,6 +382,12 @@ function handle(d: Draft, op: Op): void {
       if (!to) return refuse('already at the last phase (release)');
       if (to === 'route' && !plan.gates.route.approved) return refuse('gate route is not approved');
       if (to === 'release' && !plan.gates.release.approved) return refuse('gate release is not approved');
+      if (to === 'implement' && hasOpenBaseline(d.plan)) {
+        // The plan the user confirmed at the end of Route is what baseline 1 holds.
+        const folded = closeBaseline(d, activeIds(d.plan.blocks), activeIds(d.plan.requirements), ctx.now);
+        setPhase(d, to, undefined, { baseline: 1, folded: folded.added, reqFolded: folded.reqAdded });
+        return;
+      }
       setPhase(d, to);
       return;
     }
@@ -393,11 +426,17 @@ function handle(d: Draft, op: Op): void {
         changed,
         reqAdded: activeIds(d.plan.requirements).filter((id) => !seenReqs.has(id)),
         reqRetired: retiredReqs.filter((id) => !seenReqRetired.has(id)).sort(),
+        ...(op.via ? { via: op.via } : {}),
+        ...(op.ticket ? { ticket: op.ticket } : {}),
       });
       for (const id of changed)
         if (d.plan.blocks[id]!.status !== 'not_started')
           transition(d, id, 'not_started', { reason: `rebaseline ${decision}`, rebaseline: true });
-      emit(d, { type: 'rebaseline', reason: op.reason, data: { n, decision, changed } });
+      emit(d, {
+        type: 'rebaseline',
+        reason: op.reason,
+        data: { n, decision, changed, ...(op.via ? { via: op.via } : {}), ...(op.ticket ? { ticket: op.ticket } : {}) },
+      });
       return;
     }
     case 'release.add': {
@@ -413,6 +452,18 @@ function handle(d: Draft, op: Op): void {
       });
       d.created = id;
       emit(d, { type: 'release', data: { id, version: op.version, commit: op.commit } });
+      return;
+    }
+    case 'baseline.close': {
+      if (ctx.actor.kind !== 'hook') return refuse('baseline.close is internal', true);
+      if (!hasOpenBaseline(d.plan)) return refuse('baseline.close needs exactly one baseline without closedAt');
+      const folded = closeBaseline(
+        d,
+        op.added.filter((id) => id in d.plan.blocks),
+        op.reqAdded.filter((id) => id in d.plan.requirements),
+        op.at,
+      );
+      emit(d, { type: 'baseline.close', data: { baseline: 1, folded: folded.added, reqFolded: folded.reqAdded, at: op.at } });
       return;
     }
     case 'renumber': {

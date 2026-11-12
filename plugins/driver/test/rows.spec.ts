@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { blockLine, docSections, paneRows, type Row, type RowsOpts } from '../src/shared/rows.js';
 import { project } from '../src/shared/view.js';
 import { loadExamplePlan } from './helpers.js';
-import { docBlock, docPlan } from './shared-helpers.js';
+import { docBlock, docPlan, loopedDoc } from './shared-helpers.js';
 
 const OPTS: RowsOpts = { bodyColumns: 72, rows: 40, focus: 'auto', collapseDone: false, showRetired: false };
 type BlockRow = Extract<Row, { kind: 'block' }>;
@@ -130,5 +130,32 @@ describe('docSections', () => {
     const doc = '---\nid: B-004\ntitle: "Signup API"\n---\n\n# B-004 Signup API\n\n## Spec\n\n## Notes\nSome note.\n\n## Handoff\n';
     expect(docSections(doc)).toEqual(['## Notes\n\nSome note.']);
     expect(docSections('---\nid: B-001\n---\n\n# B-001 X\n\n## Spec\n')).toEqual([]);
+  });
+});
+
+describe('after the baseline and the loop', () => {
+  const view = project(loopedDoc());
+  const rows = paneRows(view, { ...OPTS, focus: 'all' });
+  const phase = (p: string) => rows.find((r): r is Extract<Row, { kind: 'phase' }> => r.kind === 'phase' && r.phase === p)!;
+
+  it('marks the reopened phase and keeps it open on auto focus', () => {
+    expect(phase('implement')).toMatchObject({ current: false, reopened: true, text: '▾ IMPLEMENT  1/3 done  ↺ reopened' });
+    expect(phase('validate')).toMatchObject({ current: true, reopened: false, text: '▾ VALIDATE  0/1 done  ● current' });
+    const far = project({ ...loopedDoc(), currentPhase: 'evolve' });
+    const auto = paneRows(far, { ...OPTS, focus: 'auto' });
+    expect(auto.find((r) => r.kind === 'phase' && r.phase === 'implement')).toMatchObject({ open: true, reopened: true });
+  });
+
+  it('puts a + on the block that entered after the baseline and nowhere else', () => {
+    const by = Object.fromEntries(blocksOf(rows).map((r) => [r.id, r]));
+    expect(by['B-009']!.afterBaseline).toBe(true);
+    expect(blockLine(by['B-009']!).endsWith(' +')).toBe(true);
+    expect(by['B-003']!.afterBaseline).toBeUndefined();
+    expect(blockLine(by['B-003']!)).not.toContain(' +');
+    expect(blockLine(by['B-004']!)).toContain(' !');
+  });
+
+  it('carries what a blocked block waits on', () => {
+    expect(blocksOf(rows).find((r) => r.id === 'B-006')!.waitingOn).toEqual(['B-004']);
   });
 });

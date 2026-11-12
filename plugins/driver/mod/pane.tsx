@@ -2,11 +2,12 @@ import type { Elements, On } from 'claude-code'
 
 import { PHASES, STATUS_LABEL } from '../src/shared/phases.js'
 import { paneRows } from '../src/shared/rows.js'
+import { baselineText, sinceBaseline } from '../src/shared/view.js'
 import type { DriverDetail, DriverGateName, DriverLoad, DriverPaths, DriverUi, DriverView } from '../types'
-import { approveViaMod } from './approve.js'
-import { setAutopilot } from './autopilot.js'
+import { approveViaMod, rebaselineViaMod } from './approve.js'
+import { isAutopilotPhase, setAutopilot } from './autopilot.js'
 import { type Dollar } from './cli.js'
-import { exportMermaid, initPlan } from './command.js'
+import { baselineReason, exportMermaid, initPlan } from './command.js'
 import { advanceAndKickoff, afterApproval, kickoff, nextStep, primaryAction, type Primary } from './next.js'
 import { boardDetail, boardHeader, boardView, type BoardKit } from './render-board.js'
 import { diagramView, type SvgKit } from './render-svg.js'
@@ -61,6 +62,13 @@ function actionsOf($: Dollar) {
   const askApprove = async (gate: DriverGateName) => {
     const view = await getView($)
     if (view) await setUi($, { confirm: { gate, revision: view.revision, baseline: view.baseline }, notice: null })
+  }
+  const askBaseline = async () => {
+    const view = await getView($)
+    if (!view) return
+    const added = sinceBaseline(view)
+    if (added.blocks + added.reqs === 0) return
+    await setUi($, { confirm: { gate: 'baseline', revision: view.revision, baseline: view.baseline, added }, notice: null })
   }
   return {
     setFocus: (f: DriverUi['focus']) => setUi($, { focus: f, notice: null }),
@@ -123,6 +131,7 @@ function actionsOf($: Dollar) {
     },
     retry: () => forceTick($),
     askApprove,
+    askBaseline,
     cancelApprove: () => setUi($, { confirm: null }),
     // A press is person-initiated, so this is the one pane path to approval.
     confirmApprove: async () => {
@@ -130,6 +139,12 @@ function actionsOf($: Dollar) {
       const c = ui.confirm
       if (!c) return
       await setUi($, { confirm: null })
+      if (c.gate === 'baseline') {
+        const done = await rebaselineViaMod($, baselineReason(c.baseline, c.added, 'the DRIVER pane'), c.revision)
+        await setNotice($, done.ok ? null : done.message)
+        $.ui.toast(done.message)
+        return
+      }
       const before = await getView($)
       const r = await approveViaMod($, c.gate, c.revision)
       await setNotice($, r.ok ? null : r.message)
@@ -156,6 +171,18 @@ const FOCUS_OPTIONS = [
 
 export { primaryAction }
 
+/** The baseline button shows in evolve once something was added after the baseline. */
+function baselineButton(kit: Kit, view: DriverView, a: Actions, isSecondary: boolean) {
+  const added = sinceBaseline(view)
+  if (view.currentPhase !== 'evolve' || added.blocks + added.reqs === 0) return null
+  const { Button } = kit
+  return (
+    <Button key="baseline" {...(isSecondary ? { variant: 'secondary' as const } : {})} onPress={() => a.askBaseline()}>
+      {`Confirm baseline ${view.baseline + 1}`}
+    </Button>
+  )
+}
+
 function headerView(kit: Kit, s: Snapshot) {
   const { Box, Text } = kit
   const view = s.view
@@ -166,7 +193,7 @@ function headerView(kit: Kit, s: Snapshot) {
   }
   return (
     <Box flexDirection="column">
-      <Text bold>{`DRIVER · ${view.project} · phase ${view.currentPhase} · rev ${view.revision} · baseline ${view.baseline}`}</Text>
+      <Text bold>{`DRIVER · ${view.project} · phase ${view.currentPhase} · rev ${view.revision} · ${baselineText(view)}`}</Text>
       <Text dimColor>{`${gate('route')}   ${gate('release')}`}</Text>
     </Box>
   )
@@ -209,6 +236,7 @@ function toolbar(kit: RichKit, s: Snapshot, a: Actions, canSelect: boolean, draw
   const Select = canSelect ? kit.Select : undefined
   const primary = primaryAction(view)
   const picker = canSelect && drawn ? blockPicker(kit, s, a, drawn) : null
+  const baseline = baselineButton(kit, view, a, true)
   return (
     <Box flexDirection="column" gap="xs">
       <Box flexDirection="row" alignItems="center" flexWrap="wrap" gap="sm">
@@ -227,16 +255,17 @@ function toolbar(kit: RichKit, s: Snapshot, a: Actions, canSelect: boolean, draw
           {s.ui.showRetired ? 'Hide retired' : 'Show retired'}
         </Button>
       </Box>
-      {(picker || primary) && (
+      {(picker || primary || baseline) && (
         <Box flexDirection="row" alignItems="center" flexWrap="wrap" gap="sm">
           {picker && <Text dimColor>Open</Text>}
           {picker}
           <Box flexGrow={1} />
-          {view.currentPhase === 'implement' && (
+          {isAutopilotPhase(view.currentPhase) && (
             <Button key="autopilot" variant="secondary" onPress={() => a.toggleAutopilot()}>
               {s.ui.autopilot ? 'Autopilot: on' : 'Autopilot: off'}
             </Button>
           )}
+          {baseline}
           {primary && (
             <Button key="action" hotkey="g" variant="primary" onPress={() => a.primary(primary)}>
               {primary.label}
@@ -254,6 +283,7 @@ function controls(kit: RichKit, s: Snapshot, a: Actions, canSelect: boolean) {
   if (!view) return null
   const Select = canSelect ? kit.Select : undefined
   const primary = primaryAction(view)
+  const baseline = baselineButton(kit, view, a, false)
   return (
     <Box flexDirection="row" flexWrap="wrap" gap={1}>
       {Select ? (
@@ -272,11 +302,12 @@ function controls(kit: RichKit, s: Snapshot, a: Actions, canSelect: boolean) {
       <Button key="export" onPress={() => a.exportPlan()}>
         Export Mermaid
       </Button>
-      {view.currentPhase === 'implement' && (
+      {isAutopilotPhase(view.currentPhase) && (
         <Button key="autopilot" onPress={() => a.toggleAutopilot()}>
           {s.ui.autopilot ? 'Autopilot: on' : 'Autopilot: off'}
         </Button>
       )}
+      {baseline}
       {primary && (
         <Button key="action" hotkey="g" variant="primary" onPress={() => a.primary(primary)}>
           {primary.label}
@@ -290,7 +321,7 @@ function notices(kit: Kit, s: Snapshot, a: Actions, surface: string) {
   const { Box, Text, Button } = kit
   return (
     <Box flexDirection="column">
-      {s.view && !s.ui.confirm && <Text key="next">{s.ui.autopilot ? 'Autopilot is on: Claude keeps Implement going until it is done, a block needs you, or you switch it off.' : nextStep(s.view)}</Text>}
+      {s.view && !s.ui.confirm && <Text key="next">{s.ui.autopilot ? 'Autopilot is on: Claude keeps Implement and Validate going until both are done, a block needs you, or you switch it off.' : nextStep(s.view)}</Text>}
       {s.ui.notice && <Text color="yellow">{s.ui.notice}</Text>}
       {s.ui.exportPath && (
         <Box flexDirection="row" gap={1}>
@@ -308,12 +339,21 @@ function confirmView(kit: Kit, s: Snapshot, a: Actions) {
   const { Box, Text, Button } = kit
   const c = s.ui.confirm
   if (!c) return null
+  const isBaseline = c.gate === 'baseline'
+  const text =
+    c.gate === 'baseline'
+      ? `Confirm baseline ${c.baseline + 1}: records the ${c.added.blocks} block${c.added.blocks === 1 ? '' : 's'} and ${c.added.reqs} requirement${c.added.reqs === 1 ? '' : 's'} added since baseline ${c.baseline}. ${
+          s.view?.gates.release.approved
+            ? 'This revokes the release approval, which then has to be given again.'
+            : 'This does not approve the release.'
+        }`
+      : `Approve ${c.gate} gate at revision ${c.revision} (baseline ${c.baseline}) and start ${c.gate}?`
   return (
     <Box flexDirection="column">
-      <Text color="yellow">{`Approve ${c.gate} gate at revision ${c.revision} (baseline ${c.baseline}) and start ${c.gate}?`}</Text>
+      <Text color="yellow">{text}</Text>
       <Box flexDirection="row" gap={1}>
         <Button key="confirm-yes" variant="primary" onPress={() => a.confirmApprove()}>
-          Approve and start
+          {isBaseline ? `Confirm baseline ${c.baseline + 1}` : 'Approve and start'}
         </Button>
         <Button key="confirm-no" hotkey="n" onPress={() => a.cancelApprove()}>
           Cancel
@@ -332,6 +372,8 @@ function detailView(kit: Kit, s: Snapshot, a: Actions) {
     `${STATUS_LABEL[b.status]} since ${b.since}`,
     b.owner ? `owner ${b.owner}` : '',
     b.deps.length ? `depends on ${b.deps.join(', ')}` : '',
+    b.waitingOn?.length ? `waiting on ${b.waitingOn.join(', ')}` : '',
+    b.afterBaseline ? `added after baseline ${s.view?.baseline}` : '',
     `${b.reqs} req, tests ${b.tests.pass} pass / ${b.tests.fail} fail / ${b.tests.unknown} unknown`,
   ].filter(Boolean)
   return (

@@ -49,3 +49,25 @@
 {"seq":49,"ts":"2026-11-10T18:21:32.526Z","revision":43,"actor":{"kind":"model","id":"main"},"type":"decision.add","data":{"id":"D-002","title":"Dependências só por artefato real: B-006 e B-007 em paralelo"}}
 {"seq":50,"ts":"2026-11-10T18:21:32.526Z","revision":43,"actor":{"kind":"model","id":"main"},"type":"block.set","block":"B-007","data":{"fields":["dependsOn"]}}
 {"seq":51,"ts":"2026-11-10T18:21:32.526Z","revision":43,"actor":{"kind":"model","id":"main"},"type":"block.set","block":"B-009","data":{"fields":["dependsOn"]}}
+{"seq":52,"ts":"2026-11-12T01:14:56.245Z","revision":44,"actor":{"kind":"model","id":"main"},"type":"decision.add","data":{"id":"D-003","title":"ADR-016: mudança depois do gate passa por triagem em três níveis; baseline sugerido no Evolve; piloto no laço Validate e Implement"}}
+{"seq":53,"ts":"2026-11-12T01:20:52.606Z","revision":45,"actor":{"kind":"model","id":"main"},"type":"block.add","block":"B-013","data":{"phase":"implement","title":"Motor e painel do ADR-016"}}
+{"seq":54,"ts":"2026-11-12T01:20:52.606Z","revision":45,"actor":{"kind":"model","id":"main"},"type":"block.add","block":"B-014","data":{"phase":"implement","title":"Skills Evolve e Release"}}
+{"seq":55,"ts":"2026-11-12T01:20:52.606Z","revision":45,"actor":{"kind":"model","id":"main"},"type":"block.set","block":"B-006","data":{"fields":["dependsOn","title"]}}
+{"seq":56,"ts":"2026-11-12T01:20:52.606Z","revision":45,"actor":{"kind":"model","id":"main"},"type":"block.set","block":"B-009","data":{"fields":["dependsOn"]}}
+{"seq":57,"ts":"2026-11-12T01:20:52.606Z","revision":45,"actor":{"kind":"model","id":"main"},"type":"decision.add","data":{"id":"D-004","title":"B-006 dividido em três blocos (ajuste de nível 2 do ADR-016, mesmo requisito R-001)"}}
+{"seq":58,"ts":"2026-11-12T01:21:30.405Z","revision":46,"actor":{"kind":"model","id":"main"},"type":"block.status","block":"B-013","from":"not_started","to":"in_progress"}
+{"seq":59,"ts":"2026-11-12T01:45:06.772Z","revision":47,"actor":{"kind":"model","id":"main"},"type":"block.set","block":"B-013","data":{"fields":["artifacts","tests"]}}
+{"seq":60,"ts":"2026-11-12T01:45:13.044Z","revision":48,"actor":{"kind":"model","id":"main"},"type":"block.status","block":"B-013","from":"in_progress","to":"in_review"}
+{"seq":61,"ts":"2026-11-12T01:54:30.054Z","revision":49,"actor":{"kind":"model","id":"main"},"type":"block.status","block":"B-013","from":"in_review","to":"needs_rework","reason":"Revisão adversarial (opus): baseline 1 fecha antes de o Route criar os blocos, então todo bloco sairia marcado como posterior; mais 8 achados menores (guard, retomável, spawn, piloto na fronteira, forja de rebaseline)"}
+{"seq":62,"ts":"2026-11-12T01:54:32.093Z","revision":50,"actor":{"kind":"model","id":"main"},"type":"block.status","block":"B-013","from":"needs_rework","to":"in_progress"}
+{"seq":63,"ts":"2026-11-12T02:04:33.308Z","revision":51,"actor":{"kind":"hook","id":"baseline-close"},"type":"baseline.close","data":{"at":"2026-11-12T02:04:33.308Z","baseline":1,"folded":[],"reqFolded":[]}}
+{"seq":64,"ts":"2026-11-12T02:04:33.308Z","revision":51,"actor":{"kind":"model","id":"main"},"type":"block.set","block":"B-013","data":{"fields":["tests"]}}
+{"seq":65,"ts":"2026-11-12T02:04:34.940Z","revision":52,"actor":{"kind":"model","id":"main"},"type":"block.status","block":"B-013","from":"in_progress","to":"in_review"}
+{"seq":66,"ts":"2026-11-12T15:39:49.286Z","revision":53,"actor":{"kind":"model","id":"main"},"type":"block.set","block":"B-013","data":{"fields":["tests","verification"]}}
+{"seq":67,"ts":"2026-11-12T15:39:52.216Z","revision":54,"actor":{"kind":"model","id":"main"},"type":"block.status","block":"B-013","from":"in_review","to":"done"}
+{"seq":68,"ts":"2026-11-12T15:40:11.081Z","revision":55,"actor":{"kind":"model","id":"main"},"type":"block.status","block":"B-005","from":"in_progress","to":"in_review"}
+{"seq":69,"ts":"2026-11-12T15:40:14.042Z","revision":56,"actor":{"kind":"model","id":"main"},"type":"block.set","block":"B-005","data":{"fields":["tests","verification"]}}
+{"seq":70,"ts":"2026-11-12T15:40:16.354Z","revision":57,"actor":{"kind":"model","id":"main"},"type":"block.status","block":"B-005","from":"in_review","to":"done"}
+{"seq":71,"ts":"2026-11-12T15:40:16.858Z","revision":58,"actor":{"kind":"model","id":"main"},"type":"block.status","block":"B-006","from":"not_started","to":"in_progress"}
+{"seq":72,"ts":"2026-11-12T15:56:38.846Z","revision":59,"actor":{"kind":"model","id":"main"},"type":"block.set","block":"B-006","data":{"fields":["artifacts","tests"]}}
+{"seq":73,"ts":"2026-11-12T15:56:41.550Z","revision":60,"actor":{"kind":"model","id":"main"},"type":"block.status","block":"B-006","from":"in_progress","to":"in_review"}

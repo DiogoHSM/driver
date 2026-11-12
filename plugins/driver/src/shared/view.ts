@@ -15,6 +15,10 @@ export interface BlockView {
   risk?: 'low' | 'medium' | 'high';
   retired: boolean;
   since: string;
+  /** True when the block entered the plan after the current baseline was confirmed. */
+  afterBaseline?: boolean;
+  /** For a blocked block: dependencies that are not done yet (retired ones do not count). */
+  waitingOn?: string[];
 }
 
 export interface GateView {
@@ -33,6 +37,41 @@ export interface PlanView {
   currentPhase: PhaseId;
   gates: Record<GateName, GateView>;
   blocks: BlockView[];
+  /** Non-retired requirements that entered after the current baseline (0 at baseline 0). */
+  reqsAfterBaseline: number;
+  /** Phases before the current one that still hold unfinished work (validate onward only). */
+  openBehind: PhaseId[];
+  /** The latest baseline entry, with how it was confirmed when that was recorded. */
+  latestBaseline?: { n: number; via?: string; ticket?: string };
+}
+
+/** Only the loop phases are ever reported as left open behind the current one. */
+const LOOP_PHASES: readonly PhaseId[] = ['implement', 'validate'];
+
+/** What entered the plan after the current baseline: non-retired blocks and requirements. */
+export function sinceBaseline(view: Pick<PlanView, 'blocks' | 'reqsAfterBaseline'>): { blocks: number; reqs: number } {
+  return { blocks: view.blocks.filter((b) => b.afterBaseline && !b.retired).length, reqs: view.reqsAfterBaseline ?? 0 };
+}
+
+/** `baseline 1`, or `baseline 1 · +4 since` when blocks or requirements entered after it. */
+export function baselineText(view: Pick<PlanView, 'baseline' | 'blocks' | 'reqsAfterBaseline'>): string {
+  const n = sinceBaseline(view);
+  const added = n.blocks + n.reqs;
+  return added > 0 ? `baseline ${view.baseline} · +${added} since` : `baseline ${view.baseline}`;
+}
+
+const WAITING_ON = /^waiting on (B-\d+)\b/i;
+
+/**
+ * A blocked block can be picked up again only when it was blocked for a named dependency
+ * ("waiting on B-012"), that block is one of its dependencies, and it is done now. A block held by
+ * a credential or by the person also has its dependencies done, and a reason that merely mentions
+ * a block ("needed by B-005") is not a wait.
+ */
+export function isResumable(b: Pick<BlockView, 'status' | 'reason' | 'deps'>, byId: ReadonlyMap<string, Pick<BlockView, 'status'>>): boolean {
+  if (b.status !== 'blocked') return false;
+  const named = WAITING_ON.exec(b.reason ?? '')?.[1]?.toUpperCase();
+  return named !== undefined && b.deps.includes(named) && byId.get(named)?.status === 'done';
 }
 
 /** Numeric-aware id order (B-9 < B-10), stable for any key order of the input. */
@@ -54,12 +93,31 @@ function gateView(g: PlanDoc['gates']['route'] | undefined): GateView {
 }
 
 export function project(plan: PlanDoc): PlanView {
+  const baselines = plan.baselines ?? [];
+  const inBaseline = new Set<string>();
+  const reqInBaseline = new Set<string>();
+  for (const bl of baselines) {
+    for (const id of bl.added ?? []) inBaseline.add(id);
+    for (const id of bl.reqAdded ?? []) reqInBaseline.add(id);
+  }
+  // Baseline 1 stays open until Route ends: a lone entry without closedAt cannot say what came after it.
+  const unclosed = baselines.length === 1 && baselines[0]!.closedAt === undefined;
+  const marking = plan.baseline >= 1 && plan.baselines !== undefined && !unclosed;
   const blocks: BlockView[] = Object.keys(plan.blocks)
     .sort(compareIds)
     .map((id) => {
       const b = plan.blocks[id]!;
       const tests = { pass: 0, fail: 0, unknown: 0 };
       for (const t of b.tests ?? []) if (t.result in tests) tests[t.result]++;
+      const waiting =
+        b.status === 'blocked'
+          ? [...(b.dependsOn ?? [])]
+              .filter((d) => {
+                const dep = plan.blocks[d];
+                return !!dep && !dep.retired && dep.status !== 'done';
+              })
+              .sort(compareIds)
+          : [];
       return {
         id,
         title: b.title,
@@ -74,8 +132,21 @@ export function project(plan: PlanDoc): PlanView {
         ...(b.risk ? { risk: b.risk } : {}),
         retired: !!b.retired,
         since: b.statusSince,
+        ...(marking && !inBaseline.has(id) ? { afterBaseline: true } : {}),
+        ...(waiting.length ? { waitingOn: waiting } : {}),
       };
     });
+  const cur = phaseIndex(plan.currentPhase);
+  const openBehind: PhaseId[] =
+    cur < phaseIndex('validate')
+      ? []
+      : LOOP_PHASES.filter(
+          (ph) => phaseIndex(ph) < cur && blocks.some((b) => b.phase === ph && !b.retired && b.status !== 'done'),
+        );
+  const reqsAfterBaseline = marking
+    ? Object.entries(plan.requirements ?? {}).filter(([id, r]) => !r.retired && !reqInBaseline.has(id)).length
+    : 0;
+  const latest = baselines[baselines.length - 1];
   return {
     project: plan.project?.name ?? '',
     revision: plan.revision,
@@ -83,6 +154,11 @@ export function project(plan: PlanDoc): PlanView {
     currentPhase: plan.currentPhase,
     gates: { route: gateView(plan.gates?.route), release: gateView(plan.gates?.release) },
     blocks,
+    reqsAfterBaseline,
+    openBehind,
+    ...(latest
+      ? { latestBaseline: { n: latest.n, ...(latest.via ? { via: latest.via } : {}), ...(latest.ticket ? { ticket: latest.ticket } : {}) } }
+      : {}),
   };
 }
 
@@ -119,6 +195,8 @@ export function shapeCheck(raw: unknown): { ok: true; plan: PlanDoc } | { ok: fa
 export interface Summary {
   counts: Record<BlockStatus, number>;
   ready: string[];
+  rework: string[];
+  resumable: string[];
   inProgress: { id: string; owner?: string }[];
   blocked: { id: string; reason?: string }[];
   nextGate?: GateName;
@@ -137,6 +215,10 @@ export function summarize(view: PlanView): Summary {
   const nextGate: GateName | undefined = !view.gates.route.approved ? 'route' : !view.gates.release.approved ? 'release' : undefined;
   return {
     counts,
+    rework: active.filter((b) => b.status === 'needs_rework' && phaseIndex(b.phase) <= cur).map((b) => b.id),
+    resumable: active
+      .filter((b) => b.status === 'blocked' && b.deps.length > 0 && b.deps.every(depMet))
+      .map((b) => b.id),
     ready: active.filter((b) => b.status === 'not_started' && phaseIndex(b.phase) <= cur && b.deps.every(depMet)).map((b) => b.id),
     inProgress: active.filter((b) => b.status === 'in_progress').map((b) => ({ id: b.id, ...(b.owner ? { owner: b.owner } : {}) })),
     blocked: active.filter((b) => b.status === 'blocked').map((b) => ({ id: b.id, ...(b.reason ? { reason: b.reason } : {}) })),

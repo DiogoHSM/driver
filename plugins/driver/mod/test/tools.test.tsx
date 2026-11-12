@@ -95,6 +95,8 @@ test('plan_status reads the plan without spawning anything', async ($, on) => {
   const summary = JSON.parse(String((await callTool($, { tool: TOOL('plan_status') })).result))
   expect(summary).toMatchObject({ revision: 34, currentPhase: 'implement', nextGate: 'release' })
   expect(summary.blocked).toEqual([{ id: 'B-005', reason: expect.stringContaining('RESEND_API_KEY') }])
+  expect(summary).toMatchObject({ rework: [], resumable: [], openBehind: [], reqsAfterBaseline: expect.any(Number) })
+  expect(Array.isArray(summary.afterBaseline)).toBe(true)
   const phase = JSON.parse(String((await callTool($, { tool: TOOL('plan_status'), scope: 'phase', phase: 'implement' })).result))
   expect(phase.blocks.map((b: { id: string }) => b.id)).toEqual(['B-003', 'B-004', 'B-005'])
   const block = JSON.parse(String((await callTool($, { tool: TOOL('plan_status'), scope: 'block', block: 'B-004' })).result))
@@ -216,4 +218,55 @@ test('a subagent may not write the plan, but may read it', async ($, on) => {
 
   // the main session (no agentId) is unaffected
   expect((await callTool($, { tool: TOOL('plan_ops'), ops: [{ op: 'phase.advance' }] })).result).toBe('ok rev 40')
+})
+
+test('backlog sends the items on stdin to backlog add, and reads with backlog show', async ($, on) => {
+  const w = world(on, { [PLAN_FILE]: WAITLIST_PLAN })
+  const text = 'ok; created L-01\nbacklog: 1 item'
+  const shown = { ok: true, exists: true, count: 1, entries: [{ id: 'L-01', title: 'Dark mode', at: '2026-11-11T10:00:00Z' }] }
+  w.cli = (args) =>
+    args[0] === 'where'
+      ? whereReply()
+      : args[0] === 'backlog' && args[1] === 'add'
+        ? { stdout: JSON.stringify({ ok: true, text }) }
+        : args[0] === 'backlog' && args[1] === 'show'
+          ? { stdout: JSON.stringify(shown) }
+          : {}
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  mock.clock(on)
+  await $.session.start({ cwd: ROOT, surface: 'terminal', isInteractive: true })
+
+  const items = [{ title: 'Dark mode', origin: 'validate/B-006.md', decision: 'D-005' }]
+  const r = await callTool($, { tool: TOOL('backlog'), items })
+  expect(r.result).toBe(text)
+  const add = w.cliRuns().find((x) => x.args[0] === 'backlog' && x.args[1] === 'add')!
+  expect(JSON.parse(add.stdin!)).toEqual({ items })
+  expect(add.actor).toBe('model:main')
+
+  const read = await callTool($, { tool: TOOL('backlog') })
+  expect(JSON.parse(String(read.result))).toEqual(shown)
+  const show = w.cliRuns().find((x) => x.args[1] === 'show')!
+  expect(show.args).toEqual(['backlog', 'show'])
+  expect(show.full).toContain('--json')
+  expect(show.stdin).toBeUndefined()
+
+  const before = w.cliRuns().length
+  expect((await callTool($, { tool: TOOL('backlog'), items: 'x' })).deny).toContain('items must hold 1 to 20 entries')
+  expect((await callTool($, { tool: TOOL('backlog'), items: [] })).deny).toContain('items must hold 1 to 20 entries')
+  expect((await callTool($, { tool: TOOL('backlog'), items: Array.from({ length: 21 }, () => ({ title: 't' })) })).deny).toContain('items must hold 1 to 20 entries')
+  expect(w.cliRuns().length).toBe(before)
+})
+
+test('a subagent may read the backlog but not write to it', async ($, on) => {
+  const w = world(on, { [PLAN_FILE]: WAITLIST_PLAN })
+  w.cli = (args) => (args[0] === 'where' ? whereReply() : { stdout: JSON.stringify({ ok: true, exists: false, count: 0, entries: [] }) })
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  mock.clock(on)
+  await $.session.start({ cwd: ROOT, surface: 'terminal', isInteractive: true })
+  const before = w.cliRuns().length
+
+  expect((await callTool($, { agentId: 'sub-1', tool: TOOL('backlog'), items: [{ title: 'x' }] })).deny).toBe(SUBAGENT)
+  expect(w.cliRuns().length).toBe(before)
+  expect((await callTool($, { agentId: 'sub-1', tool: TOOL('backlog') })).result).toContain('"count":0')
+  expect(w.cliRuns().find((x) => x.args[0] === 'backlog')?.actor).toBe('model:sub-1')
 })

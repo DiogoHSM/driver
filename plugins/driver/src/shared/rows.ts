@@ -3,7 +3,7 @@ import type { GateName } from './plan-doc.js';
 import { compareIds, type BlockView, type PlanView } from './view.js';
 
 export type Row =
-  | { kind: 'phase'; phase: PhaseId; text: string; current: boolean; open: boolean; expandable: boolean; done: number; total: number; attention: number }
+  | { kind: 'phase'; phase: PhaseId; text: string; current: boolean; reopened: boolean; open: boolean; expandable: boolean; done: number; total: number; attention: number }
   | { kind: 'gate'; gate: GateName; text: string; approved: boolean; by?: string }
   | {
       kind: 'block';
@@ -20,6 +20,10 @@ export type Row =
       unmet: string[];
       risk?: 'low' | 'medium' | 'high';
       retired: boolean;
+      /** The block entered the plan after the current baseline. */
+      afterBaseline?: true;
+      /** For a blocked block: dependencies that are not done yet. */
+      waitingOn?: string[];
     }
   | { kind: 'agg'; phase: PhaseId; count: number; text: string }
   | { kind: 'more'; text: string };
@@ -47,7 +51,7 @@ export const depsText = (unmet: string[]): string =>
 
 /** The text of a block row as drawn: indent, glyph, id, title, owner, pending dependencies. */
 export function blockLine(r: Extract<Row, { kind: 'block' }>): string {
-  const flag = (r.status === 'blocked' || r.status === 'needs_rework' ? ' !' : '') + (r.risk === 'high' ? ' ▲' : '');
+  const flag = (r.status === 'blocked' || r.status === 'needs_rework' ? ' !' : '') + (r.risk === 'high' ? ' ▲' : '') + (r.afterBaseline ? ' +' : '');
   return `${'  '.repeat(r.depth)}${STATUS_GLYPH[r.status]} ${r.id}  ${r.retired ? '(retired) ' : ''}${r.title}${r.owner ? `  ${ownerLabel(r.owner)}` : ''}${depsText(r.unmet)}${flag}`;
 }
 
@@ -81,11 +85,12 @@ export function paneRows(view: PlanView, opts: RowsOpts): Row[] {
   };
 
   const cur = phaseIndex(view.currentPhase);
+  const reopenedSet = new Set<PhaseId>(view.openBehind ?? []);
   const collapsible = (b: BlockView): boolean => opts.collapseDone && b.status === 'done' && !b.retired && b.id !== opts.selected;
   const wanted = (p: PhaseId): boolean => {
     if (opts.focus === 'all') return true;
     if (opts.focus !== 'auto') return opts.focus === p;
-    return Math.abs(phaseIndex(p) - cur) <= 1;
+    return Math.abs(phaseIndex(p) - cur) <= 1 || reopenedSet.has(p);
   };
 
   const out: Row[] = [];
@@ -103,13 +108,15 @@ export function paneRows(view: PlanView, opts: RowsOpts): Row[] {
     const allDone = inPhase.length > 0 && inPhase.every(collapsible);
     const isOpen = inPhase.length > 0 && wanted(p) && !(allDone && opts.focus !== p);
     const attention = inPhase.filter((b) => b.status === 'blocked' || b.status === 'needs_rework').length;
-    const tail = `${current ? '  ● current' : ''}${!isOpen && attention ? `  ! ${attention}` : ''}`;
+    const reopened = reopenedSet.has(p);
+    const tail = `${current ? '  ● current' : ''}${reopened ? '  ↺ reopened' : ''}${!isOpen && attention ? `  ! ${attention}` : ''}`;
     if (current) currentAt = out.length;
     out.push({
       kind: 'phase',
       phase: p,
       text: fit(`${isOpen ? '▾' : '▸'} ${p.toUpperCase()}  ${done}/${inPhase.length} done${tail}`, cols),
       current,
+      reopened,
       open: isOpen,
       expandable: !isOpen && inPhase.length > 0,
       done,
@@ -139,6 +146,8 @@ export function paneRows(view: PlanView, opts: RowsOpts): Row[] {
         unmet,
         ...(b.risk ? { risk: b.risk } : {}),
         retired: b.retired,
+        ...(b.afterBaseline ? { afterBaseline: true as const } : {}),
+        ...(b.waitingOn?.length ? { waitingOn: b.waitingOn } : {}),
       };
       const room = Math.max(8, cols - Array.from(blockLine({ ...row, title: '' })).length);
       out.push({ ...row, title: fit(b.title, room) });

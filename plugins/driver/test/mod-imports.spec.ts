@@ -52,12 +52,14 @@ describe('the mod only depends on itself, src/shared and the engine', () => {
   });
 
   it('the mod never names the approval entry points from a tool handler', () => {
-    // approveViaMod is reachable from the pane (ui.press) and /driver (composer origin) only
-    const users = modFiles
-      .filter((f) => !f.includes(`${path.sep}test${path.sep}`))
-      .filter((f) => /approveViaMod\(/.test(readFileSync(f, 'utf8')))
-      .map((f) => path.basename(f))
-      .sort();
-    expect(users).toEqual(['approve.ts', 'command.ts', 'pane.tsx']);
+    // approveViaMod and rebaselineViaMod are reachable from the pane (ui.press) and /driver (composer origin) only
+    for (const name of ['approveViaMod', 'rebaselineViaMod']) {
+      const users = modFiles
+        .filter((f) => !f.includes(`${path.sep}test${path.sep}`))
+        .filter((f) => new RegExp(`${name}\\(`).test(readFileSync(f, 'utf8')))
+        .map((f) => path.basename(f))
+        .sort();
+      expect(users, name).toEqual(['approve.ts', 'command.ts', 'pane.tsx']);
+    }
   });
 });

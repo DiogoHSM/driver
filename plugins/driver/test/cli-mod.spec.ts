@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { CLI, EXAMPLES, NOW, runCli, tmp } from './helpers.js';
+import { CLI, EXAMPLES, NOW, approveAsUser, runCli, tmp } from './helpers.js';
 
 beforeAll(() => {
   if (!existsSync(CLI)) throw new Error('dist/cli.js missing: run `npm run build`');
@@ -373,5 +373,114 @@ describe('what the CLI cannot prevent, it records', () => {
     const r = p.input('x', '--actor', 'user:diogo', 'gate', 'approve', 'route', '--via-mod');
     expect(r.status).toBe(0);
     expect(p.plan().gates.route).toMatchObject({ approved: true, approvedVia: 'mod', approvedTicket: createHash('sha256').update('x').digest('hex') });
+  });
+});
+
+describe('rebaseline --via-mod', () => {
+  const sha = (s: string) => createHash('sha256').update(s, 'utf8').digest('hex');
+  const setup = () => {
+    const p = project();
+    p.cli('block', 'add', 'A', '--phase', 'discover');
+    approveAsUser(p.dir, 'route'); // baseline 1, revision 3
+    const revision = p.plan().revision as number;
+    const ticket = (over: Record<string, unknown> = {}, nonce = 'n0nce-123') =>
+      writeFileSync(p.file('.mod/ticket.json'), JSON.stringify({ gate: 'rebaseline', revision, sha256: sha(nonce), exp: Date.now() + 15000, iat: Date.now(), ...Object.fromEntries(Object.entries(over).map(([k, v]) => [k, typeof v === 'function' ? (v as () => unknown)() : v])) }));
+    const rebaseline = (stdin: string, ...extra: string[]) => p.input(stdin, '--actor', 'user:diogo', 'rebaseline', '--reason', 'new scope', '--via-mod', ...extra);
+    return { ...p, revision, ticket, rebaseline };
+  };
+
+  it('confirms the next baseline with a valid ticket and the nonce on stdin, as the user, and consumes the ticket', () => {
+    const p = setup();
+    p.cli('block', 'add', 'B', '--phase', 'implement'); // enters after baseline 1
+    const revision = p.plan().revision as number;
+    writeFileSync(p.file('.mod/ticket.json'), JSON.stringify({ gate: 'rebaseline', revision, sha256: sha('n0nce-123'), exp: Date.now() + 15000, iat: Date.now() }));
+    const r = p.rebaseline('n0nce-123\n', '--json');
+    expect(r.status).toBe(0);
+    expect(JSON.parse(r.stdout)).toMatchObject({ ok: true, revision: revision + 1 });
+    const plan = p.plan();
+    expect(plan.baseline).toBe(2);
+    expect(plan.baselines[1]).toMatchObject({ n: 2, reason: 'new scope', added: ['B-002'] });
+    expect(existsSync(p.file('.mod/ticket.json'))).toBe(false);
+    expect(p.events().at(-1)).toMatchObject({ type: 'rebaseline', actor: { kind: 'user', id: 'diogo' }, data: { n: 2, via: 'mod', ticket: sha('n0nce-123') } });
+    expect(p.cli('validate', '--replay').status).toBe(0);
+  });
+
+  it('refuses without a ticket (exit 2) and without a reason, which leaves a ticket alone', () => {
+    const p = setup();
+    const r = p.rebaseline('n0nce-123');
+    expect(r.status).toBe(2);
+    expect(r.stderr).toContain('no approval ticket');
+    p.ticket();
+    const noReason = p.input('n0nce-123', '--actor', 'user:diogo', 'rebaseline', '--via-mod');
+    expect(noReason.status).toBe(2);
+    expect(noReason.stderr).toContain('missing --reason');
+    expect(existsSync(p.file('.mod/ticket.json'))).toBe(true);
+    expect(p.plan().baseline).toBe(1);
+  });
+
+  it.each([
+    ['expired', { exp: Date.now() - 1 }, 'n0nce-123', /expired/],
+    ['a gate ticket', { gate: 'route' }, 'n0nce-123', /for gate route, not rebaseline/],
+    ['wrong revision', { revision: 1 }, 'n0nce-123', /plan changed since the ticket was issued/],
+    ['wrong hash', {}, 'another-nonce', /does not match/],
+    ['empty stdin', {}, '', /does not match/],
+    ['exp far in the future', { exp: Date.now() + 3_600_000 }, 'n0nce-123', /too far ahead/],
+    ['stale iat', { iat: () => Date.now() - 60_000, exp: () => Date.now() + 5000 }, 'n0nce-123', /not fresh/],
+  ])('refuses %s with exit 2, burns the ticket and changes nothing', (_name, over, nonce, re) => {
+    const p = setup();
+    p.ticket(over as Record<string, unknown>);
+    const before = p.bytes('plan.json');
+    const r = p.rebaseline(nonce);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(re);
+    expect(existsSync(p.file('.mod/ticket.json'))).toBe(false);
+    expect(p.bytes('plan.json').equals(before)).toBe(true);
+    expect(p.rebaseline('n0nce-123').status).toBe(2);
+  });
+
+  it('a reused ticket fails the second time', () => {
+    const p = setup();
+    p.ticket();
+    expect(p.rebaseline('n0nce-123').status).toBe(0);
+    const again = p.rebaseline('n0nce-123');
+    expect(again.status).toBe(2);
+    expect(again.stderr).toContain('no approval ticket');
+    expect(p.plan().baseline).toBe(2);
+  });
+
+  it('a rebaseline ticket cannot approve a gate, and a gate ticket cannot rebaseline', () => {
+    const p = setup();
+    p.ticket();
+    const gate = p.input('n0nce-123', '--actor', 'user:diogo', 'gate', 'approve', 'release', '--via-mod');
+    expect(gate.status).toBe(2);
+    expect(gate.stderr).toContain('for gate rebaseline, not release');
+    expect(p.plan().gates.release.approved).toBe(false);
+  });
+
+  it('takes the nonce only from stdin, never from argv', () => {
+    const p = setup();
+    p.ticket();
+    const withArg = p.input('', '--actor', 'user:diogo', 'rebaseline', '--reason', 'x', '--via-mod', '--nonce', 'n0nce-123');
+    expect(withArg.status).toBe(2);
+    expect(p.plan().baseline).toBe(1);
+  });
+
+  it('a model-kind Bash invocation is still denied by the hook, and the TTY path still refuses without a terminal', () => {
+    const p = setup();
+    for (const command of ['driver rebaseline --reason x --via-mod < nonce.txt', 'driver rebaseline --reason x', 'node dist/cli.js rebaseline --via-mod --reason x']) {
+      const r = runCli(['hook', 'protect-plan'], { input: JSON.stringify({ tool_name: 'Bash', tool_input: { command }, cwd: p.dir }) });
+      expect(JSON.parse(r.stdout).hookSpecificOutput.permissionDecision, command).toBe('deny');
+    }
+    const tty = p.cli('--actor', 'user:diogo', 'rebaseline', '--reason', 'x');
+    expect(tty.status).toBe(2);
+    expect(tty.stderr).toContain('requires an interactive terminal');
+  });
+
+  it('without a baseline yet it is refused by the reducer (exit 1), after the ticket is consumed', () => {
+    const p = project();
+    writeFileSync(p.file('.mod/ticket.json'), JSON.stringify({ gate: 'rebaseline', revision: 0, sha256: sha('n'), exp: Date.now() + 15000, iat: Date.now() }));
+    const r = p.input('n', '--actor', 'user:diogo', 'rebaseline', '--reason', 'x', '--via-mod');
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain('no baseline yet');
   });
 });

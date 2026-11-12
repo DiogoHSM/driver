@@ -49,3 +49,20 @@ export function generatedPlan(n: number, statuses: BlockStatus[] = STATUS_CYCLE)
   }
   return docPlan(blocks, { currentPhase: 'implement' });
 }
+
+/** Validate sent work back: B-004 (implement) needs rework, B-006 (validate) waits on it, B-009 entered after baseline 1. */
+export function loopedDoc(): PlanDoc {
+  const done = { status: 'done' as const };
+  return docPlan(
+    {
+      'B-003': docBlock({ title: 'Landing page UI', phase: 'implement', ...done }),
+      'B-004': docBlock({ title: 'Signup API', phase: 'implement', status: 'needs_rework', statusReason: 'validate/B-006.md: criterion 3 fails', dependsOn: ['B-003'] }),
+      'B-006': docBlock({ title: 'E2E signup check', phase: 'validate', status: 'blocked', statusReason: 'waiting on B-004', dependsOn: ['B-004'] }),
+      'B-009': docBlock({ title: 'Compact signup form with a title long enough to need cutting', phase: 'implement', dependsOn: ['B-003'] }),
+    },
+    {
+      currentPhase: 'validate',
+      baselines: [{ n: 1, added: ['B-003', 'B-004', 'B-006'], reqAdded: [], closedAt: 't' }],
+    },
+  );
+}
