@@ -48,10 +48,10 @@ In a terminal the same plan is drawn as text rows.
 
 Requires Claude Code 2.1.287 or newer and Node.js on the PATH.
 
-Clone the repository, then inside Claude Code:
+Inside Claude Code:
 
 ```
-/plugin marketplace add /path/to/driver
+/plugin marketplace add DiogoHSM/driver
 /plugin install driver@driver
 ```
 

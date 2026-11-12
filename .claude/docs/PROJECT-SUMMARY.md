@@ -37,7 +37,7 @@ Claude Code plugin that enforces a structured, traceable and iterative process o
 - Diogo Martins (author, only user for now)
 
 ## Links
-- Repository: local, `~/Developer/Github/driver` (no remote yet)
+- Repository: https://github.com/DiogoHSM/driver (public, MIT)
 - Linear: DRIVER project (Personal team), https://linear.app/data4ward/project/driver-d7f69613b00d
 - Original idea document: see the 2026-10-26 session history; method version in [DECISIONS.md](DECISIONS.md)
 - Research: `docs/research/skills-landscape.md`
