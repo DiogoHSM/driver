@@ -1,6 +1,6 @@
 # Design 5: live plan-graph pane (mod)
 
-Date: 2026-10-28. Source: design subagent (Opus) over ADR-009/010, the v1 code and `claude-code.d.ts` 2.1.312. Raw report kept in English; the approved plan (PT-BR) is `.claude/plans/2026-10-28-mod-diagrama.md` and the decision is ADR-011.
+Date: 2026-10-28. Source: design subagent (Opus) over ADR-009/010, the v1 code and `claude-code.d.ts` 2.1.312. Raw report kept in English; the approved plan is `.claude/plans/2026-10-28-mod-diagram.md` and the decision is ADR-011.
 
 ## Findings that changed the brief
 
@@ -52,7 +52,7 @@ Columns are phase swimlanes with sub-columns by local depth. Constants: `NW=176 
 7. `x = laneX_p + LP + col·(NW+CG)`; `y = M + HH + slot·(NH+RG)`.
 8. `H = M + HH + maxSlots·(NH+RG) + LEG + M`; `W = laneX_5 + laneW_5 + M`; `<svg viewBox="0 0 W H">`, no `width` (fits the slot).
 
-Edges: cubic béziers right-middle → left-middle, `k = max(20,(x2−x1−NW)/2)`; backward edges loop below, dashed red; edges into a collapsed lane end in a stub. Pending dep `#6b7280` 1.5; done dep `#9ca3af` opacity .5; selected block's edges `#2563eb` 2.
+Edges: cubic beziers right-middle → left-middle, `k = max(20,(x2−x1−NW)/2)`; backward edges loop below, dashed red; edges into a collapsed lane end in a stub. Pending dep `#6b7280` 1.5; done dep `#9ca3af` opacity .5; selected block's edges `#2563eb` 2.
 
 Nodes: `<g class="n s-<status>">`, rect `rx=6`, line 1 = id (mono 10px bold) + status glyph right-aligned, line 2 = title cut at 25 chars. Glyphs `○ ● ■ ◐ ✓ ↺`; strokes 1 gray / 2.5 blue / 2.5 red / 2 amber / 1.5 green / 2.5 orange dashed. Opaque pastel cards with `#111827` text (readable on dark and light); lanes `rgba(127,127,127,.08)`. Badges: owner pill (`main` or 6 chars of agent id), red `!` on blocked/needs_rework, `▲` high risk, retired at opacity .35 with struck title. `<title>` tooltip (with `isInteractive`) holding id, title, status/since/by, owner, deps, reqs, tests, reason, XML-escaped. Gate markers: vertical line in the gap before `route` and before `release`, solid green + pill `✓ gate route · diogo` or dashed amber + pill `gate route · pending`. Current phase: accent stroke and bold header; later phases at .6. Legend at the bottom. One `<style>` with short classes, integer coordinates, no inline `style=`.
 

@@ -13,31 +13,33 @@ Structure:
 7. Size class (and one line if the answers contradict it).
 8. One closing line: reply "accept", or say what to change, ask why something was decided, or open a skipped area.
 
-## Worked example (Portuguese)
+## Worked example (English)
+
+The user wrote `/driver:discover "waitlist page for an app"`. Language: English.
 
 ```
-# Resumo do Discover
+# Discover summary
 
-**Objetivo.** Uma página de lista de espera para o app, para juntar 200 e-mails em 30 dias.
+**Goal.** A waitlist page for the app, to collect 200 emails in 30 days.
 
-**O que será construído.** Uma página única com formulário de e-mail, mensagem de confirmação e um lugar para guardar os e-mails.
+**What will be built.** A single page with an email form, a confirmation message and a place to store the emails.
 
-**O que você decidiu.**
-- Público: desenvolvedores independentes.
-- Indispensável: formulário de e-mail e confirmação na tela.
-- Sinal de sucesso: 200 e-mails em 30 dias.
+**What you decided.**
+- Audience: indie developers.
+- Must have: email form and on-screen confirmation.
+- Success signal: 200 emails in 30 days.
 
-**O que eu decidi por você.**
-- Infraestrutura e hospedagem: Vercel com plano gratuito (você já tem conta e o tráfego é baixo).
-- Dados e privacidade: guardar só o e-mail e a data (não há motivo para coletar mais).
-- Design e conteúdo: uma língua, português (o público é brasileiro).
-- Métricas: contagem de cadastros no banco, sem ferramenta de analytics (custo e consentimento a menos).
+**What I decided for you.**
+- Infrastructure and hosting: Vercel on the free plan (you already have an account and traffic is low).
+- Data and privacy: store only the email and the date (there is no reason to collect more).
+- Design and content: one language, English (the audience is English-speaking).
+- Metrics: count of signups in the database, no analytics tool (less cost and no consent banner).
 
-**O que fica de fora.** Painel de administração, links de indicação, pagamentos.
+**What stays out.** Admin dashboard, referral links, payments.
 
-**Em aberto.** Nenhuma.
+**Open questions.** None.
 
-**Tamanho.** S (alguns dias), compatível com as respostas.
+**Size.** S (a few days), consistent with the answers.
 
-Responda "aceito", ou diga o que mudar, pergunte por que decidi algo, ou peça para abrir uma área que pulei.
+Reply "accept", or say what to change, ask why I decided something, or ask me to open an area I skipped.
 ```

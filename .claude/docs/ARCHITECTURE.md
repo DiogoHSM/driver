@@ -1,55 +1,55 @@
-# Arquitetura · DRIVER
+# Architecture · DRIVER
 
-## Visão geral
-DRIVER é um marketplace de plugins de Claude Code. O core `driver` impõe o método Discover · Route · Implement · Validate · Evolve · Release sobre um projeto do usuário; packs de domínio (`driver-web`, `driver-mobile`, `driver-finance`, `driver-social`, `driver-video`) acrescentam perguntas, provedores, validadores e checklists. O artefato central é o grafo de plano em `.claude/driver/plan.json` dentro do projeto do usuário (ADR-002, ADR-009, ADR-010). Tudo o mais lê ou escreve esse arquivo.
+## Overview
+DRIVER is a Claude Code plugin marketplace. The `driver` core enforces the Discover · Route · Implement · Validate · Evolve · Release method on a user's project; domain packs (`driver-web`, `driver-mobile`, `driver-finance`, `driver-social`, `driver-video`) add questions, providers, validators and checklists. The central artifact is the plan graph in `.claude/driver/plan.json` inside the user's project (ADR-002, ADR-009, ADR-010). Everything else reads or writes that file.
 
-## Componentes
+## Components
 
-### No repositório do DRIVER
-- **`driver-core` (`plugins/driver/src/`)**: biblioteca TypeScript com o schema zod (`schema.ts`), validador de invariantes (`validate.ts`), reducer puro de mutações (`reducer.ts`), máquina de estados e revogação de gates (`state-machine.ts`), adaptador de I/O com lock e rename atômico (`store.ts`), alocação de ids (`ids.ts`) e exportador Mermaid (`mermaid.ts`).
-- **CLI `driver` (`src/cli.ts` → `dist/cli.js`)**: única porta de escrita do `plan.json`. Comandos: `init · where · status · validate [--replay] · apply (lote atômico via stdin) · block add|set|status|owner|retire|doc · req add|retire|doc · discover log|show · decision add · gate approve|revoke · phase advance|back · rebaseline · release add · export mermaid · renumber`. `gate approve`, `rebaseline` e `--force` exigem TTY ou, via mod, `--via-mod` com ticket. Bundle único commitado para os hooks não dependerem de build.
-- **Hooks (`plugins/driver/hooks/`)**: `PreToolUse` em `Agent|Task|Workflow` (gate por fase, via `jq`), `PreToolUse` em `Edit|Write|Bash` (protege `plan.json` e bloqueia `driver approve` vindo do modelo), `SubagentStop` (bloco órfão vira `blocked`).
-- **Código compartilhado sem dependências (`src/shared/`)**: fases, paleta, projeção `PlanView`, veredito de gate, regras de proteção, layout em swimlanes, SVG e linhas do terminal. É a única parte do core que o mod pode importar (o mod não tem Node nem zod); o código node importa daqui também, então hook shell e mod aplicam as mesmas regras (ADR-011).
-- **Mod (`plugins/driver/mod/`)**: painel ao lado do chat que lê `plan.json` por polling (`$.fs`, 1 s), projeta em `$.state` e desenha SVG vertical na largura do painel (Desktop/VS Code, `mod/render-svg.tsx`), quadro de cartões (mobile, `mod/render-board.tsx`) ou linhas Box/Text (terminal, `mod/render-terminal.tsx`); seleção de bloco por `Select`/`Input` na barra, porque cliques no SVG não chegam ao plugin. Registra as tools `mcp__driver__set_block_state`, `plan_ops`, `plan_status` e, desde o ADR-013, três tools de registro silencioso que não tocam `plan.json`: `discover_log` (entrevista em `discover/interview.jsonl`, com `interview.md`, `assumptions.md` e `non-goals.md` gerados), `block_doc` (seções de `blocks/B-nnn.md`) e `req_doc` (seções de `requirements/R-nnn.md`); e o comando `/driver`. Chamadas vindas de subagente são recusadas, salvo `plan_status`, a leitura do `discover_log` e `set_block_state`/`block_doc` no bloco de que o subagente é owner. Escreve sempre pela CLI (`$.process.run`). Hooks: `agent.spawn` (gate + claim de owner, inclusive agentes de Workflow), `classic.SubagentStop`, guard `tool.call`. `/driver approve <gate>` só com origem `composer` (ou botão do painel) e ticket one-shot com hash: o canal de aprovação à prova de modelo.
-- **Skills de fase (`plugins/driver/skills/`)**: as seis existem: `discover` e `route` (ADR-012), `implement`, `validate`, `evolve` e `release` (ADR-016, ADR-017). Toda mudança depois do gate route passa pela triagem de `plugins/driver/references/triage.md` (correção volta o bloco de origem a retrabalho, ajuste vira bloco novo marcado como posterior ao baseline, mudança de escopo é pergunta com três saídas). Validate escreve um relatório por bloco de validação, Evolve escreve a revisão do ciclo e aponta os botões de baseline e de gate, Release registra a entrega e fecha com o backlog do próximo ciclo. Skills nativas de plugin (`SKILL.md` com frontmatter, `user-invocable: true`, slash `/driver:discover` e `/driver:route`), texto em inglês, entrevista na língua do usuário via `AskUserQuestion`. Convenções compartilhadas (tools, regra `"$n"`, pré-condições do reducer, formatos de arquivo, regras duras) em `plugins/driver/references/driver-conventions.md`, fora de `skills/` para não ser varrido como skill. Escrevem no plano só pelas tools `mcp__driver__*` (fallback: CLI). Discover grava a árvore de decisões em `discover/interview.md` a cada resposta e manda um lote único de `req.add`/`decision.add` no fim; Route cria blocos com `block.add` em lote, preenche `blocks/B-nnn.md` e `route/risks.md`, valida o diagrama com o usuário e avança a fase. Skills externas (superpowers) são apoio opcional, invocadas só se instaladas (ADR-017).
-- **Packs (futuro, `plugins/driver-*/`)**: plugins separados no mesmo marketplace, dependentes do core. Dados extras em `ext['driver-<pack>']`.
+### In the DRIVER repository
+- **`driver-core` (`plugins/driver/src/`)**: TypeScript library with the zod schema (`schema.ts`), invariant validator (`validate.ts`), pure mutation reducer (`reducer.ts`), state machine and gate revocation (`state-machine.ts`), I/O adapter with lock and atomic rename (`store.ts`), id allocation (`ids.ts`) and Mermaid exporter (`mermaid.ts`).
+- **`driver` CLI (`src/cli.ts` → `dist/cli.js`)**: the only write door to `plan.json`. Commands: `init · where · status · validate [--replay] · apply (atomic batch via stdin) · block add|set|status|owner|retire|doc · req add|retire|doc · discover log|show · decision add · gate approve|revoke · phase advance|back · rebaseline · release add · export mermaid · renumber`. `gate approve`, `rebaseline` and `--force` require a TTY or, through the mod, `--via-mod` with a ticket. Single committed bundle so the hooks do not depend on a build.
+- **Hooks (`plugins/driver/hooks/`)**: `PreToolUse` on `Agent|Task|Workflow` (gate by phase, via `jq`), `PreToolUse` on `Edit|Write|Bash` (protects `plan.json` and blocks `driver approve` coming from the model), `SubagentStop` (orphan block becomes `blocked`).
+- **Dependency-free shared code (`src/shared/`)**: phases, palette, `PlanView` projection, gate verdict, protection rules, swimlane layout, SVG and terminal lines. It is the only part of the core the mod can import (the mod has no Node or zod); node code imports from here too, so the shell hook and the mod apply the same rules (ADR-011).
+- **Mod (`plugins/driver/mod/`)**: panel beside the chat that reads `plan.json` by polling (`$.fs`, 1 s), projects into `$.state` and draws a vertical SVG at the panel width (Desktop/VS Code, `mod/render-svg.tsx`), a card board (mobile, `mod/render-board.tsx`) or Box/Text lines (terminal, `mod/render-terminal.tsx`); block selection through `Select`/`Input` in the bar, because clicks on the SVG do not reach the plugin. It registers the tools `mcp__driver__set_block_state`, `plan_ops`, `plan_status` and, since ADR-013, three silent logging tools that do not touch `plan.json`: `discover_log` (interview in `discover/interview.jsonl`, with generated `interview.md`, `assumptions.md` and `non-goals.md`), `block_doc` (sections of `blocks/B-nnn.md`) and `req_doc` (sections of `requirements/R-nnn.md`); and the `/driver` command. Calls coming from a subagent are refused, except `plan_status`, reading `discover_log`, and `set_block_state`/`block_doc` on the block the subagent owns. It always writes through the CLI (`$.process.run`). Hooks: `agent.spawn` (gate + owner claim, including Workflow agents), `classic.SubagentStop`, `tool.call` guard. `/driver approve <gate>` only with origin `composer` (or the panel button) and a one-shot ticket with a hash: the model-proof approval channel.
+- **Phase skills (`plugins/driver/skills/`)**: all six exist: `discover` and `route` (ADR-012), `implement`, `validate`, `evolve` and `release` (ADR-016, ADR-017). Every change after the route gate goes through the triage in `plugins/driver/references/triage.md` (a fix sends the originating block back to rework, an adjustment becomes a new block marked as after-baseline, a scope change is a question with three outcomes). Validate writes one report per validation block, Evolve writes the cycle review and points to the baseline and gate buttons, Release records the delivery and closes with the next-cycle backlog. Native plugin skills (`SKILL.md` with frontmatter, `user-invocable: true`, slash `/driver:discover` and `/driver:route`), text in English, interview in the user's language via `AskUserQuestion`. Shared conventions (tools, the `"$n"` rule, reducer preconditions, file formats, hard rules) in `plugins/driver/references/driver-conventions.md`, outside `skills/` so it is not scanned as a skill. They write to the plan only through the `mcp__driver__*` tools (fallback: CLI). Discover records the decision tree in `discover/interview.md` at every answer and sends a single batch of `req.add`/`decision.add` at the end; Route creates blocks with `block.add` in a batch, fills `blocks/B-nnn.md` and `route/risks.md`, validates the diagram with the user and advances the phase. External skills (superpowers) are optional support, invoked only if installed (ADR-017).
+- **Packs (future, `plugins/driver-*/`)**: separate plugins in the same marketplace, dependent on the core. Extra data in `ext['driver-<pack>']`.
 
-### No projeto do usuário (`.claude/driver/`)
-`plan.json` (snapshot canônico) · `events.jsonl` (ledger) · `log/REL-n.jsonl` · `blocks/B-xxx.md` · `requirements/R-xxx.md` · `decisions/D-xxx.md` · `discover/` · `exports/` (gitignored) · `.lock/` (gitignored).
+### In the user's project (`.claude/driver/`)
+`plan.json` (canonical snapshot) · `events.jsonl` (ledger) · `log/REL-n.jsonl` · `blocks/B-xxx.md` · `requirements/R-xxx.md` · `decisions/D-xxx.md` · `discover/` · `exports/` (gitignored) · `.lock/` (gitignored).
 
-## Fluxo de dados
+## Data flow
 
 ```
-usuário ──/driver approve (composer + ticket)──▶ mod ──▶ CLI ─┐
-skill de fase ──tools mcp__driver__* / CLI─────────────────▶ │ driver-core: lock → ler → reducer → validar → .tmp+rename → evento
-subagent (resultado) ─▶ orquestrador ─▶ │
+user ──/driver approve (composer + ticket)──▶ mod ──▶ CLI ─┐
+phase skill ──mcp__driver__* tools / CLI───────────────────▶ │ driver-core: lock → read → reducer → validate → .tmp+rename → event
+subagent (result) ─▶ orchestrator ─▶ │
                                    └──▶ .claude/driver/plan.json + events.jsonl
                                               │              │
-                        hook PreToolUse (jq) ◀┘              └▶ mod (polling 1 s, redesenha se revision mudou)
-                                                                 exportador Mermaid (exports/plan.mmd)
+                        PreToolUse hook (jq) ◀┘              └▶ mod (1 s polling, redraws if revision changed)
+                                                                 Mermaid exporter (exports/plan.mmd)
 ```
 
-Regras: um escritor (o processo que segura o lock); raiz resolvida pelo worktree principal via `git rev-parse --git-common-dir`; branches de worktree nunca tocam `plan.json`; `revision` sobe a cada escrita, `baseline` a cada re-baseline do Evolve.
+Rules: one writer (the process holding the lock); root resolved through the main worktree via `git rev-parse --git-common-dir`; worktree branches never touch `plan.json`; `revision` goes up on every write, `baseline` on every Evolve re-baseline.
 
-## Integrações externas
-- Claude Code CLI ≥ 2.1.287 (mods) e sistema de plugins com `dependencies` semver (ADR-003).
-- Nenhum plugin é dependência dura do core (ADR-017 revê o ADR-003 para o core): superpowers é apoio opcional das skills Implement, Validate e Release. Packs podem pinar plugins próprios.
-- Provedores de domínio (Vercel, Supabase, Resend, HyperFrames, ElevenLabs...) só via registro de capacidades, por bloco (ADR-004). O core não conhece provedores.
+## External integrations
+- Claude Code CLI ≥ 2.1.287 (mods) and a plugin system with semver `dependencies` (ADR-003).
+- No plugin is a hard dependency of the core (ADR-017 revises ADR-003 for the core): superpowers is optional support for the Implement, Validate and Release skills. Packs may pin their own plugins.
+- Domain providers (Vercel, Supabase, Resend, HyperFrames, ElevenLabs...) only through the capability registry, per block (ADR-004). The core does not know providers.
 
-## Diagrama
+## Diagram
 
 ```mermaid
 flowchart LR
-  subgraph repo[Repositório DRIVER]
+  subgraph repo[DRIVER repository]
     core[driver-core]
-    cli[CLI driver]
+    cli[driver CLI]
     hooks[Hooks]
-    shared[src/shared · sem deps]
+    shared[src/shared · no deps]
     mod[Mod: pane, tools, /driver]
-    skills[Skills de fase · discover a release]
-    packs[Packs · futuro]
+    skills[Phase skills · discover to release]
+    packs[Packs · future]
   end
-  subgraph user[Projeto do usuário]
+  subgraph user[User project]
     plan[.claude/driver/plan.json]
     events[events.jsonl]
     md[blocks/ requirements/ decisions/]

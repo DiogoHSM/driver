@@ -1,6 +1,6 @@
-# Pesquisa 3: infraestrutura de plugin do Claude Code
+# Research 3: Claude Code plugin infrastructure
 
-Data: 2026-10-26. Fonte: subagent de pesquisa (Opus), docs oficiais em code.claude.com, repos oficiais e CLI local (versão 2.1.305). Relatório bruto em inglês; síntese em português em [skills-landscape.md](skills-landscape.md).
+Date: 2026-10-26. Source: research subagent (Opus), official docs at code.claude.com, official repos and local CLI (version 2.1.305). Raw report in English; synthesis in [skills-landscape.md](skills-landscape.md).
 
 Labels: **[C]** confirmed in docs or local files, **[I]** inferred, **[NF]** not found.
 

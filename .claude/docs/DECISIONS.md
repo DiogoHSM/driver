@@ -1,348 +1,365 @@
-# Decisões Arquiteturais · DRIVER
+# Architectural Decisions · DRIVER
 
-## [ADR-001] Plugin de Claude Code, não ferramenta standalone
-**Data:** 2026-10-26
-**Status:** Aceito
+## [ADR-001] Claude Code plugin, not a standalone tool
+**Date:** 2026-10-26
+**Status:** Accepted
 
-### Contexto
-A ideia original era uma ferramenta de IA independente que generalizasse a execução de qualquer projeto (planilha a sistema complexo). A avaliação apontou complexidade excessiva: executores por domínio, modelo de permissões, dezenas de integrações e orquestração teriam que ser construídos do zero.
+### Context
+The original idea was an independent AI tool that would generalize the execution of any project (from a spreadsheet to a complex system). The assessment flagged excessive complexity: per-domain executors, a permission model, dozens of integrations and orchestration would all have to be built from scratch.
 
-### Decisão
-DRIVER é um plugin de Claude Code. O Claude Code é o harness: fornece executor, permissões, subagents, worktrees, hooks, checkpoints e UI. O plugin constrói só a camada de processo.
+### Decision
+DRIVER is a Claude Code plugin. Claude Code is the harness: it provides the executor, permissions, subagents, worktrees, hooks, checkpoints and UI. The plugin builds only the process layer.
 
-### Alternativas consideradas
-- Ferramenta standalone sobre o Agent SDK: descartada pelo custo de reconstruir o que o Claude Code já dá.
-- Apenas um conjunto de skills soltas: insuficiente, porque falta o grafo de estado e o diagrama.
+### Alternatives considered
+- Standalone tool on top of the Agent SDK: discarded because of the cost of rebuilding what Claude Code already provides.
+- Just a set of loose skills: insufficient, because the state graph and the diagram would be missing.
 
-### Consequências
-Dependência total do ecossistema Claude Code. Diagrama vivo depende do app desktop (mod), com fallback em Mermaid para CLI.
-
----
-
-## [ADR-002] O artefato central é o grafo do plano, não o diagrama
-**Data:** 2026-10-26
-**Status:** Aceito
-
-### Contexto
-O documento original tratava o diagrama como "sistema nervoso" do projeto. Diagramas gerados por LLM são instáveis e não versionáveis.
-
-### Decisão
-O artefato vivo é um grafo de blocos em arquivo (formato a definir), com estado por bloco, dependências, artefatos e requisitos ligados. O diagrama é uma renderização desse grafo. Hierarquia fase → épico → bloco para projetos grandes.
-
-### Consequências
-Resolve centenas de blocos (colapso hierárquico), exportação (serialização), versionamento (diff do grafo) e fallback CLI (Mermaid). Formato do grafo é a decisão de design mais importante do projeto e ainda está aberta.
+### Consequences
+Total dependency on the Claude Code ecosystem. The living diagram depends on the desktop app (mod), with a Mermaid fallback for the CLI.
 
 ---
 
-## [ADR-003] Compor skills existentes: dependência pinada por padrão, vendorização como exceção
-**Data:** 2026-10-26 (revisado no mesmo dia após pesquisa de infraestrutura)
-**Status:** Aceito
+## [ADR-002] The central artifact is the plan graph, not the diagram
+**Date:** 2026-10-26
+**Status:** Accepted
 
-### Contexto
-superpowers, grill-me, impeccable, hyperframes e outros já cobrem boa parte do processo. Depender deles em runtime tem risco dos dois lados: o upstream pode mudar para pior, ou o DRIVER pode querer divergir. A pesquisa confirmou que plugins podem declarar `dependencies` em `plugin.json` com faixa semver (`^`, `~`, `=`), resolvidas contra tags git `<plugin>--v<versão>`, com instalação automática e detecção de conflito.
+### Context
+The original document treated the diagram as the project's "nervous system". LLM-generated diagrams are unstable and cannot be versioned.
 
-### Decisão
-- Plugins que o DRIVER usa diretamente (superpowers, feature-dev, code-review oficiais) entram como **dependência declarada com versão pinada** (`=x.y.z` ou `~x.y`). Atualização é deliberada: o DRIVER só sobe a versão quando revisado.
-- **Vendorização** (cópia com atribuição, versão e licença no cabeçalho) só para: skills soltas sem plugin publicado (ex.: `grilling` do Matt Pocock, 25 linhas, MIT) ou upstreams que não publicam tags de versão.
-- Skills de domínio (impeccable, hyperframes, ElevenLabs...) nunca são vendorizadas nem dependências fixas; são sugeridas e instaladas sob demanda via registro de capacidades (ADR-004).
-- Skills de documento da Anthropic (docx/pdf/pptx/xlsx) são source-available sem redistribuição: só referenciar.
+### Decision
+The living artifact is a graph of blocks in a file (format to be defined), with per-block state, dependencies, artifacts and linked requirements. The diagram is a rendering of that graph. Phase → epic → block hierarchy for large projects.
 
-### Alternativas consideradas
-- Vendorizar tudo (decisão original): perde atualizações semanais do superpowers e acumula drift. Rejeitada após confirmar que pinning de versão resolve o risco de mudança indesejada.
-- Dependência sem pinning: expõe o DRIVER a mudanças do upstream sem revisão.
-- Reescrever tudo: repete trabalho bom.
-
-### Consequências
-O DRIVER precisa publicar suas próprias tags via `claude plugin tag`. Dependências cross-marketplace exigem `allowCrossMarketplaceDependenciesOn` no marketplace raiz. Se o superpowers não publicar tags no formato esperado, cai na exceção de vendorização.
+### Consequences
+Solves hundreds of blocks (hierarchical collapse), export (serialization), versioning (graph diff) and the CLI fallback (Mermaid). The graph format is the most important design decision of the project and is still open.
 
 ---
 
-## [ADR-004] Registro de capacidades por bloco, carregamento sob demanda
-**Data:** 2026-10-26
-**Status:** Aceito
+## [ADR-003] Compose existing skills: pinned dependency by default, vendoring as the exception
+**Date:** 2026-10-26 (revised the same day after the infrastructure research)
+**Status:** Accepted
 
-### Contexto
-Execução autônoma precisa de muitas integrações (Vercel, Supabase, Railway, Clerk, Resend, Google, ElevenLabs, Figma...). Dezenas de MCPs ligados simultaneamente degradam seleção de tool e consomem contexto.
+### Context
+superpowers, grill-me, impeccable, hyperframes and others already cover a good part of the process. Depending on them at runtime carries risk on both sides: upstream may change for the worse, or DRIVER may want to diverge. The research confirmed that plugins can declare `dependencies` in `plugin.json` with a semver range (`^`, `~`, `=`), resolved against git tags `<plugin>--v<version>`, with automatic installation and conflict detection.
 
-### Decisão
-Integrações são atributo do bloco, não do projeto. Um registro de capacidades mapeia capacidade → provedores → forma de acesso (CLI preferida, MCP quando não há CLI, API direta). Discover sugere provedores a quem não os conhece. Route registra o provedor por bloco e as credenciais necessárias. Implement carrega só o que o bloco precisa. Credenciais são requisito levantado no Discover.
+### Decision
+- Plugins that DRIVER uses directly (official superpowers, feature-dev, code-review) come in as a **declared dependency with a pinned version** (`=x.y.z` or `~x.y`). Updating is deliberate: DRIVER only raises the version after review.
+- **Vendoring** (a copy with attribution, version and license in the header) only for: loose skills with no published plugin (e.g. `grilling` by Matt Pocock, 25 lines, MIT) or upstreams that do not publish version tags.
+- Domain skills (impeccable, hyperframes, ElevenLabs...) are never vendored nor fixed dependencies; they are suggested and installed on demand through the capability registry (ADR-004).
+- Anthropic's document skills (docx/pdf/pptx/xlsx) are source-available without redistribution: reference only.
 
-### Consequências
-Nada carregado por padrão. Modelo de permissão por tipo de ação (reversível executa, irreversível confirma, destrutiva em produção exige gate) precisa ser definido antes da execução autônoma.
+### Alternatives considered
+- Vendor everything (original decision): loses superpowers' weekly updates and accumulates drift. Rejected after confirming that version pinning resolves the risk of unwanted change.
+- Dependency without pinning: exposes DRIVER to upstream changes without review.
+- Rewrite everything: repeats good work.
 
----
-
-## [ADR-005] Core + packs por domínio
-**Data:** 2026-10-26
-**Status:** Aceito
-
-### Decisão
-`driver` (core: fases, grafo, gates, mod, Evolve) + packs `driver-web`, `driver-mobile`, `driver-finance`, `driver-social`, `driver-video`. Cada pack contribui: perguntas de entrevista do domínio, entradas no registro de capacidades, validadores e checklist de release. O core não conhece provedores.
-
-### Consequências
-Evita a generalização excessiva da versão standalone. Packs podem evoluir independentemente.
+### Consequences
+DRIVER needs to publish its own tags via `claude plugin tag`. Cross-marketplace dependencies require `allowCrossMarketplaceDependenciesOn` in the root marketplace. If superpowers does not publish tags in the expected format, it falls under the vendoring exception.
 
 ---
 
-## [ADR-006] Paralelismo: subagents e worktrees na v1; nested sessions na v2
-**Data:** 2026-10-26
-**Status:** Aceito
+## [ADR-004] Per-block capability registry, loaded on demand
+**Date:** 2026-10-26
+**Status:** Accepted
 
-### Contexto
-O app desktop expõe ferramentas para uma sessão iniciar e controlar outras. Nested sessions são caras e opacas para o orquestrador.
+### Context
+Autonomous execution needs many integrations (Vercel, Supabase, Railway, Clerk, Resend, Google, ElevenLabs, Figma...). Dozens of MCPs on at the same time degrade tool selection and consume context.
 
-### Decisão
-v1 usa subagents (model explícito, background, `isolation: worktree` quando blocos editam os mesmos arquivos) e o Workflow tool para lotes homogêneos sem gate humano. Nested sessions só na v2, para blocos longos e independentes que o usuário quer acompanhar separadamente, e só com protocolo de estado em arquivo que todas as sessões escrevem e o mod lê.
+### Decision
+Integrations are an attribute of the block, not of the project. A capability registry maps capability → providers → form of access (CLI preferred, MCP when there is no CLI, direct API). Discover suggests providers to those who do not know them. Route records the provider per block and the credentials needed. Implement loads only what the block needs. Credentials are a requirement raised in Discover.
 
-Restrições confirmadas na pesquisa:
-- Workflow **não aceita input humano no meio da execução**. Gates ficam na conversa principal; um Workflow por lote de Implement ou Validate.
-- As ferramentas de sessão do app desktop (`start_session` etc.) não são documentadas publicamente. A v2 usa o caminho documentado: `claude --bg` + cross-session messaging (`SendMessage`), que é texto puro, fila de 50 mensagens e nunca concede aprovação.
-- Headless (`-p`, SDK, cloud): mod não desenha, só hooks funcionam. O plugin precisa degradar para esse modo.
+### Consequences
+Nothing is loaded by default. A permission model per action type (reversible runs, irreversible confirms, destructive in production requires a gate) needs to be defined before autonomous execution.
 
 ---
 
-## [ADR-007] Nome da quinta fase: Evolve
-**Data:** 2026-10-26
-**Status:** Aceito
+## [ADR-005] Core + packs per domain
+**Date:** 2026-10-26
+**Status:** Accepted
 
-### Contexto
-Candidatos: Evolve, Examine, Evaluate.
+### Decision
+`driver` (core: phases, graph, gates, mod, Evolve) + packs `driver-web`, `driver-mobile`, `driver-finance`, `driver-social`, `driver-video`. Each pack contributes: domain interview questions, entries in the capability registry, validators and a release checklist. The core does not know providers.
 
-### Decisão
-Evolve. Examine e Evaluate significam "verificar", que já é o Validate. Evolve nomeia a parte inédita do método: decidir para onde voltar, registrar por quê e re-baselinear plano e grafo.
-
----
-
-## [ADR-009] Grafo em `.claude/driver/plan.json`; mod renderiza; gates reforçados por hook
-**Data:** 2026-10-26 (aceito em 2026-10-27 com o formato definido no ADR-010)
-**Status:** Aceito
-
-### Contexto
-Pesquisa de infraestrutura: Tasks nativas do Claude Code estão desligadas por padrão em modelos novos e têm campos e storage não documentados. O arquivo de plan mode é por sessão e sem formato documentado. Mods podem desenhar painel ao lado do chat (SVG só no Desktop e VS Code; Box/Text ou Raster no terminal), ler arquivos via `$.fs`, reagir a eventos e registrar tools que o modelo chama. `AskUserQuestion` pode ser auto-continuado por `askUserQuestionTimeout`.
-
-### Decisão
-- Fonte de verdade: `.claude/driver/plan.json`, de propriedade do DRIVER, com blocos, estados, arestas, requisitos ligados, provedor por bloco e flag `approved` por gate. Markdown por bloco para texto longo.
-- O mod do core espelha o arquivo em `$.state` e desenha: SVG no Desktop/VS Code, layout Box/Text no terminal. Mermaid gerado em arquivo como fallback universal (CLI sem mod, headless, exportação).
-- O mod registra `mcp__driver__set_block_state` para o modelo mudar estado sem escrever JSON na mão.
-- Gates são reforçados por hook `PreToolUse` (ou guard de `tool.call` no mod) que recusa Agent/Workflow na fase seguinte enquanto o plano não registra `approved: true`. Prompt sozinho não é gate.
-
-### Consequências
-Mínimo de CLI 2.1.287. API de mods é early access: rechecar `claude-code.d.ts` a cada release. Nenhum mod existente faz isso; é a parte inédita do plugin.
+### Consequences
+Avoids the excessive generalization of the standalone version. Packs can evolve independently.
 
 ---
 
-## [ADR-010] Formato do `plan.json` v1: snapshot canônico, escritor único, ledger de eventos
-**Data:** 2026-10-27
-**Status:** Aceito
-**Plano:** `.claude/plans/2026-10-27-plan-json-v1.md`
+## [ADR-006] Parallelism: subagents and worktrees in v1; nested sessions in v2
+**Date:** 2026-10-26
+**Status:** Accepted
 
-### Contexto
-O ADR-009 fixou o arquivo, não o formato. Consumidores do arquivo: mod (polling via `$.fs`, desenha SVG ou Box/Text), hook `PreToolUse` em shell (precisa responder "gate aprovado?" com uma expressão `jq`), tool `mcp__driver__set_block_state`, exportador Mermaid, skills de fase. Fato decisivo: o arquivo fica no git, então cada worktree de subagent tem uma cópia desatualizada.
+### Context
+The desktop app exposes tools for one session to start and control others. Nested sessions are expensive and opaque to the orchestrator.
 
-### Decisão
-1. **Snapshot canônico em JSON**, não log de eventos como fonte: hook e mod precisam de uma leitura barata. `requirements` e `blocks` são objetos indexados por id (`R-001`, `B-001`) para lookup O(1) em `jq` e diffs estáveis.
-2. **Dois contadores:** `revision` sobe em toda escrita (CAS e detecção de mudança pelo mod); `baseline` sobe só em re-baseline no Evolve (0 até o Gate 1).
-3. **Estados do bloco** em snake_case: `not_started · in_progress · blocked · in_review · done · needs_rework`. Toda transição carimba `statusSince`, `statusBy` (`{kind: model|user|hook, id}`) e, em blocked/needs_rework, `statusReason`. `not_started → in_progress` grava `owner` e funciona como claim sob lock.
-4. **Gates** em `gates.route` e `gates.release` (chave = fase liberada). Aprovação só por comando do usuário, nunca pelo modelo. Revogação automática pelo escritor: `release` cai em re-baseline, quando um bloco sai de `done`, quando a fase recua de evolve/release ou quando um requisito entra ou sai depois do Gate 1; `route` cai só quando a fase recua a discover. (Revisado em 2026-10-27: a versão inicial revogava `route` a cada mudança de requisito, o que tornava impossível adicionar requisito no Evolve sem voltar ao Discover. O Gate 1 aprova o entendimento; mudanças posteriores são assunto do re-baseline e do Gate 2.)
-5. **Escritor único:** um núcleo TS (reducer puro + adaptador node) usado pela CLI `driver` e pelas tools do mod. Protocolo: raiz resolvida pelo worktree principal (`git rev-parse --git-common-dir`), lock por `mkdir .lock` (stale após 30 s, retry até 5 s), validar antes de gravar, `.tmp` + fsync + rename, serialização determinística, depois anexar evento em `events.jsonl`. Orquestrador é o escritor normal; subagents devolvem resultado estruturado.
-6. **Ledger** `events.jsonl` commitado (`merge=union`), rotacionado para `log/REL-n.jsonl` a cada Release. `plan.json` guarda só o estado atual; histórico vive no ledger e no git.
-7. **Nada é apagado:** blocos e requisitos removidos pelo Evolve ganham `retired: {at, decision, reason}` citando um `D-xxx`. Ids alocados só pelo escritor a partir de `nextId`, nunca reutilizados.
-8. **Texto longo fora do JSON:** `blocks/<id>.md`, `requirements/<id>.md`, `decisions/<id>.md`; caminho implícito pelo id.
-9. **Credenciais** só como nomes de variáveis de ambiente em `provider.credentials`; valores nunca entram no arquivo.
-10. **Extensibilidade:** `ext` por pack (`ext['driver-web']`); campos reservados opcionais `estimate`, `parent`/`epics`, `impact`; leitores ignoram campos desconhecidos; `schemaVersion` só sobe em quebra.
-11. **Hooks:** `PreToolUse` em `Agent|Task|Workflow` lê o marcador `DRIVER-BLOCK: B-xxx` do prompt (fallback `currentPhase`) e nega se o gate da fase não está aprovado; arquivo ausente → allow, ilegível → deny. `PreToolUse` em `Edit|Write|MultiEdit|Bash` nega escrita direta em `plan.json`/`events.jsonl` (inclusive redirecionamento, `sed -i`, `tee`, `mv`, `cp`, `rm` via Bash) e `gate approve` vindo do modelo. `SubagentStop` move para `blocked` o bloco `in_progress` cujo `owner` encerrou sem handoff. Hooks procuram o plano primeiro no worktree principal, depois no `cwd`.
-12. **Guardas adicionais no reducer:** bloco não inicia em fase posterior a `currentPhase`; `release` só aprova com `route` aprovado; `release.add` exige gate `release`; `needs_rework` limpa `verification`; `in_review` exige seção `## Handoff` preenchida em `blocks/<id>.md` (checagem do store, `--force` para usuário). A invariante `phases.currentValid` (bloco iniciado em fase posterior à atual) é aviso, não erro, para permitir `phase back` com blocos já concluídos. Cobertura de requisitos (`req.coverage`) é aviso até a fase validate e erro a partir dela, para que requisitos possam entrar no Implement e no Evolve antes de ganharem bloco.
-13. **CLI:** `--root <dir>` ou `DRIVER_ROOT` sobrepõem a resolução via git (necessário para exemplos dentro de outro repositório). Raiz = worktree principal via `git worktree list --porcelain`, depois `--show-toplevel`, depois `cwd`. Ator padrão `model:main`; `DRIVER_ACTOR` ou `--actor kind:id` para mudar.
-14. **Ações exclusivas do usuário exigem terminal interativo** (revisão adversarial de 2026-10-27): `gate approve`, `rebaseline` e `--force` abrem `/dev/tty` e pedem `yes` digitado; sem tty (caso da ferramenta Bash do modelo) a CLI recusa. `--actor user:x` sozinho não concede nada. O hook de proteção ainda nega, após normalizar aspas e expansões, comandos Bash que invoquem essas ações ou as embrulhem em `script`/`expect`/`unbuffer`. Limite conhecido, demonstrado na revisão: um script gravado em arquivo e executado sob pseudoterminal (`script`, `expect`, `pty.spawn`) derrota a confirmação; por isso o hook nega qualquer uso desses wrappers no Bash, não só junto de `driver`. Isso eleva a barra, não a fecha; o canal à prova de modelo é o comando do mod (`$.command.register`) na v2. Pendência registrada: o orquestrador só conhece o `agent_id` de um subagent depois de criá-lo, então `--owner` cobre o caso quando o id é passado no claim; mapeamento via `SubagentStart` fica para a fase do mod.
-15. **Decisões registradas no plano:** `decisions` (opcional, `D-xxx` → título, data, motivo, ator), criadas por `decision add`, por `gate approve route` e por `rebaseline`. Retirar bloco ou requisito exige citar uma decisão existente (`ref.decision`).
+### Decision
+v1 uses subagents (explicit model, background, `isolation: worktree` when blocks edit the same files) and the Workflow tool for homogeneous batches without a human gate. Nested sessions only in v2, for long, independent blocks that the user wants to follow separately, and only with a file-based state protocol that all sessions write and the mod reads.
 
-### Alternativas consideradas
-- Log de eventos como fonte de verdade, snapshot derivado: cada consumidor teria que dobrar o log; o hook em `jq` ficaria caro. Rejeitada.
-- Arestas em lista separada `edges[]`: redundante com `dependsOn` na v1; outras relações entram como campo novo.
-- Ids por hash (evita colisão em merge humano): perde legibilidade; `driver renumber` repara colisões.
-- Tasks nativas do Claude Code como storage: desligadas por padrão em modelos novos, campos não documentados (ver ADR-009).
-
-### Consequências
-Hooks exigem `node` no PATH (a checagem de gate tem fallback em `jq` puro). Branches de worktree nunca tocam `plan.json`, então merge de volta não conflita. Capacidades de `$.fs` (create exclusivo, rename, stat) precisam ser confirmadas antes do mod; fallback é `$.process.spawn` da CLI.
+Constraints confirmed in the research:
+- Workflow **does not accept human input in the middle of execution**. Gates stay in the main conversation; one Workflow per Implement or Validate batch.
+- The desktop app's session tools (`start_session` etc.) are not publicly documented. v2 uses the documented path: `claude --bg` + cross-session messaging (`SendMessage`), which is plain text, a 50-message queue and never grants approval.
+- Headless (`-p`, SDK, cloud): the mod does not draw, only hooks work. The plugin needs to degrade to this mode.
 
 ---
 
-## [ADR-011] Mod do diagrama vivo: painel no core, aprovação por origem do usuário + ticket, claim de owner em `agent.spawn`
-**Data:** 2026-10-28
-**Status:** Aceito
-**Plano:** `.claude/plans/2026-10-28-mod-diagrama.md` · **Design:** `docs/research/05-mod-design.md`
+## [ADR-007] Name of the fifth phase: Evolve
+**Date:** 2026-10-26
+**Status:** Accepted
 
-### Contexto
-O ADR-009 previu o mod; o v1 do `plan.json` deixou duas lacunas que só ele fecha: o canal de aprovação de gate à prova de modelo (a confirmação por TTY cai diante de pseudoterminal) e o mapeamento `agent_id` → bloco. Fatos da API de mods (2.1.312): o módulo não tem Node nem DOM (não importa zod nem `node:*`); `command.run` carrega `e.origin`, e só o Enter do usuário é `composer`; `ui.press` também é iniciado pela pessoa; `agent.spawn` vê o prompt e devolve `agentId`, inclusive para agentes de Workflow; `$.process.run` aceita `stdin`.
+### Context
+Candidates: Evolve, Examine, Evaluate.
 
-### Decisão
-1. **Mod dentro do plugin core** (`plugins/driver/mod/`), listado em `hooks/hooks.json` sob `modules`, convivendo com os hooks shell (que seguem valendo em headless).
-2. **Código compartilhado sem dependências em `src/shared/`** (fases, paleta, projeção `PlanView`, veredito de gate, regras de proteção, layout, SVG, linhas do terminal). O código node (schema zod, hooks shell, mermaid) importa de lá; o mod também. Um `tsconfig.json` raiz com `types: []` impede `node:*` em `src/shared`. Testes vitest passam a `*.spec.ts`; `*.test.tsx` fica para `claude plugin test`.
-3. **Renderização:** no Desktop e no VS Code, SVG **vertical**: fases como faixas empilhadas, cartões de 56 px com texto de 13 px, arestas ortogonais, gates como linha com pílula entre as faixas. O desenho é feito na largura do painel em pixels (`bodyColumns × 9` menos 16 de margem; o 8 original deixava um nono do painel vazio no Desktop, medido em 2026-11-11) e passado ao elemento `Svg` com `width`/`height` explícitos e `isInteractive` (hover, `<title>` como tooltip), então nunca é reescalado: um painel estreito rola em vez de encolher. Paleta igual à do Mermaid com texto fixo escuro em cartões opacos (legível em dark e light), glifos de status para daltonismo, orçamento de 131k chars com escada de degradação (colapsar `done` por fase, tooltips curtos, cair para o quadro de cartões). Como cliques dentro do SVG não chegam ao plugin, a seleção de bloco é um `Select` na barra (ou um `Input` com o id acima de 64 blocos desenhados). Mobile: quadro de cartões nativo (`Box`/`Button`). Terminal: uma linha por bloco, botão por linha, foco automático na fase atual. O layout horizontal em swimlanes continua em `src/shared/layout.ts` para exportação.
-4. **Escrita sempre pela CLI** via `$.process.run(['node', dist/cli.js, ...])`; novos comandos: `where`, `apply --json` (atômico, uma revisão para várias ops), `--expect-revision`, `block owner` (CAS), `status --json`. Leitura por `$.fs` com polling de 1 s (5 s com painel fechado) e detecção por `mtime`/`size`/`revision`.
-5. **Tools para o modelo** (`mcp__driver__set_block_state`, `plan_ops`, `plan_status`), não deferidas, com erros estruturados do reducer; nunca expõem `gate approve`, `rebaseline`, `--force` nem `not_started`.
-6. **Canal de aprovação à prova de modelo:** `/driver approve <gate>` só com `e.origin.kind === 'composer'` (ou botão do painel via `ui.press`); o mod grava um ticket one-shot `{gate, revision, sha256(nonce), exp 15 s}` em `.claude/driver/.mod/` e chama `gate approve --via-mod` com o nonce por **stdin**; a CLI apaga o ticket antes de validar, exige `plan.revision` igual ao visto pelo usuário e compara o hash em tempo constante. O modelo não produz `command.run` composer nem `ui.press`; `gate approve`, `via-mod` e escrita em `.claude/driver/` são negados no Bash por tokens (não por frase), e o guard só vale onde existe plano. Força do canal = força da proteção do próprio `plan.json`, que a revisão de 2026-10-28 mostrou ser contornável por script em arquivo e cadeias de `cd`: portanto o canal **eleva a barra e é auditável** (toda aprovação registra `approvedVia: tty|mod` e, no mod, o hash do ticket; o mod alerta qualquer gate que vire aprovado sem ter sido emitido pela sessão, com banner vermelho quando `approvedVia` falta ou o ticket é desconhecido), não é à prova de modelo. Risco aceito explicitamente: interpretadores inline (`node -e`, `python -c`) com strings concatenadas não são bloqueados, porque negá-los em todo projeto com plano geraria falsos positivos demais; a defesa é a evidência de adulteração, não a prevenção. Rejeitados: nonce em arquivo puro (legível), token em env ou `$.store` (visível por `ps eww` e `cat`).
-7. **Claim de owner em `agent.spawn`:** o mod lê `DRIVER-BLOCK: B-xxx` do prompt, aplica o mesmo veredito de gate do hook shell (fecha a lacuna de agentes de Workflow), e após `next` registra `in_progress --owner <agentId>` ou transfere com `block owner --from main`. `classic.SubagentStop` só redesenha (o hook shell faz o orphan). Guard `tool.call` do mod repete `protectPlan` com `realPath` e comparação case-insensitive (corrige bypass `.Claude/Driver` em APFS, também no node).
-
-### Consequências
-Revisão adversarial (`docs/research/06-review-mod.md`) exigiu: guards por basename e por token independentes de diretório, escopo do guard restrito a projetos com plano, gate também para agentes retomados (`SendMessage`), ticket com janela de 20 s e registro `via`/`ticket` no evento. Dependência de `node` no PATH do app GUI (descoberta via `zsh -lc`, cache em `$.store`, `userConfig nodePath`; degradação documentada). API de mods early access: `claude-code.d.ts` 2.1.312 fixado, rechecar por release. Checklist de primeiro load no plano.
-
-Iteração visual (2026-10-29): o primeiro SVG (swimlanes horizontais, fonte de 10 px, sem `width`) saiu ilegível no Desktop, que o desenhou no tamanho intrínseco reduzido; uma lista de texto e um quadro de cartões nativos foram testados e rejeitados como pobres demais. A causa era escala, não formato: o item 3 passou a descrever o SVG vertical dimensionado em pixels. HTML/webview e Mermaid não existem no painel de mods; se o SVG ainda não bastar, a alternativa é uma página local servida pela CLI e aberta no browser do Desktop, fora do mod e sem o botão de aprovação.
-
-Refinamento do guard (2026-10-29, PER-619): o `protectCommand` tratava qualquer linha de heredoc como comando e negava código com `(` e `$` (um regex em um teste, por exemplo) com a mensagem de ação user-only. Semântica adotada, igual à do bash: o corpo de um heredoc é a stdin do comando que o abre, não uma sequência de comandos; é julgado por esse comando. Shell na linha (`bash <<EOF`, `cat <<EOF | sh`) → corpo recursado como comandos; `xargs` sobre a CLI → corpo vira argumentos; interpretador (`python3 -`, `node -`) com corpo que cita arquivo protegido ou após `cd` no diretório do plano → negado com mensagem própria (`MSG_SCRIPT`, a mesma regra de `python -c`); corpo sem aspas no delimitador → cada `$( … )` e crase é recursado, porque o shell os expande. `<<` entre aspas ou após `#` não abre heredoc; `"$( … )"` reabre contexto de comando (idioma do `git commit -m "$(cat <<'EOF'`). Ao mesmo tempo o normalizador passou a tratar quebra de linha como `;` (antes colapsava em espaço, e `echo hi` seguido de `driver gate approve route` em outra linha passava), parênteses de agrupamento são descartados (`(driver rebaseline)` é julgado como `driver rebaseline`) e um nome de comando vindo de substituição ou variável é negado com `MSG_SUBST`. Duas revisões (a primeira, adversarial, foi interrompida por classificador de segurança; a segunda auditou a classificação contra bash 3.2 e zsh 5.9) acrescentaram: comentário só após separador não escapado, `${ … }`, `$[ … ]` e `$'…'` no scanner, heredoc aberto em linha continuada ou lido pela linha seguinte a um `|`, terminador `EOF)` dentro de `$( … )`, `patch`/`git apply` com corpo que cita arquivo protegido, contexto de `cd` herdado pelo corpo recursado, `$( … )` em posição de argumento julgado como comando, wrappers com opções (`sudo -E`, `nice -n`, `timeout`), `case`/funções/keywords descartados e nomes comparados sem caixa. Separadores (`|`, `;`, `&`) dentro de aspas, `[[ ]]`, `(( ))` e `${ }` deixaram de partir o comando (eram a origem de falsos positivos antigos como `grep -E 'a|(b)$'`); em troca, o código passado a `bash -c`/`eval` é julgado recursivamente como os comandos que contém. Uma string entre aspas só é julgada como comandos quando há na linha um executor de código conhecido (shells, `eval`, `source`, `su`, `watch`, `find`, `xargs`, `ssh`, `npx`/`npm`/`pnpm`/`yarn`, `tmux`, `make`, `docker`, ajustes `git -c alias.*=!`/`core.sshCommand=` etc.): é uma lista de bloqueio por natureza, e um executor fora dela (`git config alias.x '!…'` seguido de `git x`, `osascript`/`perl` com `system(…)`) passa. Custo aceito: `eval "$(…)"` e `bash -c "$X"` são negados (código opaco vindo de expansão); um script inline que cita `plan.json` é negado mesmo quando só lê; uma mensagem de commit com `;` é negada se a mesma linha contém a palavra `bash` (`brew install bash && git commit -m "a; …"`); `driver 'gate approve' route` passa porque o bash entrega um argv só e a CLI não divide argumentos. Fora do alcance, registrado: função definida em linha anterior e chamada com heredoc, `bash <<< $'…\x20…'`, `exec {fd}<<EOF` do zsh, código escrito em arquivo e executado depois. Ajuste de 2026-10-30: o script de um editor in-place (`sed -i`, `perl -pi`, `ruby -i`; o valor de `-e`/`-f` ou o primeiro operando) não é caminho e sai do julgamento de alvo; antes, um `s/.*/x/` aplicado a um arquivo em `.claude/` era lido como glob capaz de cobrir `.mod` e negado.
+### Decision
+Evolve. Examine and Evaluate mean "verify", which is already Validate. Evolve names the novel part of the method: deciding where to go back to, recording why, and re-baselining the plan and graph.
 
 ---
 
-## [ADR-012] Skills de fase: Discover e Route como skills nativas do core, entrevista por opções, escrita só pelas tools
-**Data:** 2026-10-30
-**Status:** Aceito
+## [ADR-009] Graph in `.claude/driver/plan.json`; mod renders; gates enforced by hook
+**Date:** 2026-10-26 (accepted on 2026-10-27 with the format defined in ADR-010)
+**Status:** Accepted
 
-### Contexto
-Com CLI, tools `mcp__driver__*`, hooks e painel prontos, quem usa o DRIVER ainda precisa saber chamar `plan_ops` à mão. A pesquisa (`docs/research/skills-landscape.md`, seções 2 e 6) aponta Discover e Route como o elo mais fraco do pipeline manual e indica o que compor: fronteira de decisões do grilling, formato de pergunta do spec-kit `clarify`, uma pergunta por turno com `AskUserQuestion` (compound-engineering), auto-revisão do `writing-plans`. `grilling` e spec-kit não estão instalados; superpowers 7.0.0 está, mas `brainstorming` usa texto livre e `writing-plans` escreve um plano em markdown, não blocos no grafo. Design bruto em `docs/research/07-skills-design.md`; plano em `.claude/plans/2026-10-30-skills-discover-route.md`.
+### Context
+Infrastructure research: Claude Code's native Tasks are off by default in new models and have undocumented fields and storage. The plan mode file is per session and has no documented format. Mods can draw a panel beside the chat (SVG only on Desktop and VS Code; Box/Text or Raster in the terminal), read files via `$.fs`, react to events and register tools that the model calls. `AskUserQuestion` can be auto-continued by `askUserQuestionTimeout`.
 
-### Decisão
-1. **Uma skill por fase, no core, no formato nativo de skill de plugin:** `plugins/driver/skills/discover/SKILL.md` e `plugins/driver/skills/route/SKILL.md`, `user-invocable: true`, invocação pelo modelo permitida (Discover invoca Route depois do gate), sem `context: fork` (a entrevista precisa do histórico). Texto das skills em inglês; a conversa acontece na língua do usuário. Convenções compartilhadas em `plugins/driver/references/driver-conventions.md`, fora de `skills/`.
-2. **Entrevista por opções, uma pergunta por turno:** `AskUserQuestion` com 2 a 3 opções reais mais "Não sei / decida por mim", recomendada primeiro com sufixo `(Recommended)`, consequência na descrição e "Por que importa" no texto. Fronteira de decisões (grilling) persistida em `discover/interview.md` a cada resposta; fatos são apurados por subagentes de leitura em background, decisões são do usuário; teste de decisões já tomadas contra `discover/assumptions.md`, respostas anteriores e o repositório. "Não sei" nunca bloqueia: pesquisa, default seguro registrado como premissa `A-nn`, ou adiamento.
-3. **Proporcionalidade** pelo mecanismo do ADR-008 (abaixo), decidido na primeira rodada por esforço estimado e registrado como decisão `D-nnn`.
-4. **Sem dependência do superpowers nesta rodada.** Discover tem estilo próprio; Route copia o checklist de auto-revisão do `writing-plans` (cobertura, varredura, dependências, foco de revisão, proporção). A dependência pinada do ADR-003 fica para B-006, onde Implement usa `subagent-driven-development`.
-5. **Durante a entrevista só arquivos; o plano recebe um lote no fim.** Requisitos, premissas (`source: assumed`, `ref: discover/assumptions.md`), não-objetivos (`kind: non-goal`) e a decisão de classe entram por `plan_ops` depois do play back aceito, em lotes de até 25 ops. Motivo: nada é apagado (ADR-010 item 7). A skill escreve `requirements/R-nnn.md`, `discover/*.md`, `blocks/B-nnn.md` e `route/risks.md` com Write/Edit; `plan.json`, `events.jsonl`, `log/` e `.mod/` continuam fora do alcance; gate, rebaseline e `--force` continuam do usuário.
-6. **Cada skill tem um bloco no plano** ("Discovery interview" em discover, "Route plan" em route dependente do primeiro), com artifacts (caminhos relativos à raiz do projeto, como `.claude/driver/discover/interview.md`), Handoff e `verification.passes` marcado pelo modelo tendo o aceite explícito do usuário como evidência. Route termina com `phase.advance` para implement; não há gate humano entre Route e Implement (visão, seção 5). Bloco `done` nunca é reaberto: amend (Discover depois do gate) e replan (Route) criam blocos novos ("Discovery amend: <tópico>", "Route replan: <motivo>"); a única exceção é o retrabalho do Discovery antes do gate, pelo caminho `done → needs_rework → in_progress`. O lote de saída é idempotente: os ids criados ficam registrados em `interview.md` e uma reentrada só acrescenta o que falta.
-7. **Route decompõe em blocos de implement, validate, evolve e release** com saída observável, critério de aceite como definition of done, `dependsOn` só para dependência real, cobertura de todo requisito por ≥ 1 implement e ≥ 1 validate, risco por regra fixa, `provider` quando há capacidade externa, matriz de riscos em `route/risks.md`, diagrama validado pelo usuário (painel e `export mermaid`) e `driver validate` sem aviso `req.coverage`.
+### Decision
+- Source of truth: `.claude/driver/plan.json`, owned by DRIVER, with blocks, states, edges, linked requirements, provider per block and an `approved` flag per gate. Markdown per block for long text.
+- The core mod mirrors the file into `$.state` and draws: SVG on Desktop/VS Code, Box/Text layout in the terminal. Mermaid generated to a file as a universal fallback (CLI without mod, headless, export).
+- The mod registers `mcp__driver__set_block_state` so the model can change state without hand-writing JSON.
+- Gates are enforced by a `PreToolUse` hook (or a `tool.call` guard in the mod) that refuses Agent/Workflow in the next phase while the plan does not record `approved: true`. A prompt alone is not a gate.
 
-### Consequências
-Rejeitados: `brainstorming` do superpowers como Discover (texto livre, sem persistência, sem opções visuais); `req.add` incremental durante a entrevista (ruído de retire); gate humano no fim do Route (só dois gates). Riscos aceitos: classe L pode passar de 30 turnos (mitigação: teto por rodada e arquivos à prova de compactação); o painel não mostra requisitos até o fim da entrevista; `verification.passes` do modelo nos blocos das skills. Confirmado no primeiro load (2026-10-30): slash `/driver:discover` e `/driver:route`; `allowed-tools` com `Bash(driver *)` aceito pelo `claude plugin validate`. Revisão adversarial opus da mesma data: 7 correções obrigatórias (busca de bloco por título via `plan_status scope: phase`, lote de saída idempotente, interview fechada antes do gate volta ao passo do gate, amend/replan sem reabrir bloco `done`, `kind` das premissas, faixa de blocos só implement e validate, texto do gate `route` nas convenções) e 9 melhorias aplicadas (reclassificação ao fim da rodada 1 com flags no frontmatter, "nunca reperguntar sem informação nova", premissas viram `Accepted: yes` no aceite, aviso de que aprovar o gate não inicia turno do modelo, docs de bloco só com Edit, artifacts relativos à raiz e `exports/plan.mmd` fora dos artifacts por ser gitignored, heredoc entre aspas no fallback da CLI, tabela de transições nas convenções, subagentes de pesquisa do tipo `Explore`).
+### Consequences
+Minimum CLI 2.1.287. The mods API is early access: recheck `claude-code.d.ts` on every release. No existing mod does this; it is the novel part of the plugin.
 
 ---
 
-## [ADR-013] Entrevista por interesse: núcleo de produto, áreas por escolha, resumo como mensagem final, registro silencioso
-**Data:** 2026-11-10
-**Status:** Aceito (revisa o ADR-008 e os itens 2 e 5 do ADR-012)
+## [ADR-010] `plan.json` v1 format: canonical snapshot, single writer, event ledger
+**Date:** 2026-10-27
+**Status:** Accepted
+**Plan:** `.claude/plans/2026-10-27-plan-json-v1.md`
 
-### Contexto
-Primeiro dogfooding das skills (cópia de `examples/web-waitlist`, classe S). O protocolo funcionou, mas o Diogo apontou quatro problemas: (1) entrevista longa demais para o tamanho, porque "dados pessoais" (um campo de e-mail) subiu a profundidade para classe M e o teto por rodada virou meta; (2) perguntas técnicas de baixo impacto feitas a quem pode não querer decidi-las, sem que decisões relevantes possam ser tomadas às escondidas; (3) o resumo de aceite não apareceu: texto escrito antes de uma chamada de ferramenta é condensado no terminal, e a pergunta "o resumo acima está correto?" ficou sem resumo; (4) cada resposta gerava um diff de `interview.md` na tela, e as edições por `sed` esbarravam no guard.
+### Context
+ADR-009 fixed the file, not the format. Consumers of the file: mod (polling via `$.fs`, draws SVG or Box/Text), shell `PreToolUse` hook (needs to answer "gate approved?" with a `jq` expression), the `mcp__driver__set_block_state` tool, Mermaid exporter, phase skills. Decisive fact: the file lives in git, so each subagent worktree has a stale copy.
 
-### Decisão
-1. **Núcleo de produto, sempre perguntado.** Depois da classificação (domínio e tamanho), a entrevista pergunta só o que apenas o usuário sabe: objetivo e sinal de sucesso, público, capacidades indispensáveis, o que fica de fora. Orçamento total do núcleo, contado em perguntas e não em rodadas: XS 2, S 4, M 6, L 8. É teto, não meta: nó com default seguro vira premissa sem pergunta.
-2. **Áreas técnicas por escolha.** Depois do núcleo, uma pergunta de múltipla escolha: "Em quais áreas você quer decidir os detalhes?", com 2 a 4 áreas derivadas do domínio (para web: infraestrutura e hospedagem, dados e privacidade, design e conteúdo, métricas). Área marcada: até 3 perguntas. Área não marcada: o modelo decide e registra cada decisão como premissa `A-nn` com a escolha e o motivo em uma linha. XS pula a pergunta de áreas (tudo decidido pelo modelo e mostrado no resumo).
-3. **Exceção de sempre perguntar.** Decisão cara de reverter, que gasta dinheiro, que coleta dado sensível (pagamento, saúde, documentos, menores) ou que age em produção é perguntada mesmo com a área pulada. Substitui a subida de classe do ADR-008: um e-mail de contato não é gatilho.
-4. **Progresso e saída antecipada.** Toda pergunta traz o progresso ("3 de ~6"). A partir da terceira pergunta depois da classificação, uma das opções é "Já basta, resuma": os nós abertos viram premissas com o default recomendado. Checkpoint (pre-mortem, red team, socrático) só para classe M e L.
-5. **Resumo como mensagem final do turno.** O resumo é texto corrido na língua do usuário, sem chamada de ferramenta depois dele no mesmo turno: objetivo, o que será construído, o que o usuário decidiu, o que o modelo decidiu por ele (com motivo), o que fica de fora, perguntas em aberto. Termina pedindo "aceito" ou o que mudar; o usuário também pode perguntar o porquê de uma decisão ou abrir uma área pulada. O mesmo texto é gravado em `.claude/driver/discover/summary.md`. O aceite vem na mensagem seguinte do usuário; só então roda o lote de saída.
-6. **Registro silencioso pela tool `mcp__driver__discover_log`.** Fonte de verdade da entrevista passa a ser `.claude/driver/discover/interview.jsonl` (append-only, escrito só pela CLI). A tool chama `driver discover log` (JSON na stdin) e a CLI regenera `interview.md`, `assumptions.md` e `non-goals.md` a partir do log; o modelo não edita mais esses três arquivos. Sem argumentos de escrita a tool devolve o estado (meta, nós, não-objetivos, fronteira) para retomada. Contrato:
-   - entrada `{ meta?, nodes?, nonGoals? }`, todos opcionais;
-   - `meta`: `goal`, `class` (XS|S|M|L), `domain`, `language`, `stage` (core|areas|summary|closed), `areas` (lista oferecida), `chosenAreas`, `reclassified` (bool), `checkpoint` (none|pre-mortem|red-team|socratic|skipped), `batchApplied` (string); chaves ausentes ficam como estão;
-   - `nodes[]`: `id` (`Q-nn`; ausente cria o próximo), `question`, `area` (core ou nome da área), `dependsOn[]`, `kind` (fact|decision), `status` (open|researching|settled|assumed|deferred), `answer`, `source` (user|research|assumed), `options[]` (mostradas), `why` (motivo, obrigatório quando `status` é assumed), `requirement` (`R-nnn`, preenchido depois do lote); atualização é por `id`, campo ausente fica como está; um nó que passa a `assumed` ganha `A-nn` automático;
-   - `nonGoals[]`: `id` (`N-nn`; ausente cria), `statement`, `reason`, `requirement`;
-   - saída: ids criados, contagens por status e a fronteira (nós abertos cujos `dependsOn` estão resolvidos ou assumidos).
-7. **Route segue o mesmo padrão** (acrescentado no mesmo dia, depois de o Diogo rodar o Route no terminal): a confirmação do plano deixa de ser pergunta de ferramenta sobre um diagrama que o terminal não mostra. O turno termina com a lista de blocos por fase (id, título, dependências, risco, o que roda em paralelo), contagem contra a faixa, caminho crítico e blocos de risco alto, na língua do usuário, gravada também em `.claude/driver/route/summary.md`; a confirmação vem na mensagem seguinte. Os documentos de bloco são preenchidos pela tool `mcp__driver__block_doc` (`driver block doc`, JSON na stdin: `{blocks:[{id, spec?, acceptance?[], notes?, handoff?}]}`, 1 a 30 por chamada), que reescreve só as seções nomeadas, preserva frontmatter e título, recusa bloco `done` ou aposentado e não mexe em `plan.json`. As skills não usam mais Write, Edit, `sed` ou redirecionamento em `blocks/` nem nos arquivos gerados de `discover/`.
-8. **Guard.** `sed -i`, `perl -pi` e `ruby -i` depois de um `cd` para dentro da pasta do plano só são negados quando o operando é protegido, é glob ou não existe (antes, qualquer edição in-place ali era negada, inclusive de `discover/interview.md`). Exceção inesperada no guard continua negando a chamada, mas o caso que a provocou vira teste. Mudança no guard passa por revisão adversarial (GUARDRAILS).
+### Decision
+1. **Canonical snapshot in JSON**, not an event log as the source: the hook and the mod need a cheap read. `requirements` and `blocks` are objects indexed by id (`R-001`, `B-001`) for O(1) lookup in `jq` and stable diffs.
+2. **Two counters:** `revision` goes up on every write (CAS and change detection by the mod); `baseline` goes up only on re-baseline in Evolve (0 until Gate 1).
+3. **Block states** in snake_case: `not_started · in_progress · blocked · in_review · done · needs_rework`. Every transition stamps `statusSince`, `statusBy` (`{kind: model|user|hook, id}`) and, in blocked/needs_rework, `statusReason`. `not_started → in_progress` records `owner` and works as a claim under lock.
+4. **Gates** in `gates.route` and `gates.release` (key = phase released). Approval only by user command, never by the model. Automatic revocation by the writer: `release` falls on re-baseline, when a block leaves `done`, when the phase goes back from evolve/release, or when a requirement enters or leaves after Gate 1; `route` falls only when the phase goes back to discover. (Revised on 2026-10-27: the initial version revoked `route` on every requirement change, which made it impossible to add a requirement in Evolve without going back to Discover. Gate 1 approves the understanding; later changes are a matter for the re-baseline and Gate 2.)
+5. **Single writer:** a TS core (pure reducer + node adapter) used by the `driver` CLI and by the mod tools. Protocol: root resolved by the main worktree (`git rev-parse --git-common-dir`), lock by `mkdir .lock` (stale after 30 s, retry up to 5 s), validate before writing, `.tmp` + fsync + rename, deterministic serialization, then append an event to `events.jsonl`. The orchestrator is the normal writer; subagents return a structured result.
+6. **Ledger** `events.jsonl` committed (`merge=union`), rotated to `log/REL-n.jsonl` at every Release. `plan.json` holds only the current state; history lives in the ledger and in git.
+7. **Nothing is deleted:** blocks and requirements removed by Evolve get `retired: {at, decision, reason}` citing a `D-xxx`. Ids are allocated only by the writer from `nextId`, never reused.
+8. **Long text outside the JSON:** `blocks/<id>.md`, `requirements/<id>.md`, `decisions/<id>.md`; path implied by the id.
+9. **Credentials** only as environment variable names in `provider.credentials`; values never enter the file.
+10. **Extensibility:** `ext` per pack (`ext['driver-web']`); optional reserved fields `estimate`, `parent`/`epics`, `impact`; readers ignore unknown fields; `schemaVersion` only goes up on a breaking change.
+11. **Hooks:** `PreToolUse` on `Agent|Task|Workflow` reads the `DRIVER-BLOCK: B-xxx` marker from the prompt (fallback `currentPhase`) and denies if the phase gate is not approved; missing file → allow, unreadable → deny. `PreToolUse` on `Edit|Write|MultiEdit|Bash` denies direct writes to `plan.json`/`events.jsonl` (including redirection, `sed -i`, `tee`, `mv`, `cp`, `rm` via Bash) and `gate approve` coming from the model. `SubagentStop` moves to `blocked` the `in_progress` block whose `owner` ended without a handoff. Hooks look for the plan first in the main worktree, then in `cwd`.
+12. **Additional reducer guards:** a block does not start in a phase later than `currentPhase`; `release` only approves with `route` approved; `release.add` requires the `release` gate; `needs_rework` clears `verification`; `in_review` requires a filled `## Handoff` section in `blocks/<id>.md` (store check, `--force` for the user). The invariant `phases.currentValid` (block started in a phase later than the current one) is a warning, not an error, to allow `phase back` with already completed blocks. Requirement coverage (`req.coverage`) is a warning until the validate phase and an error from then on, so that requirements can enter in Implement and Evolve before getting a block.
+13. **CLI:** `--root <dir>` or `DRIVER_ROOT` override the git-based resolution (needed for examples inside another repository). Root = main worktree via `git worktree list --porcelain`, then `--show-toplevel`, then `cwd`. Default actor `model:main`; `DRIVER_ACTOR` or `--actor kind:id` to change it.
+14. **User-only actions require an interactive terminal** (adversarial review of 2026-10-27): `gate approve`, `rebaseline` and `--force` open `/dev/tty` and ask for a typed `yes`; without a tty (the case of the model's Bash tool) the CLI refuses. `--actor user:x` alone grants nothing. The protection hook still denies, after normalizing quotes and expansions, Bash commands that invoke these actions or wrap them in `script`/`expect`/`unbuffer`. Known limit, demonstrated in the review: a script written to a file and run under a pseudoterminal (`script`, `expect`, `pty.spawn`) defeats the confirmation; for that reason the hook denies any use of these wrappers in Bash, not only alongside `driver`. This raises the bar, it does not close it; the model-proof channel is the mod command (`$.command.register`) in v2. Pending item recorded: the orchestrator only knows a subagent's `agent_id` after creating it, so `--owner` covers the case when the id is passed in the claim; mapping via `SubagentStart` is left for the mod phase.
+15. **Decisions recorded in the plan:** `decisions` (optional, `D-xxx` → title, date, reason, actor), created by `decision add`, by `gate approve route` and by `rebaseline`. Retiring a block or requirement requires citing an existing decision (`ref.decision`).
 
-9. **Ajustes da revisão adversarial (mesmo dia).** Orçamentos por classe, todos tetos: núcleo XS 2, S 4, M 6, L 8; perguntas de área no total XS 0, S 3, M 6, L 9 (no máximo 3 por área); "sempre perguntar" no máximo 2, fora dos orçamentos e válido para toda classe, por lista fechada (gasta dinheiro; coleta dado de pagamento, saúde, documento ou de menores; apaga dado sem volta; cria compromisso legal). Hospedar, escolher banco e campo de e-mail não são gatilhos. O aceite é gravado (`meta.accepted`) antes do lote de saída, que primeiro lê os requisitos já no plano e só acrescenta o que falta. Só viram requisito decisões que o produto precisa cumprir (classificação e escolha de áreas ficam no registro). Arquivos de requisito passam pela tool `mcp__driver__req_doc`. Corpo de seção não pode conter título de nível 1 ou 2 fora de bloco de código, e o reducer exige exatamente um `## Handoff`. O mod recusa escrita vinda de subagente, exceto estado e documento do bloco de que ele é owner. Os dois resumos (`discover/summary.md`, `route/summary.md`) são documentos do usuário, na língua dele, títulos incluídos.
-10. **Guard, segunda rodada.** Além do item 8: script de `sed` com `w` perto de arquivo protegido ou com `e` é negado, com ou sem `-i`; código de `perl`/`ruby` em qualquer cluster de flags conta como script inline, e edição in-place deles dentro da pasta do plano continua negada; script colado na flag, `-I` do sed BSD, `--in-place=SUF` e `-l N` são reconhecidos; chaves, sequências `{a..b}` e alternância do zsh contam como expansão; `cd` que alcança a pasta do plano por `..`, `pushd` ou variável conta como estar nela; `log/*` relativo é protegido ali.
+### Alternatives considered
+- Event log as the source of truth, derived snapshot: every consumer would have to fold the log; the `jq` hook would get expensive. Rejected.
+- Edges in a separate `edges[]` list: redundant with `dependsOn` in v1; other relations come in as a new field.
+- Hash-based ids (avoids collision in human merges): loses readability; `driver renumber` repairs collisions.
+- Claude Code native Tasks as storage: off by default in new models, undocumented fields (see ADR-009).
 
-### Consequências
-A profundidade da entrevista passa a depender do interesse do usuário, não só do tamanho: quem não é técnico responde o núcleo e revisa o resumo; quem quer decidir infra marca a área. A classe continua fixando a faixa de blocos do Route. Custos: mais decisões tomadas pelo modelo (mitigação: nenhuma fica fora do resumo e a exceção do item 3); o aceite custa um turno a mais; `interview.jsonl` é mais um arquivo e a CLI ganha um renderizador de markdown. `interview.jsonl` não entra na lista de arquivos protegidos pelo guard nesta rodada (a skill proíbe editá-lo; proteger é decisão futura se o dogfooding mostrar edição manual). Rejeitado: manter rodadas com tetos menores (não resolve "quem decide o quê"); pôr o resumo no campo de pergunta da ferramenta (limite de tamanho, sem formatação).
+### Consequences
+Hooks require `node` on the PATH (the gate check has a pure `jq` fallback). Worktree branches never touch `plan.json`, so merging back does not conflict. `$.fs` capabilities (exclusive create, rename, stat) need to be confirmed before the mod; the fallback is the CLI's `$.process.spawn`.
 
 ---
 
-## [ADR-014] Próximo passo sempre visível: o painel diz o que fazer e o botão principal aciona o Claude
+## [ADR-011] Living diagram mod: panel in the core, approval by user origin + ticket, owner claim on `agent.spawn`
+**Date:** 2026-10-28
+**Status:** Accepted
+**Plan:** `.claude/plans/2026-10-28-mod-diagram.md` · **Design:** `docs/research/05-mod-design.md`
 
-**Data:** 2026-11-11 · **Status:** Aceito · **Issue:** PER-669 (segundo dogfooding)
+### Context
+ADR-009 anticipated the mod; `plan.json` v1 left two gaps that only the mod closes: the model-proof gate approval channel (the TTY confirmation falls to a pseudoterminal) and the `agent_id` → block mapping. Facts about the mods API (2.1.312): the module has no Node or DOM (it does not import zod or `node:*`); `command.run` carries `e.origin`, and only the user's Enter is `composer`; `ui.press` is also initiated by the person; `agent.spawn` sees the prompt and returns `agentId`, including for Workflow agents; `$.process.run` accepts `stdin`.
 
-**Contexto.** No segundo dogfooding (projeto novo, app Desktop) o Discover e o Route correram bem, mas a passagem entre eles deixou o usuário perdido: aprovar o gate e clicar em "Advance to route" mudou a fase no plano e nada mais aconteceu, porque o painel só escreve no plano e não aciona o modelo. Além disso o painel oferecia "Advance to implement" com a fase route sem nenhum bloco, e "Advance to validate" com implement em 0 de 12.
+### Decision
+1. **Mod inside the core plugin** (`plugins/driver/mod/`), listed in `hooks/hooks.json` under `modules`, living alongside the shell hooks (which keep applying in headless).
+2. **Dependency-free shared code in `src/shared/`** (phases, palette, `PlanView` projection, gate verdict, protection rules, layout, SVG, terminal lines). The node code (zod schema, shell hooks, mermaid) imports from there; the mod does too. A root `tsconfig.json` with `types: []` prevents `node:*` in `src/shared`. Vitest tests become `*.spec.ts`; `*.test.tsx` is left for `claude plugin test`.
+3. **Rendering:** on Desktop and VS Code, **vertical** SVG: phases as stacked bands, 56 px cards with 13 px text, orthogonal edges, gates as a line with a pill between the bands. The drawing is made at the panel width in pixels (`bodyColumns × 9` minus 16 of margin; the original 8 left a ninth of the panel empty on Desktop, measured on 2026-11-11) and passed to the `Svg` element with explicit `width`/`height` and `isInteractive` (hover, `<title>` as tooltip), so it is never rescaled: a narrow panel scrolls instead of shrinking. Palette equal to Mermaid's with fixed dark text on opaque cards (legible in dark and light), status glyphs for color blindness, a 131k-char budget with a degradation ladder (collapse `done` per phase, short tooltips, fall back to the card board). Since clicks inside the SVG do not reach the plugin, block selection is a `Select` in the bar (or an `Input` with the id above 64 drawn blocks). Mobile: native card board (`Box`/`Button`). Terminal: one line per block, a button per line, automatic focus on the current phase. The horizontal swimlane layout stays in `src/shared/layout.ts` for export.
+4. **Writes always through the CLI** via `$.process.run(['node', dist/cli.js, ...])`; new commands: `where`, `apply --json` (atomic, one revision for several ops), `--expect-revision`, `block owner` (CAS), `status --json`. Reads via `$.fs` with 1 s polling (5 s with the panel closed) and detection by `mtime`/`size`/`revision`.
+5. **Tools for the model** (`mcp__driver__set_block_state`, `plan_ops`, `plan_status`), not deferred, with structured errors from the reducer; they never expose `gate approve`, `rebaseline`, `--force` or `not_started`.
+6. **Model-proof approval channel:** `/driver approve <gate>` only with `e.origin.kind === 'composer'` (or a panel button via `ui.press`); the mod writes a one-shot ticket `{gate, revision, sha256(nonce), exp 15 s}` in `.claude/driver/.mod/` and calls `gate approve --via-mod` with the nonce through **stdin**; the CLI deletes the ticket before validating, requires `plan.revision` equal to the one the user saw, and compares the hash in constant time. The model does not produce a composer `command.run` nor `ui.press`; `gate approve`, `via-mod` and writes to `.claude/driver/` are denied in Bash by tokens (not by phrase), and the guard only applies where a plan exists. Strength of the channel = strength of the protection of `plan.json` itself, which the 2026-10-28 review showed can be bypassed by a script in a file and `cd` chains: therefore the channel **raises the bar and is auditable** (every approval records `approvedVia: tty|mod` and, in the mod, the ticket hash; the mod alerts on any gate that becomes approved without having been issued by the session, with a red banner when `approvedVia` is missing or the ticket is unknown), it is not model-proof. Risk explicitly accepted: inline interpreters (`node -e`, `python -c`) with concatenated strings are not blocked, because denying them in every project with a plan would generate too many false positives; the defense is tamper evidence, not prevention. Rejected: nonce in a plain file (readable), token in env or `$.store` (visible via `ps eww` and `cat`).
+7. **Owner claim on `agent.spawn`:** the mod reads `DRIVER-BLOCK: B-xxx` from the prompt, applies the same gate verdict as the shell hook (closes the gap for Workflow agents), and after `next` records `in_progress --owner <agentId>` or transfers with `block owner --from main`. `classic.SubagentStop` only redraws (the shell hook does the orphan handling). The mod's `tool.call` guard repeats `protectPlan` with `realPath` and case-insensitive comparison (fixes the `.Claude/Driver` bypass on APFS, in node as well).
 
-**Decisão.**
-1. O painel mostra sempre uma linha "Next: ..." com o próximo passo, derivada só da `PlanView` (função pura `nextStep`). Nenhum estado do plano fica sem próximo passo visível, salvo release concluída.
-2. O botão principal tem três formas, nesta ordem:
-   - **Approve `<gate>` gate** quando o método pede um gate e ele não está aprovado (regra do ADR-011, inalterada, com as duas confirmações e o ticket). Aprovado o gate, o mod avança a fase e aciona o Claude, sem segundo clique.
-   - **Continue `<fase>`** quando a fase atual não tem blocos ou tem bloco ativo não concluído. Não escreve no plano; só aciona o Claude.
-   - **Start `<próxima fase>`** quando todos os blocos ativos da fase atual estão concluídos e a próxima não depende de gate pendente. Avança a fase e aciona o Claude.
-   O botão "Advance to ..." deixa de existir: avançar com a fase incompleta continua possível pela tool `plan_ops` e pela CLI (o reducer não muda), mas o painel não oferece.
-3. "Acionar o Claude" é `$.prompt.submit` com um texto curto e fixo que nomeia a fase e a skill (`driver:discover`, `driver:route`); para fases ainda sem skill, o texto pede `plan_status`, a lista dos blocos prontos com recomendação e motivo, e a pergunta de qual começar. O envio é um turno próprio, entra na fila se a sessão estiver ocupada e chega ao modelo com origem `plugin`.
-4. `/driver approve <gate>` digitado faz o mesmo que o botão: aprova, avança e aciona.
-5. O prompt enviado pelo mod nunca aprova nada: aprovação continua exigindo origem `composer` ou `ui.press` mais ticket. Um prompt de origem `plugin` é só um pedido de trabalho, igual a uma mensagem do usuário, e passa pelos mesmos hooks de gate.
+### Consequences
+Adversarial review (`docs/research/06-review-mod.md`) required: guards by basename and by token independent of directory, guard scope restricted to projects with a plan, gate also for resumed agents (`SendMessage`), ticket with a 20 s window and a `via`/`ticket` record in the event. Dependency on `node` on the PATH of the GUI app (discovered via `zsh -lc`, cached in `$.store`, `userConfig nodePath`; degradation documented). Mods API is early access: `claude-code.d.ts` 2.1.312 pinned, recheck per release. First-load checklist in the plan.
 
-**Alternativas descartadas.** Só preencher o campo de mensagem com `/driver:route` (minha proposta inicial): ainda exige saber que falta um Enter, e o usuário pediu que aprovar leve adiante. Disparar sem clique ao detectar gate aprovado no polling: gastaria turno por aprovação feita em outro terminal ou sessão.
+Visual iteration (2026-10-29): the first SVG (horizontal swimlanes, 10 px font, no `width`) came out unreadable on Desktop, which drew it at the reduced intrinsic size; a text list and a board of native cards were tested and rejected as too poor. The cause was scale, not format: item 3 now describes the vertical SVG sized in pixels. HTML/webview and Mermaid do not exist in the mod panel; if the SVG is still not enough, the alternative is a local page served by the CLI and opened in the Desktop browser, outside the mod and without the approval button.
 
-**Consequências.** Quem aprova um gate aceita gastar o turno seguinte; isso fica dito no texto da confirmação ("Approve and start ..."). As skills de fase devem terminar toda mensagem final com o próximo passo do usuário (já era regra do ADR-013 para Discover e Route; vale para as de B-006).
+Guard refinement (2026-10-29, PER-619): `protectCommand` treated every heredoc line as a command and denied code with `(` and `$` (a regex in a test, for example) with the user-only action message. Semantics adopted, the same as bash's: a heredoc body is the stdin of the command that opens it, not a sequence of commands; it is judged by that command. Shell on the line (`bash <<EOF`, `cat <<EOF | sh`) → body recursed as commands; `xargs` over the CLI → body becomes arguments; interpreter (`python3 -`, `node -`) with a body that mentions a protected file or after `cd` into the plan directory → denied with its own message (`MSG_SCRIPT`, the same rule as `python -c`); body with an unquoted delimiter → each `$( … )` and backtick is recursed, because the shell expands them. `<<` inside quotes or after `#` does not open a heredoc; `"$( … )"` reopens command context (the idiom of `git commit -m "$(cat <<'EOF'`). At the same time the normalizer started treating a line break as `;` (before, it collapsed into a space, and `echo hi` followed by `driver gate approve route` on another line got through), grouping parentheses are discarded (`(driver rebaseline)` is judged as `driver rebaseline`) and a command name coming from a substitution or variable is denied with `MSG_SUBST`. Two reviews (the first, adversarial, was interrupted by a security classifier; the second audited the classification against bash 3.2 and zsh 5.9) added: comment only after an unescaped separator, `${ … }`, `$[ … ]` and `$'…'` in the scanner, heredoc opened on a continued line or read by the line following a `|`, terminator `EOF)` inside `$( … )`, `patch`/`git apply` with a body that mentions a protected file, `cd` context inherited by the recursed body, `$( … )` in argument position judged as a command, wrappers with options (`sudo -E`, `nice -n`, `timeout`), `case`/functions/keywords discarded and names compared case-insensitively. Separators (`|`, `;`, `&`) inside quotes, `[[ ]]`, `(( ))` and `${ }` no longer split the command (they were the source of old false positives such as `grep -E 'a|(b)$'`); in exchange, the code passed to `bash -c`/`eval` is judged recursively as the commands it contains. A quoted string is only judged as commands when the line has a known code executor (shells, `eval`, `source`, `su`, `watch`, `find`, `xargs`, `ssh`, `npx`/`npm`/`pnpm`/`yarn`, `tmux`, `make`, `docker`, `git -c alias.*=!`/`core.sshCommand=` adjustments etc.): it is a blocklist by nature, and an executor outside it (`git config alias.x '!…'` followed by `git x`, `osascript`/`perl` with `system(…)`) gets through. Accepted cost: `eval "$(…)"` and `bash -c "$X"` are denied (opaque code coming from an expansion); an inline script that mentions `plan.json` is denied even when it only reads; a commit message with `;` is denied if the same line contains the word `bash` (`brew install bash && git commit -m "a; …"`); `driver 'gate approve' route` gets through because bash delivers a single argv and the CLI does not split arguments. Out of reach, recorded: a function defined on an earlier line and called with a heredoc, `bash <<< $'…\x20…'`, zsh's `exec {fd}<<EOF`, code written to a file and executed later. Adjustment of 2026-10-30: the script of an in-place editor (`sed -i`, `perl -pi`, `ruby -i`; the value of `-e`/`-f` or the first operand) is not a path and is taken out of target judgment; before, an `s/.*/x/` applied to a file in `.claude/` was read as a glob able to cover `.mod` and denied.
 
-## [ADR-015] Próximo passo em toda resposta e piloto automático opcional no Implement
+---
 
-**Data:** 2026-11-11 · **Status:** Aceito · **Issue:** PER-669 (segundo dogfooding)
+## [ADR-012] Phase skills: Discover and Route as native core skills, interview by options, writes only through the tools
+**Date:** 2026-10-30
+**Status:** Accepted
 
-**Contexto.** No Implement do coffee-app o Claude fechou um bloco, fez o commit pedido e encerrou a resposta sem dizer o que vinha depois. O autor sabe que basta pedir para continuar; um usuário comum fica parado. O pedido foi: sempre haver uma dica, uma pergunta, ou uma opção de ligar o automático e deixar o Claude decidir tudo até o fim da implementação.
+### Context
+With the CLI, `mcp__driver__*` tools, hooks and panel ready, whoever uses DRIVER still needs to know how to call `plan_ops` by hand. The research (`docs/research/skills-landscape.md`, sections 2 and 6) points to Discover and Route as the weakest link of the manual pipeline and indicates what to compose: the decision frontier from grilling, the question format of spec-kit's `clarify`, one question per turn with `AskUserQuestion` (compound-engineering), the self-review of `writing-plans`. `grilling` and spec-kit are not installed; superpowers 7.0.0 is, but `brainstorming` uses free text and `writing-plans` writes a plan in markdown, not blocks in the graph. Raw design in `docs/research/07-skills-design.md`; plan in `.claude/plans/2026-10-30-skills-discover-route.md`.
 
-**Decisão.**
-1. **Regra permanente no prompt.** Em projeto com plano, o mod acrescenta uma seção ao system prompt (`prompt.compose`, id `driver:next-step`, escopo `session`): toda resposta final da sessão principal termina com o próximo passo do usuário, como pergunta com opções ou como a ação exata a tomar; depois de uma tarefa lateral (commit, dúvida) a resposta volta ao plano, lista os blocos prontos e recomenda um com o motivo. Vale em qualquer fase e não depende de skill.
-2. **Piloto automático**, desligado por padrão, ligado pelo usuário no painel (botão "Autopilot") ou por `/driver auto on|off`. Só age na fase implement. Ligado, a cada fim de turno da sessão principal o mod lê o plano e, havendo trabalho, envia o próximo pedido por `$.prompt.submit`. O texto do pedido manda o Claude escolher o bloco, decidir sozinho o que tem padrão seguro, registrar escolhas não óbvias com `decision.add` e não fazer perguntas.
-3. **O piloto para sozinho** (desliga e avisa no painel e por toast) quando: todos os blocos de implement estão concluídos; não há bloco pronto nem em andamento (o que resta está bloqueado); o turno foi interrompido pelo usuário, recusado ou morreu por erro; o plano não mudou de revisão em dois turnos automáticos seguidos; ou passou de 60 turnos automáticos numa ativação.
-4. **O que o piloto nunca decide.** A lista fechada de "sempre perguntar" do ADR-013 (gastar dinheiro, dado de pagamento, saúde, documento ou de menores, apagar sem volta, compromisso legal), mais publicar ou enviar para fora (push, deploy, loja) e credencial ausente. Nesses casos o Claude marca o bloco como `blocked` com o motivo e segue para outro bloco pronto; sem outro, o piloto para pelo item 3. Gates continuam humanos: o piloto não aprova, e nem poderia (ADR-011).
-5. O estado do piloto vive em `$.state` (sessão), não no plano: fechar a sessão desliga.
+### Decision
+1. **One skill per phase, in the core, in the native plugin skill format:** `plugins/driver/skills/discover/SKILL.md` and `plugins/driver/skills/route/SKILL.md`, `user-invocable: true`, invocation by the model allowed (Discover invokes Route after the gate), no `context: fork` (the interview needs the history). Skill text in English; the conversation happens in the user's language. Shared conventions in `plugins/driver/references/driver-conventions.md`, outside `skills/`.
+2. **Interview by options, one question per turn:** `AskUserQuestion` with 2 to 3 real options plus "I don't know / you decide", the recommended one first with the `(Recommended)` suffix, the consequence in the description and "Why it matters" in the text. Decision frontier (grilling) persisted in `discover/interview.md` on every answer; facts are established by background read-only subagents, decisions belong to the user; already-made decisions are tested against `discover/assumptions.md`, earlier answers and the repository. "I don't know" never blocks: research, a safe default recorded as an `A-nn` assumption, or deferral.
+3. **Proportionality** through the ADR-008 mechanism (below), decided in the first round by estimated effort and recorded as a `D-nnn` decision.
+4. **No dependency on superpowers in this round.** Discover has its own style; Route copies the self-review checklist from `writing-plans` (coverage, sweep, dependencies, review focus, proportion). The pinned dependency of ADR-003 is left for B-006, where Implement uses `subagent-driven-development`.
+5. **During the interview only files; the plan receives a batch at the end.** Requirements, assumptions (`source: assumed`, `ref: discover/assumptions.md`), non-goals (`kind: non-goal`) and the class decision enter through `plan_ops` after the accepted play back, in batches of up to 25 ops. Reason: nothing is deleted (ADR-010 item 7). The skill writes `requirements/R-nnn.md`, `discover/*.md`, `blocks/B-nnn.md` and `route/risks.md` with Write/Edit; `plan.json`, `events.jsonl`, `log/` and `.mod/` stay out of reach; gate, rebaseline and `--force` stay with the user.
+6. **Each skill has a block in the plan** ("Discovery interview" in discover, "Route plan" in route depending on the first), with artifacts (paths relative to the project root, such as `.claude/driver/discover/interview.md`), Handoff and `verification.passes` marked by the model with the user's explicit acceptance as evidence. Route ends with `phase.advance` to implement; there is no human gate between Route and Implement (vision, section 5). A `done` block is never reopened: amend (Discover after the gate) and replan (Route) create new blocks ("Discovery amend: <topic>", "Route replan: <reason>"); the only exception is rework of the Discovery before the gate, via the path `done → needs_rework → in_progress`. The output batch is idempotent: the created ids are recorded in `interview.md` and a re-entry only adds what is missing.
+7. **Route decomposes into implement, validate, evolve and release blocks** with observable output, an acceptance criterion as the definition of done, `dependsOn` only for real dependencies, coverage of every requirement by ≥ 1 implement and ≥ 1 validate, risk by a fixed rule, `provider` when there is an external capability, a risk matrix in `route/risks.md`, a diagram validated by the user (panel and `export mermaid`) and `driver validate` without a `req.coverage` warning.
 
-**Alternativas descartadas.** Hook de fim de turno que só cobra o próximo passo quando falta: exigiria julgar o texto da resposta. Piloto cobrindo validate e evolve: essas fases ainda não têm skill e o Evolve decide escopo; fica para depois de B-006.
+### Consequences
+Rejected: superpowers' `brainstorming` as Discover (free text, no persistence, no visual options); incremental `req.add` during the interview (retire noise); a human gate at the end of Route (only two gates). Accepted risks: class L may exceed 30 turns (mitigation: ceiling per round and compaction-proof files); the panel does not show requirements until the end of the interview; the model's `verification.passes` on the skills' blocks. Confirmed on first load (2026-10-30): slash `/driver:discover` and `/driver:route`; `allowed-tools` with `Bash(driver *)` accepted by `claude plugin validate`. Opus adversarial review of the same date: 7 mandatory fixes (block lookup by title via `plan_status scope: phase`, idempotent output batch, an interview closed before the gate goes back to the gate step, amend/replan without reopening a `done` block, `kind` of assumptions, block range only implement and validate, text of the `route` gate in the conventions) and 9 improvements applied (reclassification at the end of round 1 with flags in the frontmatter, "never re-ask without new information", assumptions become `Accepted: yes` on acceptance, a notice that approving the gate does not start a model turn, block docs only with Edit, artifacts relative to the root and `exports/plan.mmd` outside the artifacts because it is gitignored, quoted heredoc in the CLI fallback, transition table in the conventions, research subagents of type `Explore`).
 
-**Consequências.** O piloto gasta turnos sem pedir; os cinco freios do item 3 limitam o custo, e o de "plano sem mudança" pega laço improdutivo. Decisões tomadas no automático ficam em `decisions/` para revisão no Evolve.
+---
 
-## [ADR-016] Mudança depois do gate: triagem em três níveis, baseline sugerido no Evolve, piloto no laço Validate e Implement
+## [ADR-013] Interview by interest: product core, areas by choice, summary as the final message, silent logging
+**Date:** 2026-11-10
+**Status:** Accepted (revises ADR-008 and items 2 and 5 of ADR-012)
 
-**Data:** 2026-11-11 · **Status:** Aceito, implementação em B-006 · **Issue:** PER-669 (segundo dogfooding)
+### Context
+First dogfooding of the skills (copy of `examples/web-waitlist`, class S). The protocol worked, but Diogo pointed out four problems: (1) the interview was too long for the size, because "personal data" (an email field) raised the depth to class M and the per-round ceiling became a target; (2) low-impact technical questions asked to someone who may not want to decide them, without relevant decisions being allowed to be made behind their back; (3) the acceptance summary did not appear: text written before a tool call is condensed in the terminal, and the question "is the summary above correct?" was left without a summary; (4) every answer produced a diff of `interview.md` on screen, and the `sed` edits ran into the guard.
 
-**Contexto.** No coffee-app o Validate reprovou três blocos e o usuário trouxe feedback de uso no iPhone. Sem skill de Validate nem de Evolve, o Claude criou quatro blocos novos em implement (decisões D-004 e D-005) com a fase em validate. O motor aceitou: o plano aprovado no gate cresceu sem marca nem aviso, a fase atual deixou de dizer onde o trabalho está, os blocos de validação ficaram em andamento à espera de correção. O usuário perguntou se aquilo já não era Evolve e um novo ciclo, e fixou o limite: uma alteração qualquer não pode recomeçar o ciclo; o DRIVER avalia, sugere e sempre oferece o próximo passo, inclusive seguir decidindo sozinho.
+### Decision
+1. **Product core, always asked.** After classification (domain and size), the interview asks only what only the user knows: goal and success signal, audience, indispensable capabilities, what stays out. Total core budget, counted in questions and not in rounds: XS 2, S 4, M 6, L 8. It is a ceiling, not a target: a node with a safe default becomes an assumption without a question.
+2. **Technical areas by choice.** After the core, a multiple-choice question: "In which areas do you want to decide the details?", with 2 to 4 areas derived from the domain (for web: infrastructure and hosting, data and privacy, design and content, metrics). Area checked: up to 3 questions. Area not checked: the model decides and records each decision as an `A-nn` assumption with the choice and the reason in one line. XS skips the areas question (everything decided by the model and shown in the summary).
+3. **Always-ask exception.** A decision that is costly to reverse, spends money, collects sensitive data (payment, health, documents, minors) or acts on production is asked even with the area skipped. Replaces the class bump of ADR-008: a contact email is not a trigger.
+4. **Progress and early exit.** Every question carries the progress ("3 of ~6"). From the third question after classification, one of the options is "Enough, summarize": open nodes become assumptions with the recommended default. Checkpoint (pre-mortem, red team, socratic) only for classes M and L.
+5. **Summary as the final message of the turn.** The summary is running text in the user's language, with no tool call after it in the same turn: goal, what will be built, what the user decided, what the model decided for them (with reason), what stays out, open questions. It ends by asking for "accepted" or what to change; the user may also ask why a decision was made or open a skipped area. The same text is written to `.claude/driver/discover/summary.md`. Acceptance comes in the user's next message; only then does the output batch run.
+6. **Silent logging through the `mcp__driver__discover_log` tool.** The source of truth of the interview becomes `.claude/driver/discover/interview.jsonl` (append-only, written only by the CLI). The tool calls `driver discover log` (JSON on stdin) and the CLI regenerates `interview.md`, `assumptions.md` and `non-goals.md` from the log; the model no longer edits these three files. With no write arguments the tool returns the state (meta, nodes, non-goals, frontier) for resumption. Contract:
+   - input `{ meta?, nodes?, nonGoals? }`, all optional;
+   - `meta`: `goal`, `class` (XS|S|M|L), `domain`, `language`, `stage` (core|areas|summary|closed), `areas` (list offered), `chosenAreas`, `reclassified` (bool), `checkpoint` (none|pre-mortem|red-team|socratic|skipped), `batchApplied` (string); absent keys stay as they are;
+   - `nodes[]`: `id` (`Q-nn`; absent creates the next), `question`, `area` (core or area name), `dependsOn[]`, `kind` (fact|decision), `status` (open|researching|settled|assumed|deferred), `answer`, `source` (user|research|assumed), `options[]` (shown), `why` (reason, required when `status` is assumed), `requirement` (`R-nnn`, filled in after the batch); update is by `id`, an absent field stays as it is; a node that becomes `assumed` gets an automatic `A-nn`;
+   - `nonGoals[]`: `id` (`N-nn`; absent creates), `statement`, `reason`, `requirement`;
+   - output: created ids, counts per status and the frontier (open nodes whose `dependsOn` are settled or assumed).
+7. **Route follows the same pattern** (added the same day, after Diogo ran Route in the terminal): confirmation of the plan stops being a tool question about a diagram that the terminal does not show. The turn ends with the list of blocks per phase (id, title, dependencies, risk, what runs in parallel), count against the range, critical path and high-risk blocks, in the user's language, also written to `.claude/driver/route/summary.md`; confirmation comes in the next message. Block documents are filled in by the `mcp__driver__block_doc` tool (`driver block doc`, JSON on stdin: `{blocks:[{id, spec?, acceptance?[], notes?, handoff?}]}`, 1 to 30 per call), which rewrites only the named sections, preserves frontmatter and title, refuses a `done` or retired block and does not touch `plan.json`. The skills no longer use Write, Edit, `sed` or redirection in `blocks/` nor in the generated files of `discover/`.
+8. **Guard.** `sed -i`, `perl -pi` and `ruby -i` after a `cd` into the plan folder are only denied when the operand is protected, is a glob or does not exist (before, any in-place edit there was denied, including of `discover/interview.md`). An unexpected exception in the guard still denies the call, but the case that caused it becomes a test. A change to the guard goes through adversarial review (GUARDRAILS).
 
-**Decisão.**
-1. **Triagem de toda mudança que aparece depois do gate route**, feita pelo Claude antes de mexer no plano:
-   - **Nível 1, correção.** Algo falhou contra um critério de aceite que já existe. O bloco de origem vai para `needs_rework` com o relatório como motivo e volta a ser trabalhado. Não se cria bloco novo e não se pergunta.
-   - **Nível 2, ajuste.** Trabalho novo que serve a um requisito já aprovado e não muda o que outros blocos entregam. Entra como bloco novo, com `decision.add`, aviso de uma linha ao usuário, e o trabalho segue sem pergunta, com ou sem piloto.
-   - **Nível 3, mudança de escopo.** Requisito novo ou alterado, toque em não-objetivo, item da lista de "sempre perguntar" (ADR-013), ou invalidação de bloco já concluído. O Claude avalia o impacto (blocos afetados, tamanho estimado) e pergunta com três saídas, uma recomendada: entrar neste ciclo; ficar para o próximo ciclo (pendência registrada, o release atual não espera); replanejar agora (volta a Route, só quando a estrutura do plano muda).
-2. **Nenhum nível recomeça o ciclo sozinho.** Rebaseline deixa de ser pré-condição para trabalhar: os blocos e requisitos que entraram depois do baseline vigente ficam marcados no plano e no painel. Na revisão do Evolve o DRIVER mostra a diferença para o baseline e sugere confirmar o próximo, de uma vez. O ato continua só do usuário (ADR-010, ADR-011).
-3. **A fase atual acompanha o trabalho.** Enquanto houver retrabalho ou ajuste em implement com a fase em validate, o painel mostra o laço (Validate de volta a Implement) em vez de deixar validate como única fase ativa; o bloco de validação que espera correção não fica em andamento, fica `blocked` com o bloco que o segura como motivo.
-4. **Próximo passo na triagem.** A resposta que comunica a triagem termina com as duas formas de seguir: um item por vez com pergunta, ou seguir sozinho até fechar (piloto automático).
-5. **Piloto automático no laço.** Revê o item 2 do ADR-015: o piloto vale em implement e validate e no vai e volta entre as duas. Ligado, decide os níveis 1 e 2; no nível 3 adota a saída recomendada e registra a decisão, exceto no que ele nunca decide (ADR-015 item 4), em que para. Os freios do ADR-015 item 3 valem iguais; "tudo concluído" passa a ser implement e validate concluídos.
+9. **Adjustments from the adversarial review (same day).** Budgets per class, all ceilings: core XS 2, S 4, M 6, L 8; area questions in total XS 0, S 3, M 6, L 9 (at most 3 per area); "always ask" at most 2, outside the budgets and valid for every class, by a closed list (spends money; collects payment, health, document or minors' data; deletes data irreversibly; creates a legal commitment). Hosting, choosing a database and an email field are not triggers. Acceptance is recorded (`meta.accepted`) before the output batch, which first reads the requirements already in the plan and only adds what is missing. Only decisions that the product must fulfill become requirements (classification and area choice stay in the log). Requirement files go through the `mcp__driver__req_doc` tool. A section body cannot contain a level 1 or 2 heading outside a code block, and the reducer requires exactly one `## Handoff`. The mod refuses writes coming from a subagent, except state and the document of the block it owns. The two summaries (`discover/summary.md`, `route/summary.md`) are user documents, in their language, headings included.
+10. **Guard, second round.** In addition to item 8: a `sed` script with `w` near a protected file or with `e` is denied, with or without `-i`; `perl`/`ruby` code in any flag cluster counts as an inline script, and in-place editing by them inside the plan folder remains denied; script glued to the flag, BSD sed's `-I`, `--in-place=SUF` and `-l N` are recognized; braces, `{a..b}` sequences and zsh alternation count as expansion; a `cd` that reaches the plan folder via `..`, `pushd` or a variable counts as being in it; relative `log/*` is protected there.
 
-**Alternativas descartadas.** Parar e exigir novo ciclo a cada bloco criado depois do gate: transforma ajuste pequeno em cerimônia, e o usuário recusou. Bloquear `block.add` depois do gate sem rebaseline: mesma rigidez, imposta pelo motor. Perguntar também no nível 2: uma parada a mais por ajuste, sem decisão real do usuário em jogo. Deixar como está: o gate route perde o sentido quando o plano cresce sem marca.
+### Consequences
+The depth of the interview now depends on the user's interest, not only on size: someone who is not technical answers the core and reviews the summary; someone who wants to decide infra checks the area. The class still fixes the Route block range. Costs: more decisions made by the model (mitigation: none is left out of the summary and the exception in item 3); acceptance costs one extra turn; `interview.jsonl` is one more file and the CLI gains a markdown renderer. `interview.jsonl` does not enter the list of files protected by the guard in this round (the skill forbids editing it; protecting it is a future decision if dogfooding shows manual editing). Rejected: keeping rounds with smaller ceilings (does not solve "who decides what"); putting the summary in the tool's question field (size limit, no formatting).
 
-**Consequências.** A classificação entre nível 2 e 3 é julgamento do modelo; a marca "depois do baseline" e a revisão no Evolve são o que torna um erro de classificação visível. Pede do motor: marca de origem por bloco e requisito em relação ao baseline, lista de pendências do próximo ciclo, e a regra de fase do item 3. Pede do mod: marca no cartão, laço no painel, piloto em duas fases. As skills de Validate e Evolve (B-006) carregam a triagem.
+---
 
-**Adendo (2026-11-11, plano do B-006).**
-1. **A marca "depois do baseline" é derivada**, sem campo novo no `plan.json`: um bloco ou requisito está depois do baseline quando seu id não aparece em nenhum `baselines[].added` ou `.reqAdded`. Planos existentes funcionam sem migração e `schemaVersion` continua 1. Limite conhecido: se o gate route for revogado e aprovado de novo, o que foi criado no intervalo aparece como posterior.
-   **Correção da revisão adversarial (mesma data).** O baseline 1 nasce na aprovação do gate route, antes de o Route criar os blocos; derivado só dali, todo bloco do plano sairia marcado. O baseline 1 passa a **fechar no fim do Route**: no `phase.advance` de route para implement, o reducer acrescenta ao baseline 1 os blocos e requisitos ativos ainda fora dele e grava `closedAt` na entrada (campo opcional; `baselines[]` é objeto frouxo, sem mudança de versão). É o plano que o usuário confirmou no passo 6 do Route. Sem `closedAt`, a view não marca nada. Planos que já passaram do Route são fechados uma vez, na próxima escrita, pela op interna `baseline.close`, calculada do ledger (o que foi criado antes da mudança de fase para implement); sem ledger, fecha com tudo o que existe.
-2. **As pendências do próximo ciclo ficam fora do `plan.json`**, em `backlog.jsonl` na pasta do plano, escritas pela tool silenciosa `mcp__driver__backlog`, com `backlog.md` gerado. Um requisito adiado dentro do plano obrigaria a mexer em cobertura, gate de release e rebaseline; fora dele nada é revogado e a lista vira entrada do próximo Discover (`amend`).
-3. **O novo baseline pode ser confirmado no painel**, botão `Confirm baseline N`, pelo mesmo caminho da aprovação de gate do ADR-011 (origem do usuário e ticket). O terminal continua valendo. Para o modelo segue impossível. A entrada do baseline guarda `via` e `ticket`, e o painel aplica a ela a mesma detecção de forja dos gates (alerta quando o baseline muda sem ticket emitido por ele).
-4. **A espera de um bloco de validação é derivada**: bloco `blocked` com dependência não concluída. A view expõe de quem ele espera e quando pode ser retomado; um spawn de subagente não desbloqueia bloco nessa situação.
+## [ADR-014] Next step always visible: the panel says what to do and the main button triggers Claude
 
-## [ADR-017] Superpowers como apoio opcional das skills do core
+**Date:** 2026-11-11 · **Status:** Accepted · **Issue:** PER-669 (second dogfooding)
 
-**Data:** 2026-11-11 · **Status:** Aceito · **Revê:** ADR-003 (só para o core) e ADR-012 item 4
+**Context.** In the second dogfooding (new project, Desktop app) Discover and Route went well, but the handoff between them left the user lost: approving the gate and clicking "Advance to route" changed the phase in the plan and nothing else happened, because the panel only writes to the plan and does not trigger the model. In addition, the panel offered "Advance to implement" with the route phase having no blocks, and "Advance to validate" with implement at 0 of 12.
 
-**Contexto.** O ADR-003 previa superpowers como dependência pinada, e o ADR-012 adiou o pin para o B-006, onde Implement usaria `subagent-driven-development`. Dependência entre marketplaces exige que o usuário libere `allowCrossMarketplaceDependenciesOn`, e quem instala o DRIVER passaria a ser obrigado a instalar outro plugin. O público que o dogfooding mostrou é o usuário comum, para quem cada passo extra de instalação pesa.
+**Decision.**
+1. The panel always shows a "Next: ..." line with the next step, derived only from the `PlanView` (pure function `nextStep`). No plan state is left without a visible next step, except a completed release.
+2. The main button has three forms, in this order:
+   - **Approve `<gate>` gate** when the method asks for a gate and it is not approved (rule of ADR-011, unchanged, with the two confirmations and the ticket). Once the gate is approved, the mod advances the phase and triggers Claude, with no second click.
+   - **Continue `<phase>`** when the current phase has no blocks or has an active block that is not completed. It does not write to the plan; it only triggers Claude.
+   - **Start `<next phase>`** when all active blocks of the current phase are completed and the next one does not depend on a pending gate. It advances the phase and triggers Claude.
+   The "Advance to ..." button ceases to exist: advancing with the phase incomplete remains possible through the `plan_ops` tool and the CLI (the reducer does not change), but the panel does not offer it.
+3. "Triggering Claude" is `$.prompt.submit` with a short, fixed text that names the phase and the skill (`driver:discover`, `driver:route`); for phases that still have no skill, the text asks for `plan_status`, the list of ready blocks with a recommendation and reason, and the question of which to start with. The submission is its own turn, queues if the session is busy and reaches the model with origin `plugin`.
+4. A typed `/driver approve <gate>` does the same as the button: approves, advances and triggers.
+5. The prompt sent by the mod never approves anything: approval still requires origin `composer` or `ui.press` plus a ticket. A prompt with origin `plugin` is only a work request, equal to a user message, and goes through the same gate hooks.
 
-**Decisão.**
-1. As skills do core trazem o protocolo completo em texto próprio: teste primeiro, verificação por evidência (identificar, rodar, ler, conferir), destino do código no release.
-2. Se o plugin superpowers estiver instalado, a skill invoca a equivalente pela tool Skill (`test-driven-development`, `verification-before-completion`, `finishing-a-development-branch`) e segue o resultado; se não estiver, segue o próprio texto. Nenhuma versão é pinada no manifesto.
-3. O ADR-003 continua valendo para packs e para skills vendorizadas: cabeçalho com origem, versão e licença.
+**Alternatives discarded.** Only filling the message field with `/driver:route` (my initial proposal): it still requires knowing that an Enter is missing, and the user asked that approving carry things forward. Firing without a click on detecting an approved gate in polling: it would spend a turn on an approval made in another terminal or session.
 
-**Alternativas descartadas.** Dependência dura pinada: instalação mais pesada e quebra quando o upstream muda de versão maior. Vendorizar as skills do superpowers: o plugin é publicado e versionado, o ADR-003 reserva a cópia para quem não é.
+**Consequences.** Whoever approves a gate accepts spending the following turn; this is stated in the confirmation text ("Approve and start ..."). The phase skills must end every final message with the user's next step (already a rule in ADR-013 for Discover and Route; it applies to those of B-006).
 
-**Consequências.** O texto próprio precisa ser mantido; em troca o DRIVER funciona sozinho. O comportamento varia um pouco conforme o superpowers esteja ou não instalado, o que o dogfooding deve cobrir nos dois casos.
+## [ADR-015] Next step in every response and optional autopilot in Implement
 
-## [ADR-008] Proporcionalidade de cerimônia
-**Data:** 2026-10-26 (fechado em 2026-10-30 pelo ADR-012)
-**Status:** Aceito
+**Date:** 2026-11-11 · **Status:** Accepted · **Issue:** PER-669 (second dogfooding)
 
-### Contexto
-Mínimo de 3 rodadas de entrevista sem limite de duração afasta projetos pequenos (um deck, um script).
+**Context.** In the coffee-app Implement, Claude closed a block, made the requested commit and ended the response without saying what came next. The author knows it is enough to ask it to continue; an ordinary user is left stuck. The request was: there should always be a hint, a question, or an option to turn on automatic mode and let Claude decide everything until the end of the implementation.
 
-### Decisão
-A profundidade do Discover e o número de blocos do Route escalam com uma classe de tamanho decidida na primeira rodada da entrevista, pelo esforço estimado pelo usuário:
+**Decision.**
+1. **Permanent rule in the prompt.** In a project with a plan, the mod adds a section to the system prompt (`prompt.compose`, id `driver:next-step`, scope `session`): every final response of the main session ends with the user's next step, as a question with options or as the exact action to take; after a side task (commit, question) the response returns to the plan, lists the ready blocks and recommends one with the reason. It applies in any phase and does not depend on a skill.
+2. **Autopilot**, off by default, turned on by the user in the panel ("Autopilot" button) or by `/driver auto on|off`. It only acts in the implement phase. When on, at the end of each turn of the main session the mod reads the plan and, if there is work, sends the next request via `$.prompt.submit`. The request text tells Claude to choose the block, decide on its own whatever has a safe default, record non-obvious choices with `decision.add` and not ask questions.
+3. **The autopilot stops by itself** (turns off and warns in the panel and by toast) when: all implement blocks are completed; there is no block ready or in progress (what remains is blocked); the turn was interrupted by the user, refused or died from an error; the plan did not change revision in two consecutive automatic turns; or it went past 60 automatic turns in one activation.
+4. **What the autopilot never decides.** The closed "always ask" list from ADR-013 (spending money, payment, health, document or minors' data, irreversible deletion, legal commitment), plus publishing or sending outside (push, deploy, store) and a missing credential. In these cases Claude marks the block as `blocked` with the reason and moves on to another ready block; with no other, the autopilot stops by item 3. Gates remain human: the autopilot does not approve, and could not (ADR-011).
+5. The autopilot state lives in `$.state` (session), not in the plan: closing the session turns it off.
 
-| Classe | Sinal | Rodadas | Perguntas por rodada | Blocos no Route |
+**Alternatives discarded.** An end-of-turn hook that only demands the next step when it is missing: it would require judging the response text. Autopilot covering validate and evolve: those phases still have no skill and Evolve decides scope; left for after B-006.
+
+**Consequences.** The autopilot spends turns without asking; the five brakes in item 3 limit the cost, and the "plan unchanged" one catches an unproductive loop. Decisions made in automatic mode stay in `decisions/` for review in Evolve.
+
+## [ADR-016] Change after the gate: three-level triage, baseline suggested in Evolve, autopilot in the Validate and Implement loop
+
+**Date:** 2026-11-11 · **Status:** Accepted, implementation in B-006 · **Issue:** PER-669 (second dogfooding)
+
+**Context.** In coffee-app, Validate failed three blocks and the user brought usage feedback from the iPhone. With no Validate or Evolve skill, Claude created four new blocks in implement (decisions D-004 and D-005) with the phase at validate. The engine accepted it: the plan approved at the gate grew with no mark or warning, the current phase stopped saying where the work is, and the validation blocks were left in progress waiting for a fix. The user asked whether that wasn't already Evolve and a new cycle, and set the limit: an arbitrary change cannot restart the cycle; DRIVER evaluates, suggests and always offers the next step, including continuing to decide on its own.
+
+**Decision.**
+1. **Triage of every change that appears after the route gate**, done by Claude before touching the plan:
+   - **Level 1, fix.** Something failed against an acceptance criterion that already exists. The originating block goes to `needs_rework` with the report as the reason and is worked on again. No new block is created and no question is asked.
+   - **Level 2, adjustment.** New work that serves an already approved requirement and does not change what other blocks deliver. It enters as a new block, with `decision.add`, a one-line notice to the user, and the work proceeds without a question, with or without autopilot.
+   - **Level 3, scope change.** New or changed requirement, touching a non-goal, an item on the "always ask" list (ADR-013), or invalidation of an already completed block. Claude evaluates the impact (affected blocks, estimated size) and asks with three outcomes, one recommended: enter this cycle; wait for the next cycle (pending item recorded, the current release does not wait); replan now (back to Route, only when the structure of the plan changes).
+2. **No level restarts the cycle on its own.** Rebaseline ceases to be a precondition for working: the blocks and requirements that came in after the current baseline are marked in the plan and in the panel. In the Evolve review DRIVER shows the difference from the baseline and suggests confirming the next one, all at once. The act remains the user's alone (ADR-010, ADR-011).
+3. **The current phase follows the work.** While there is rework or adjustment in implement with the phase at validate, the panel shows the loop (Validate back to Implement) instead of leaving validate as the only active phase; the validation block waiting for a fix does not stay in progress, it is `blocked` with the block holding it as the reason.
+4. **Next step in the triage.** The response that communicates the triage ends with the two ways to proceed: one item at a time with a question, or continue on its own until closing (autopilot).
+5. **Autopilot in the loop.** Revises item 2 of ADR-015: the autopilot applies in implement and validate and in the back and forth between the two. When on, it decides levels 1 and 2; at level 3 it adopts the recommended outcome and records the decision, except for what it never decides (ADR-015 item 4), where it stops. The brakes of ADR-015 item 3 apply equally; "everything completed" becomes implement and validate completed.
+
+**Alternatives discarded.** Stopping and requiring a new cycle for every block created after the gate: turns a small adjustment into ceremony, and the user refused. Blocking `block.add` after the gate without a rebaseline: the same rigidity, imposed by the engine. Asking at level 2 too: one more stop per adjustment, with no real user decision at stake. Leaving it as is: the route gate loses its meaning when the plan grows without a mark.
+
+**Consequences.** The classification between level 2 and 3 is the model's judgment; the "after the baseline" mark and the review in Evolve are what make a classification mistake visible. It requires from the engine: an origin mark per block and requirement relative to the baseline, a list of next-cycle pending items, and the phase rule from item 3. It requires from the mod: a mark on the card, the loop in the panel, autopilot in two phases. The Validate and Evolve skills (B-006) carry the triage.
+
+**Addendum (2026-11-11, B-006 plan).**
+1. **The "after the baseline" mark is derived**, with no new field in `plan.json`: a block or requirement is after the baseline when its id does not appear in any `baselines[].added` or `.reqAdded`. Existing plans work without migration and `schemaVersion` stays at 1. Known limit: if the route gate is revoked and approved again, what was created in the interval appears as later.
+   **Correction from the adversarial review (same date).** Baseline 1 is born at the approval of the route gate, before Route creates the blocks; derived only from there, every block of the plan would come out marked. Baseline 1 now **closes at the end of Route**: on the `phase.advance` from route to implement, the reducer adds to baseline 1 the active blocks and requirements still outside it and records `closedAt` in the entry (optional field; `baselines[]` is a loose object, no version change). It is the plan the user confirmed in step 6 of Route. Without `closedAt`, the view marks nothing. Plans that have already passed Route are closed once, on the next write, by the internal op `baseline.close`, computed from the ledger (what was created before the phase change to implement); without a ledger, it closes with everything that exists.
+2. **Next-cycle pending items stay outside `plan.json`**, in `backlog.jsonl` in the plan folder, written by the silent tool `mcp__driver__backlog`, with `backlog.md` generated. A requirement deferred inside the plan would force changes to coverage, the release gate and rebaseline; outside it nothing is revoked and the list becomes input to the next Discover (`amend`).
+3. **The new baseline can be confirmed in the panel**, `Confirm baseline N` button, through the same path as the gate approval of ADR-011 (user origin and ticket). The terminal remains valid. For the model it stays impossible. The baseline entry stores `via` and `ticket`, and the panel applies to it the same forgery detection as the gates (alerts when the baseline changes without a ticket issued by it).
+4. **The wait of a validation block is derived**: a `blocked` block with an uncompleted dependency. The view exposes whom it is waiting for and when it can be resumed; a subagent spawn does not unblock a block in this situation.
+
+## [ADR-017] Superpowers as optional support for the core skills
+
+**Date:** 2026-11-11 · **Status:** Accepted · **Revisits:** ADR-003 (only for the core) and ADR-012 item 4
+
+**Context.** ADR-003 anticipated superpowers as a pinned dependency, and ADR-012 postponed the pin to B-006, where Implement would use `subagent-driven-development`. A cross-marketplace dependency requires the user to allow `allowCrossMarketplaceDependenciesOn`, and whoever installs DRIVER would become obliged to install another plugin. The audience that dogfooding showed is the ordinary user, for whom each extra installation step weighs.
+
+**Decision.**
+1. The core skills carry the complete protocol in their own text: test first, verification by evidence (identify, run, read, check), destination of the code at release.
+2. If the superpowers plugin is installed, the skill invokes the equivalent through the Skill tool (`test-driven-development`, `verification-before-completion`, `finishing-a-development-branch`) and follows the result; if it is not, it follows its own text. No version is pinned in the manifest.
+3. ADR-003 continues to apply to packs and to vendored skills: header with origin, version and license.
+
+**Alternatives discarded.** Hard pinned dependency: heavier installation and breakage when upstream changes major version. Vendoring the superpowers skills: the plugin is published and versioned, and ADR-003 reserves copying for those that are not.
+
+**Consequences.** The own text needs to be maintained; in exchange DRIVER works on its own. Behavior varies a little depending on whether superpowers is installed or not, which dogfooding should cover in both cases.
+
+## [ADR-018] The repository is written in English
+
+**Date:** 2026-11-12 · **Status:** Accepted · **Revisits:** the language convention in `CLAUDE.md` and `.claude/GUARDRAILS.md` (docs in Brazilian Portuguese, code in English)
+
+**Context.** The repository was mixed: code, skills and panel texts in English; ADRs, plans, vision, part of the research and the worked examples inside the skill templates in Portuguese. The plugin is meant to be published, and a reader who does not read Portuguese could not follow the decisions behind it.
+
+**Decision.**
+1. Every file in the repository is written in English: `README.md`, `CLAUDE.md`, `.claude/docs/`, `.claude/plans/`, `docs/`, code, comments, skill texts and the examples in skill templates. New commit messages are in English.
+2. File names follow the same rule. `docs/vision/initial-definition.md` becomes `docs/vision/initial-definition.md` and `.claude/plans/2026-10-28-mod-diagram.md` becomes `.claude/plans/2026-10-28-mod-diagram.md`.
+3. Skills keep talking to the user in the user's language, and user documents (`discover/summary.md`, `evolve/review.md`) are still written in that language. Only the examples shipped in the repository changed.
+4. Existing commit messages are not rewritten: the author decided the history stays as it is.
+5. The DRIVER plan of this repository (`.claude/driver/`) keeps its existing Portuguese titles, block documents and ledger. `events.jsonl` is append-only and `validate --replay` checks it against `plan.json`, so translating it would mean editing the plan by hand, which the fixed rules forbid. New blocks, requirements and decisions are written in English.
+
+**Alternatives discarded.** Translating only the README and the user-facing docs: the ADRs are the most useful reading for a contributor and would stay closed. Keeping two languages side by side: double maintenance for a single author. Rewriting the plan ledger: breaks the one-writer rule for no gain to the reader.
+
+**Consequences.** The no em dash rule checked by `test/skills.spec.ts` stays. The plan folder of this repository is the one place where Portuguese remains, and it fades as the plan moves on.
+
+## [ADR-008] Proportionality of ceremony
+**Date:** 2026-10-26 (closed on 2026-10-30 by ADR-012)
+**Status:** Accepted
+
+### Context
+A minimum of 3 interview rounds with no duration limit puts off small projects (a deck, a script).
+
+### Decision
+The depth of Discover and the number of Route blocks scale with a size class decided in the first round of the interview, by the effort estimated by the user:
+
+| Class | Signal | Rounds | Questions per round | Blocks in Route |
 |---|---|---|---|---|
-| XS | uma tarde | 1 + play back | 3 | 2 a 4 |
-| S | alguns dias | 2 + play back | 4 | 4 a 8 |
-| M | algumas semanas | 3 + play back | 6 | 8 a 15 |
-| L | meses ou um time | 3 ou mais, até a fronteira esvaziar | 8 | 15 a 30 |
+| XS | one afternoon | 1 + play back | 3 | 2 to 4 |
+| S | a few days | 2 + play back | 4 | 4 to 8 |
+| M | a few weeks | 3 + play back | 6 | 8 to 15 |
+| L | months or a team | 3 or more, until the frontier empties | 8 | 15 to 30 |
 
-Dinheiro, dados pessoais, produção, ações irreversíveis ou domínio regulado sobem a profundidade do Discover em uma classe, sem mudar a faixa de blocos. A classe é registrada como decisão no plano; o usuário pode reclassificar uma vez, ao fim da primeira rodada; exceder a faixa de blocos exige motivo declarado.
+Money, personal data, production, irreversible actions or a regulated domain raise the depth of Discover by one class, without changing the block range. The class is recorded as a decision in the plan; the user may reclassify once, at the end of the first round; exceeding the block range requires a stated reason.
 
-**Revisão de 2026-11-10 (ADR-013):** as colunas "Rodadas" e "Perguntas por rodada" e a subida de classe por risco deixam de valer. A classe fixa o orçamento do núcleo da entrevista (XS 2, S 4, M 6, L 8 perguntas no total) e a faixa de blocos; a profundidade técnica vem das áreas que o usuário escolhe.
+**Revision of 2026-11-10 (ADR-013):** the "Rounds" and "Questions per round" columns and the class bump for risk cease to apply. The class fixes the budget of the interview core (XS 2, S 4, M 6, L 8 questions in total) and the block range; technical depth comes from the areas the user chooses.
 
-A faixa de blocos conta só blocos de implement e validate. Os blocos fixos de cada plano ("Discovery interview", "Route plan", "Evolve review" e o bloco de release) são sobrecarga constante e não contam; sem isso XS não caberia em 2 a 4 (revisão de 2026-10-30). XS também dispensa a pergunta de reclassificação e a pergunta de não-objetivos: ambos entram no play back.
+The block range counts only implement and validate blocks. The fixed blocks of each plan ("Discovery interview", "Route plan", "Evolve review" and the release block) are constant overhead and do not count; without this, XS would not fit in 2 to 4 (revision of 2026-10-30). XS also waives the reclassification question and the non-goals question: both enter the play back.

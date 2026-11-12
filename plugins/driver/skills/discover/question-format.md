@@ -32,45 +32,45 @@ Recommend so that a plain "yes" is a good answer: the first option is what you w
 
 - Start every question text with the progress, for example `(3 of ~6)`. Count every question after the classify call (core, areas gate, area questions, always-ask). The number after `~` is your best estimate of how many you will ask in total. It can change, but never exceeds the ceilings above. Right after the areas gate, the next question's text states the real remaining total, for example `(6 of ~9: 3 more questions in your areas, then the summary)`. Orientation lines and "I assumed X" notes also go inside the question text, never in a separate message before the tool call (it is condensed in the terminal).
 - The classify call has no progress marker and is not counted.
-- Everything the user sees is in the user's language: the "(Recommended)" suffix (for Portuguese "(Recomendado)"), "Not sure / decide for me" ("Não sei / decida por mim"), "That is enough, summarize" ("Já basta, resuma"), headers and descriptions. The English examples below are for an English-speaking user.
+- Everything the user sees is in the user's language: the "(Recommended)" suffix, "Not sure / decide for me", "That is enough, summarize", headers and descriptions are all translated into the user's language. The examples below are for an English-speaking user.
 - From the third question on, one option is "That is enough, summarize" (translated). Picking it: create and assume, with a `why`, every remaining decision the plan needs (in chosen and unchosen areas), log `checkpoint: skipped` when the class had a checkpoint, and jump to the Summary.
 - Slot budget: the tool allows at most 4 options. From the third question on, "Not sure / decide for me" and "That is enough, summarize" take two slots, so a question has at most 2 real options. Before the third question it can have 3 real options.
 - multiSelect lists (the areas gate, candidate non-goals) have neither "Not sure" nor "enough": selecting nothing means "none of these, decide for me".
 
-## Worked example 1 (Portuguese, the classify call, not counted)
+## Worked example 1 (English, the classify call, not counted)
 
-The user wrote: `/driver:discover "página de lista de espera para um app"`. Language: Portuguese.
+The user wrote: `/driver:discover "waitlist page for an app"`. Language: English.
 
 ```json
 {
   "questions": [
     {
-      "question": "Que tipo de entrega é essa? Por que importa: define os provedores e as camadas de teste que vou sugerir.",
-      "header": "Domínio",
+      "question": "What kind of deliverable is this? Why it matters: it sets the providers and the test layers I will suggest.",
+      "header": "Domain",
       "multiSelect": false,
       "options": [
-        {"label": "Site ou app web (Recomendado)", "description": "Página pública com formulário; precisa de hospedagem e de um lugar para guardar e-mails."},
-        {"label": "Documento ou apresentação", "description": "Entrega em arquivo; sem backend, a verificação é revisão visual."},
-        {"label": "Automação ou dados", "description": "Script ou planilha; a verificação é rodar com dados de exemplo."},
-        {"label": "Não sei / decida por mim", "description": "Assumo site web pela descrição e registro como premissa."}
+        {"label": "Website or web app (Recommended)", "description": "Public page with a form; needs hosting and a place to store emails."},
+        {"label": "Document or presentation", "description": "File deliverable; with no backend, verification is a visual review."},
+        {"label": "Automation or data", "description": "Script or spreadsheet; verification is running it with sample data."},
+        {"label": "Not sure / decide for me", "description": "I assume a website from the description and record it as an assumption."}
       ]
     },
     {
-      "question": "Quanto esforço você estima? Por que importa: define quantas perguntas faço sobre o produto e quantos blocos o plano terá.",
-      "header": "Tamanho",
+      "question": "How much effort do you estimate? Why it matters: it sets how many product questions I ask and how many blocks the plan will have.",
+      "header": "Size",
       "multiSelect": false,
       "options": [
-        {"label": "Uma tarde", "description": "2 perguntas, sem áreas, de 2 a 4 blocos."},
-        {"label": "Alguns dias (Recomendado)", "description": "Até 4 perguntas do produto e até 3 nas áreas que você escolher, de 4 a 8 blocos."},
-        {"label": "Algumas semanas", "description": "Até 6 perguntas do produto, até 6 nas áreas e checkpoint, de 8 a 15 blocos."},
-        {"label": "Meses ou um time", "description": "Até 8 perguntas do produto, até 9 nas áreas e checkpoint, de 15 a 30 blocos."}
+        {"label": "One afternoon", "description": "2 questions, no areas, 2 to 4 blocks."},
+        {"label": "A few days (Recommended)", "description": "Up to 4 product questions and up to 3 in the areas you choose, 4 to 8 blocks."},
+        {"label": "A few weeks", "description": "Up to 6 product questions, up to 6 in the areas and a checkpoint, 8 to 15 blocks."},
+        {"label": "Months or a team", "description": "Up to 8 product questions, up to 9 in the areas and a checkpoint, 15 to 30 blocks."}
       ]
     }
   ]
 }
 ```
 
-The size question has four real options, so there is no "Not sure" slot. When that happens, rely on "Other": if the user types "não sei", infer the class, log it as an assumption, and say so. Use this four-option shape only in the classify call.
+The size question has four real options, so there is no "Not sure" slot. When that happens, rely on "Other": if the user types "not sure", infer the class, log it as an assumption, and say so. Use this four-option shape only in the classify call.
 
 ## Worked example 2 (English, a core question with the "enough" option)
 

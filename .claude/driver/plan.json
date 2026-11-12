@@ -37,7 +37,7 @@
   "blocks": {
     "B-001": {
       "artifacts": [
-        "docs/vision/definicao-inicial.md",
+        "docs/vision/initial-definition.md",
         "docs/research/skills-landscape.md",
         "docs/research/01-process-skills.md",
         "docs/research/02-domain-packs.md",
@@ -71,7 +71,7 @@
       "artifacts": [
         ".claude/docs/DECISIONS.md",
         ".claude/plans/2026-10-27-plan-json-v1.md",
-        ".claude/plans/2026-10-28-mod-diagrama.md"
+        ".claude/plans/2026-10-28-mod-diagram.md"
       ],
       "dependsOn": [
         "B-001"
@@ -335,7 +335,7 @@
     "B-012": {
       "artifacts": [
         ".claude/driver/blocks/B-012.md",
-        "docs/vision/definicao-inicial.md"
+        "docs/vision/initial-definition.md"
       ],
       "dependsOn": [
         "B-001"
@@ -543,7 +543,7 @@
       "title": "Packs por domínio sugerem a stack ideal sob demanda"
     }
   },
-  "revision": 60,
+  "revision": 61,
   "schemaVersion": 1,
-  "updatedAt": "2026-11-12T15:56:41.550Z"
+  "updatedAt": "2026-11-12T17:40:05.327Z"
 }

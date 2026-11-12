@@ -1,143 +1,143 @@
-# Pesquisa 2: packs de domínio e registro de capacidades
+# Research 2: domain packs and capability registry
 
-Data: 2026-10-26. Fonte: subagent de pesquisa (Opus), verificação via GitHub API e `anthropics/claude-plugins-official/.claude-plugin/marketplace.json` (315 plugins). "CLI?" indica que existe CLI nativa e ela deve ser preferida ao MCP (custo zero de contexto até ser chamada). Itens não verificados estão marcados.
+Date: 2026-10-26. Source: research subagent (Opus), checked via the GitHub API and `anthropics/claude-plugins-official/.claude-plugin/marketplace.json` (315 plugins). "CLI?" means a native CLI exists and should be preferred over the MCP (zero context cost until it is called). Unverified items are marked.
 
-## Quatro achados que mudam o plano
+## Four findings that change the plan
 
-- **ElevenLabs MCP local** (`elevenlabs/elevenlabs-mcp`) foi arquivado em agosto de 2026. Usar o MCP hospedado ou a CLI.
-- **`@railway/mcp-server`** foi arquivado em maio de 2026. O MCP agora vem embutido na CLI como `railway mcp`.
-- **XcodeBuildMCP** virou `getsentry/MobileBuildMCP`. O tap antigo do Homebrew ainda funciona.
-- **Auth.js / next-auth** teve último push em julho de 2026, efetivamente em manutenção. Better Auth é o sucessor prático (handover não confirmado).
+- **Local ElevenLabs MCP** (`elevenlabs/elevenlabs-mcp`) was archived in August 2026. Use the hosted MCP or the CLI.
+- **`@railway/mcp-server`** was archived in May 2026. The MCP now ships inside the CLI as `railway mcp`.
+- **XcodeBuildMCP** became `getsentry/MobileBuildMCP`. The old Homebrew tap still works.
+- **Auth.js / next-auth** had its last push in July 2026, effectively in maintenance. Better Auth is the practical successor (handover not confirmed).
 
 ## A. Web build
 
-| Nome | Tipo | URL | Licença | Auth | Custo | CLI? | Veredito |
+| Name | Type | URL | License | Auth | Cost | CLI? | Verdict |
 |---|---|---|---|---|---|---|---|
-| Vercel CLI + plugin `vercel` (MCP remoto em mcp.vercel.com) | CLI + plugin + MCP | github.com/vercel/vercel-plugin | NOASSERTION | OAuth / token | Freemium | **Sim** (`vercel`) | RECOMENDAR: hosting frontend padrão |
-| Supabase CLI + MCP (`?read_only=true&project_ref=`) | CLI + MCP + plugin | github.com/supabase/mcp | Apache-2.0 | OAuth | Freemium | Sim para migrations; MCP para SQL e advisors | RECOMENDAR: banco, auth e storage juntos |
-| Railway (`railway mcp` na CLI + plugin `railway`) | CLI + plugin | github.com/railwayapp/railway-skills | MIT | login CLI / OAuth | Pago por uso | **Sim** | OPCIONAL: mais fácil para backends/containers |
-| Netlify (`@netlify/mcp` + `netlify-skills`) | MCP + plugin | github.com/netlify/netlify-mcp | não declarada | OAuth / PAT | Freemium | **Sim** (`netlify`) | OPCIONAL: alternativa à Vercel |
-| Cloudflare (MCP com `search()`/`execute()` + plugin) | MCP + plugin | github.com/cloudflare/mcp-server-cloudflare | Apache-2.0 | OAuth / token | Freemium | **Sim** (`wrangler`) | OPCIONAL: edge, R2, DNS |
-| Clerk (`clerk/skills`, mcp.clerk.com) | Skill + MCP | clerk.com/docs/guides/ai/overview | não declarada | MCP só de docs | Freemium | `clerk init` | OPCIONAL: melhor UI de auth pronta |
-| Supabase Auth | parte do Supabase | | | | Free tier | | RECOMENDAR quando já em Supabase |
-| Better Auth | Lib | github.com/better-auth/better-auth | MIT | | Free | | OPCIONAL: auth self-hosted |
-| Auth.js / next-auth | Lib | github.com/nextauthjs/next-auth | ISC | | Free | | EVITAR: modo manutenção |
-| Resend (plugin, CLI, MCP) | Skill + CLI + MCP | github.com/resend/resend-skills · resend/resend-cli | MIT | API key | Freemium | **Sim** | RECOMENDAR: melhor DX para e-mail |
-| Postmark MCP | MCP | github.com/ActiveCampaign/postmark-mcp | MIT | server token | Pago (trial) | Não | OPCIONAL: deliverability, MCP só local |
-| Stripe (plugin, mcp.stripe.com) | Plugin + MCP | github.com/stripe/ai | MIT | OAuth / restricted key | Taxas Stripe | Sim (`stripe` para webhooks) | RECOMENDAR: oficial, test mode primeiro |
+| Vercel CLI + `vercel` plugin (remote MCP at mcp.vercel.com) | CLI + plugin + MCP | github.com/vercel/vercel-plugin | NOASSERTION | OAuth / token | Freemium | **Yes** (`vercel`) | RECOMMEND: default frontend hosting |
+| Supabase CLI + MCP (`?read_only=true&project_ref=`) | CLI + MCP + plugin | github.com/supabase/mcp | Apache-2.0 | OAuth | Freemium | Yes for migrations; MCP for SQL and advisors | RECOMMEND: database, auth and storage together |
+| Railway (`railway mcp` in the CLI + `railway` plugin) | CLI + plugin | github.com/railwayapp/railway-skills | MIT | CLI login / OAuth | Pay per use | **Yes** | OPTIONAL: easier for backends/containers |
+| Netlify (`@netlify/mcp` + `netlify-skills`) | MCP + plugin | github.com/netlify/netlify-mcp | not declared | OAuth / PAT | Freemium | **Yes** (`netlify`) | OPTIONAL: alternative to Vercel |
+| Cloudflare (MCP with `search()`/`execute()` + plugin) | MCP + plugin | github.com/cloudflare/mcp-server-cloudflare | Apache-2.0 | OAuth / token | Freemium | **Yes** (`wrangler`) | OPTIONAL: edge, R2, DNS |
+| Clerk (`clerk/skills`, mcp.clerk.com) | Skill + MCP | clerk.com/docs/guides/ai/overview | not declared | docs-only MCP | Freemium | `clerk init` | OPTIONAL: best ready-made auth UI |
+| Supabase Auth | part of Supabase | | | | Free tier | | RECOMMEND when already on Supabase |
+| Better Auth | Lib | github.com/better-auth/better-auth | MIT | | Free | | OPTIONAL: self-hosted auth |
+| Auth.js / next-auth | Lib | github.com/nextauthjs/next-auth | ISC | | Free | | AVOID: maintenance mode |
+| Resend (plugin, CLI, MCP) | Skill + CLI + MCP | github.com/resend/resend-skills · resend/resend-cli | MIT | API key | Freemium | **Yes** | RECOMMEND: best DX for email |
+| Postmark MCP | MCP | github.com/ActiveCampaign/postmark-mcp | MIT | server token | Paid (trial) | No | OPTIONAL: deliverability, local-only MCP |
+| Stripe (plugin, mcp.stripe.com) | Plugin + MCP | github.com/stripe/ai | MIT | OAuth / restricted key | Stripe fees | Yes (`stripe` for webhooks) | RECOMMEND: official, test mode first |
 
-Também no marketplace oficial: Auth0, WorkOS, Neon, Render, Firebase, Convex.
+Also in the official marketplace: Auth0, WorkOS, Neon, Render, Firebase, Convex.
 
 ## B. Mobile build
 
-| Nome | Tipo | URL | Licença | Auth | Custo | CLI? | Veredito |
+| Name | Type | URL | License | Auth | Cost | CLI? | Verdict |
 |---|---|---|---|---|---|---|---|
-| Expo plugin `expo` + EAS CLI | Plugin + CLI | github.com/expo/skills | MIT | login Expo | Freemium | **Sim** (`eas`) | RECOMENDAR: caminho padrão React Native |
-| Expo MCP (mcp.expo.dev; local exige SDK 54+) | MCP remoto | docs.expo.dev/mcp | proprietário | OAuth | Franquia free (não verificado) | EAS cobre builds | OPCIONAL: simulador e DevTools |
-| MobileBuildMCP (ex-XcodeBuildMCP, Sentry) | MCP + CLI | github.com/getsentry/MobileBuildMCP | MIT | nenhuma | Free | **Sim** | RECOMENDAR: builds nativos iOS/macOS |
-| mobile-next/mobile-mcp | MCP | github.com/mobile-next/mobile-mcp | Apache-2.0 | nenhuma | Free | Não | RECOMENDAR: controle de device iOS e Android |
-| Dart/Flutter MCP (`dart mcp-server`, Dart 3.9+) | MCP | docs.flutter.dev/ai/mcp-server | BSD (não verificado) | nenhuma | Free | Sim (`flutter`) | OPCIONAL: oficial, experimental |
+| Expo plugin `expo` + EAS CLI | Plugin + CLI | github.com/expo/skills | MIT | Expo login | Freemium | **Yes** (`eas`) | RECOMMEND: default React Native path |
+| Expo MCP (mcp.expo.dev; local requires SDK 54+) | Remote MCP | docs.expo.dev/mcp | proprietary | OAuth | Free allowance (not verified) | EAS covers builds | OPTIONAL: simulator and DevTools |
+| MobileBuildMCP (ex-XcodeBuildMCP, Sentry) | MCP + CLI | github.com/getsentry/MobileBuildMCP | MIT | none | Free | **Yes** | RECOMMEND: native iOS/macOS builds |
+| mobile-next/mobile-mcp | MCP | github.com/mobile-next/mobile-mcp | Apache-2.0 | none | Free | No | RECOMMEND: iOS and Android device control |
+| Dart/Flutter MCP (`dart mcp-server`, Dart 3.9+) | MCP | docs.flutter.dev/ai/mcp-server | BSD (not verified) | none | Free | Yes (`flutter`) | OPTIONAL: official, experimental |
 
-O app desktop do Claude Code já traz controle do iOS Simulator embutido.
+The Claude Code desktop app already ships with iOS Simulator control built in.
 
-## C. Qualidade de design frontend
+## C. Frontend design quality
 
-| Nome | Tipo | URL | Licença | Auth | Custo | CLI? | Veredito |
+| Name | Type | URL | License | Auth | Cost | CLI? | Verdict |
 |---|---|---|---|---|---|---|---|
-| impeccable (autor: **Paul Bakaus**) | Skill/plugin | github.com/pbakaus/impeccable | Apache-2.0 | nenhuma | Free | `npx impeccable` | RECOMENDAR: melhor skill de design (89k★) |
-| Anthropic `frontend-design` | Plugin | claude-plugins-official | Apache-2.0 | nenhuma | Free | | OPCIONAL: impeccable constrói sobre ele |
-| shadcn MCP | MCP | ui.shadcn.com/docs/mcp | MIT | nenhuma | Free | **Sim** | OPCIONAL: CLI já cobre |
-| Figma MCP (mcp.figma.com + plugin `figma`) | MCP + plugin | github.com/figma/mcp-server-guide | não declarada | OAuth | Seat pago; write-to-canvas free em beta | Não | RECOMENDAR quando o usuário tem Figma |
-| Canva (plugin + MCP remoto) | Plugin + MCP | github.com/canva-sdks/canva-skills | Apache-2.0 | OAuth | Freemium | Não | OPCIONAL: gráficos de marketing |
-| Pencil.dev | canvas IDE + MCP local | pencil.dev | proprietário | conta | Pago (não verificado) | Não | OPCIONAL: arquivos `.pen` no repo |
-| Paper | canvas web + MCP | paper.design | proprietário | conta | Freemium (não verificado) | Não | OPCIONAL: gera HTML/CSS |
-| Superdesign | Plugin | github.com/superdesigndev/superdesign-skill | MIT | conta | Freemium | | EVITAR: sobrepõe impeccable, parado desde ago/2026 |
+| impeccable (author: **Paul Bakaus**) | Skill/plugin | github.com/pbakaus/impeccable | Apache-2.0 | none | Free | `npx impeccable` | RECOMMEND: best design skill (89k★) |
+| Anthropic `frontend-design` | Plugin | claude-plugins-official | Apache-2.0 | none | Free | | OPTIONAL: impeccable builds on it |
+| shadcn MCP | MCP | ui.shadcn.com/docs/mcp | MIT | none | Free | **Yes** | OPTIONAL: the CLI already covers it |
+| Figma MCP (mcp.figma.com + `figma` plugin) | MCP + plugin | github.com/figma/mcp-server-guide | not declared | OAuth | Paid seat; write-to-canvas free in beta | No | RECOMMEND when the user has Figma |
+| Canva (plugin + remote MCP) | Plugin + MCP | github.com/canva-sdks/canva-skills | Apache-2.0 | OAuth | Freemium | No | OPTIONAL: marketing graphics |
+| Pencil.dev | canvas IDE + local MCP | pencil.dev | proprietary | account | Paid (not verified) | No | OPTIONAL: `.pen` files in the repo |
+| Paper | web canvas + MCP | paper.design | proprietary | account | Freemium (not verified) | No | OPTIONAL: generates HTML/CSS |
+| Superdesign | Plugin | github.com/superdesigndev/superdesign-skill | MIT | account | Freemium | | AVOID: overlaps impeccable, stalled since Aug 2026 |
 
-Design system a partir de codebase existente: impeccable já cobre (gera `DESIGN.md` e tokens). Alternativa: `knowledge-work-plugins/design`.
+Design system from an existing codebase: impeccable already covers it (generates `DESIGN.md` and tokens). Alternative: `knowledge-work-plugins/design`.
 
-## D. Vídeo / motion
+## D. Video / motion
 
-| Nome | Tipo | URL | Licença | Auth | Custo | CLI? | Veredito |
+| Name | Type | URL | License | Auth | Cost | CLI? | Verdict |
 |---|---|---|---|---|---|---|---|
-| **HyperFrames** (HeyGen; HTML → MP4 via Chrome headless + FFmpeg) | Skills + CLI + plugin | github.com/heygen-com/hyperframes | Apache-2.0 | nenhuma local; conta HeyGen para render cloud e stock | Free local | **Sim** | RECOMENDAR: agent-native, licença permissiva |
-| Remotion skills (`remotion-dev/skills`) | Skills/plugin | remotion.dev/docs/ai/skills | Remotion License: empresas com 3+ pessoas pagam (de memória, não reverificado) | nenhuma | Free ou pago | Sim | OPCIONAL: maduro, licença limita empresas |
-| Runway (`runway-api`) | Plugin/API | github.com/runwayml/skills | não declarada | API key | Pago | | OPCIONAL: footage generativo |
+| **HyperFrames** (HeyGen; HTML → MP4 via headless Chrome + FFmpeg) | Skills + CLI + plugin | github.com/heygen-com/hyperframes | Apache-2.0 | none locally; HeyGen account for cloud render and stock | Free locally | **Yes** | RECOMMEND: agent-native, permissive license |
+| Remotion skills (`remotion-dev/skills`) | Skills/plugin | remotion.dev/docs/ai/skills | Remotion License: companies with 3+ people pay (from memory, not rechecked) | none | Free or paid | Yes | OPTIONAL: mature, license limits companies |
+| Runway (`runway-api`) | Plugin/API | github.com/runwayml/skills | not declared | API key | Paid | | OPTIONAL: generative footage |
 
-Remotion não está no marketplace oficial; HyperFrames está.
+Remotion is not in the official marketplace; HyperFrames is.
 
-## E. Voz / áudio
+## E. Voice / audio
 
-| Nome | Tipo | URL | Licença | Auth | Custo | CLI? | Veredito |
+| Name | Type | URL | License | Auth | Cost | CLI? | Verdict |
 |---|---|---|---|---|---|---|---|
-| ElevenLabs MCP hospedado + `@elevenlabs/cli` + `elevenlabs/skills` | MCP remoto + CLI + skills | elevenlabs.io/docs/eleven-api/resources/agent-tooling | MIT (CLI e skills) | OAuth / API key | Freemium | **Sim** | RECOMENDAR: narração premium |
-| elevenlabs-mcp (local) | MCP | github.com/elevenlabs/elevenlabs-mcp | MIT | | | | EVITAR: arquivado |
-| edge-tts | CLI/Python | github.com/rany2/edge-tts | NOASSERTION | nenhuma | Free | **Sim** | OPCIONAL: endpoint não oficial da Microsoft |
-| Kokoro-82M | modelo local | github.com/hexgrad/kokoro | Apache-2.0 | nenhuma | Free | via wrappers | RECOMENDAR: melhor qualidade free local; repo parado desde ago/2025, modelo estável |
-| Piper (fork OHF) | CLI local | github.com/OHF-Voice/piper1-gpl | GPL-3.0 | nenhuma | Free | **Sim** | OPCIONAL: mais rápido em CPU; GPL |
-| OpenAI TTS / Google Cloud TTS | API | | proprietário | API key | Pago; Google tem free tier | via SDK | OPCIONAL: fallback cloud barato |
-| whisper.cpp | CLI local | github.com/ggml-org/whisper.cpp | MIT | nenhuma | Free | **Sim** | RECOMENDAR: transcrição, ótimo em Apple Silicon |
-| faster-whisper | Python | github.com/SYSTRAN/faster-whisper | MIT | nenhuma | Free | via wrapper | OPCIONAL: Linux/GPU |
+| Hosted ElevenLabs MCP + `@elevenlabs/cli` + `elevenlabs/skills` | Remote MCP + CLI + skills | elevenlabs.io/docs/eleven-api/resources/agent-tooling | MIT (CLI and skills) | OAuth / API key | Freemium | **Yes** | RECOMMEND: premium narration |
+| elevenlabs-mcp (local) | MCP | github.com/elevenlabs/elevenlabs-mcp | MIT | | | | AVOID: archived |
+| edge-tts | CLI/Python | github.com/rany2/edge-tts | NOASSERTION | none | Free | **Yes** | OPTIONAL: unofficial Microsoft endpoint |
+| Kokoro-82M | local model | github.com/hexgrad/kokoro | Apache-2.0 | none | Free | via wrappers | RECOMMEND: best free local quality; repo stalled since Aug 2025, model stable |
+| Piper (OHF fork) | local CLI | github.com/OHF-Voice/piper1-gpl | GPL-3.0 | none | Free | **Yes** | OPTIONAL: fastest on CPU; GPL |
+| OpenAI TTS / Google Cloud TTS | API | | proprietary | API key | Paid; Google has a free tier | via SDK | OPTIONAL: cheap cloud fallback |
+| whisper.cpp | local CLI | github.com/ggml-org/whisper.cpp | MIT | none | Free | **Yes** | RECOMMEND: transcription, great on Apple Silicon |
+| faster-whisper | Python | github.com/SYSTRAN/faster-whisper | MIT | none | Free | via wrapper | OPTIONAL: Linux/GPU |
 
-A CLI do HyperFrames também tem `tts` e `transcribe` próprios.
+The HyperFrames CLI also has its own `tts` and `transcribe`.
 
-## F. Análise de dados / finanças
+## F. Data analysis / finance
 
-| Nome | Tipo | URL | Licença | Auth | Custo | CLI? | Veredito |
+| Name | Type | URL | License | Auth | Cost | CLI? | Verdict |
 |---|---|---|---|---|---|---|---|
-| Google Workspace CLI `gws` (100+ skills, MCP opcional) | CLI + skills | github.com/googleworkspace/cli | Apache-2.0 | OAuth (gcloud) | Free | **Sim** | RECOMENDAR para Sheets; Google rotula "não oficialmente suportado" |
-| Anthropic `xlsx` | Skill | github.com/anthropics/skills | source-available (não open source) | nenhuma | Free | | RECOMENDAR para Excel; referenciar, não vendorizar |
-| DuckDB CLI + `duckdb-skills` | CLI + plugin | github.com/duckdb/duckdb-skills | MIT | nenhuma | Free | **Sim** | RECOMENDAR: CSV/Parquet |
-| Postgres via `psql` / Supabase MCP | CLI / MCP | | | connection string / OAuth | Free | **Sim** | RECOMENDAR |
-| BigQuery (`bq` + `bigquery-data-analytics`) | CLI + plugin | github.com/gemini-cli-extensions/bigquery-data-analytics | Apache-2.0 (não verificado) | gcloud | Pago por uso | **Sim** | OPCIONAL |
-| Anthropic `financial-services` | Plugins | github.com/anthropics/financial-services | Apache-2.0 | vendors opcionais | Free | | OPCIONAL: modelagem profissional, não finanças pessoais |
-| `knowledge-work-plugins/data` e `/finance` | Plugins | github.com/anthropics/knowledge-work-plugins | Apache-2.0 | nenhuma | Free | | RECOMENDAR: workflows gerais de análise |
-| `dataviz` skill | Skill | embutida no Claude; não encontrada no repo público | | nenhuma | Free | | RECOMENDAR para gráficos; plotly/matplotlib como libs, sem MCP |
+| Google Workspace CLI `gws` (100+ skills, optional MCP) | CLI + skills | github.com/googleworkspace/cli | Apache-2.0 | OAuth (gcloud) | Free | **Yes** | RECOMMEND for Sheets; Google labels it "not officially supported" |
+| Anthropic `xlsx` | Skill | github.com/anthropics/skills | source-available (not open source) | none | Free | | RECOMMEND for Excel; reference, do not vendor |
+| DuckDB CLI + `duckdb-skills` | CLI + plugin | github.com/duckdb/duckdb-skills | MIT | none | Free | **Yes** | RECOMMEND: CSV/Parquet |
+| Postgres via `psql` / Supabase MCP | CLI / MCP | | | connection string / OAuth | Free | **Yes** | RECOMMEND |
+| BigQuery (`bq` + `bigquery-data-analytics`) | CLI + plugin | github.com/gemini-cli-extensions/bigquery-data-analytics | Apache-2.0 (not verified) | gcloud | Pay per use | **Yes** | OPTIONAL |
+| Anthropic `financial-services` | Plugins | github.com/anthropics/financial-services | Apache-2.0 | optional vendors | Free | | OPTIONAL: professional modeling, not personal finance |
+| `knowledge-work-plugins/data` and `/finance` | Plugins | github.com/anthropics/knowledge-work-plugins | Apache-2.0 | none | Free | | RECOMMEND: general analysis workflows |
+| `dataviz` skill | Skill | built into Claude; not found in the public repo | | none | Free | | RECOMMEND for charts; plotly/matplotlib as libs, no MCP |
 
-Nenhuma skill de finanças pessoais mantida foi encontrada. QuickBooks e NetSuite no marketplace são contabilidade empresarial. **Lacuna para o `driver-finance`.**
+No maintained personal-finance skill was found. QuickBooks and NetSuite in the marketplace are business accounting. **Gap for `driver-finance`.**
 
-## G. Social media / conteúdo
+## G. Social media / content
 
-| Nome | Tipo | URL | Licença | Auth | Custo | CLI? | Veredito |
+| Name | Type | URL | License | Auth | Cost | CLI? | Verdict |
 |---|---|---|---|---|---|---|---|
-| Postiz (plugin `postiz` = CLI, 28+ plataformas) | CLI + plugin | github.com/gitroomhq/postiz-agent | agent: NOASSERTION; app: AGPL-3.0 | API key (hospedado ou self-host) | Freemium / self-host | **Sim** | RECOMENDAR: maior cobertura, no marketplace oficial |
-| Typefully `agent-skills` | Skills | github.com/typefully/agent-skills | MIT | API key | Pago | API | OPCIONAL: melhor para X/LinkedIn |
-| Buffer MCP | MCP | buffer.com (repo oficial não encontrado) | | OAuth | Freemium | Não | OPCIONAL (não verificado) |
-| Nano Banana MCP (imagem Gemini) | MCP | github.com/zhongweili/nanobanana-mcp-server | MIT | Gemini API key | Pago | Não | OPCIONAL: comunidade |
-| Canva / `knowledge-work-plugins/marketing` | Plugin | ver acima | Apache-2.0 | OAuth / nenhuma | Free | | RECOMENDAR: calendário e drafts |
+| Postiz (`postiz` plugin = CLI, 28+ platforms) | CLI + plugin | github.com/gitroomhq/postiz-agent | agent: NOASSERTION; app: AGPL-3.0 | API key (hosted or self-host) | Freemium / self-host | **Yes** | RECOMMEND: widest coverage, in the official marketplace |
+| Typefully `agent-skills` | Skills | github.com/typefully/agent-skills | MIT | API key | Paid | API | OPTIONAL: best for X/LinkedIn |
+| Buffer MCP | MCP | buffer.com (official repo not found) | | OAuth | Freemium | No | OPTIONAL (not verified) |
+| Nano Banana MCP (Gemini image) | MCP | github.com/zhongweili/nanobanana-mcp-server | MIT | Gemini API key | Paid | No | OPTIONAL: community |
+| Canva / `knowledge-work-plugins/marketing` | Plugin | see above | Apache-2.0 | OAuth / none | Free | | RECOMMEND: calendar and drafts |
 
-Nenhuma skill forte de "content calendar" encontrada. A mais próxima é o plugin de marketing da Anthropic. **Lacuna para o `driver-social`.**
+No strong "content calendar" skill was found. The closest is Anthropic's marketing plugin. **Gap for `driver-social`.**
 
-## H. Documentos / decks
+## H. Documents / decks
 
-| Nome | Tipo | URL | Licença | Auth | Custo | Veredito |
+| Name | Type | URL | License | Auth | Cost | Verdict |
 |---|---|---|---|---|---|---|
-| Anthropic `docx` / `pptx` / `pdf` / `xlsx` | Skills | github.com/anthropics/skills | source-available, sem redistribuição | nenhuma | Free | RECOMENDAR: referenciar, não vendorizar |
-| Claude Artifacts (Slides / Docs) | embutido | claude.ai | | conta Claude | incluído | RECOMENDAR para decks compartilháveis |
-| HyperFrames "interactive deck" | Skill | ver D | Apache-2.0 | nenhuma | Free | OPCIONAL: decks animados |
-| Marp / Slidev | CLI | marp.app / sli.dev | MIT | nenhuma | Free | OPCIONAL (não pesquisado a fundo) |
+| Anthropic `docx` / `pptx` / `pdf` / `xlsx` | Skills | github.com/anthropics/skills | source-available, no redistribution | none | Free | RECOMMEND: reference, do not vendor |
+| Claude Artifacts (Slides / Docs) | built in | claude.ai | | Claude account | included | RECOMMEND for shareable decks |
+| HyperFrames "interactive deck" | Skill | see D | Apache-2.0 | none | Free | OPTIONAL: animated decks |
+| Marp / Slidev | CLI | marp.app / sli.dev | MIT | none | Free | OPTIONAL (not researched in depth) |
 
-## Marketplace oficial e diretório de conectores
+## Official marketplace and connector directory
 
-**Em `claude-plugins-official`:** vercel, supabase, railway, netlify-skills, cloudflare, stripe, resend, auth0, workos, neon, render, firebase, expo, figma, canva, superdesign, frontend-design, hyperframes, runway-api, postiz, duckdb-skills, bigquery-data-analytics, playwright, chrome-devtools-mcp, huggingface-skills, save-to-spotify.
+**In `claude-plugins-official`:** vercel, supabase, railway, netlify-skills, cloudflare, stripe, resend, auth0, workos, neon, render, firebase, expo, figma, canva, superdesign, frontend-design, hyperframes, runway-api, postiz, duckdb-skills, bigquery-data-analytics, playwright, chrome-devtools-mcp, huggingface-skills, save-to-spotify.
 
-**Fora dele:** impeccable, Remotion, ElevenLabs, Clerk, shadcn, MobileBuildMCP, mobile-mcp, Typefully, `gws`.
+**Outside it:** impeccable, Remotion, ElevenLabs, Clerk, shadcn, MobileBuildMCP, mobile-mcp, Typefully, `gws`.
 
-**Diretório de conectores do claude.ai:** Stripe, Figma, Canva e Notion confirmados por anúncio da Anthropic. Esta sessão tem Vercel, Supabase, Resend, ElevenLabs, HyperFrames, Linear, Slack e Google Workspace conectados, o que sugere presença no diretório. Lista completa não confirmada.
+**claude.ai connector directory:** Stripe, Figma, Canva and Notion confirmed by an Anthropic announcement. This session has Vercel, Supabase, Resend, ElevenLabs, HyperFrames, Linear, Slack and Google Workspace connected, which suggests they are in the directory. Full list not confirmed.
 
-## "Stack ideal" padrão proposta (10)
+## Proposed default "ideal stack" (10)
 
-1. **impeccable** para qualidade de design.
-2. **Vercel CLI + plugin** para deploy.
-3. **Supabase CLI + MCP** (read-only, project-scoped) para banco e auth.
-4. **Stripe plugin** para pagamentos, test mode primeiro.
-5. **Resend CLI/skills** para e-mail.
-6. **Expo skills + EAS CLI** para mobile, mais **MobileBuildMCP** para iOS nativo.
-7. **HyperFrames** para vídeo.
-8. **ElevenLabs CLI/MCP hospedado** para voz paga; **Kokoro + whisper.cpp** como opção free local.
-9. **DuckDB CLI + `gws` CLI** para dados e Sheets.
-10. **Postiz CLI** para social, mais skills **docx/pptx/xlsx/pdf** da Anthropic.
+1. **impeccable** for design quality.
+2. **Vercel CLI + plugin** for deploy.
+3. **Supabase CLI + MCP** (read-only, project-scoped) for database and auth.
+4. **Stripe plugin** for payments, test mode first.
+5. **Resend CLI/skills** for email.
+6. **Expo skills + EAS CLI** for mobile, plus **MobileBuildMCP** for native iOS.
+7. **HyperFrames** for video.
+8. **Hosted ElevenLabs CLI/MCP** for paid voice; **Kokoro + whisper.cpp** as the free local option.
+9. **DuckDB CLI + `gws` CLI** for data and Sheets.
+10. **Postiz CLI** for social, plus Anthropic's **docx/pptx/xlsx/pdf** skills.
 
-## Fontes
+## Sources
 
 - github.com/pbakaus/impeccable · github.com/heygen-com/hyperframes · remotion.dev/docs/ai/skills
 - docs.expo.dev/mcp · github.com/getsentry/MobileBuildMCP · github.com/mobile-next/mobile-mcp · docs.flutter.dev/ai/mcp-server

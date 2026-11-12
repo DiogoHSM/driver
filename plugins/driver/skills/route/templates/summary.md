@@ -11,25 +11,27 @@ Structure:
 5. High-risk blocks with their mitigation in a few words.
 6. Closing line: reply "ok" to confirm, or say what to change (blocks, order, split).
 
-## Worked example (Portuguese)
+## Worked example (English)
+
+The user wrote `/driver:discover "waitlist page for an app"`. Language: English.
 
 ```
-# Plano de blocos
+# Block plan
 
-A lista abaixo é o plano; o painel do DRIVER mostra o mesmo grafo quando está aberto.
+The list below is the plan; the DRIVER pane shows the same graph when it is open.
 
 **Implement**
-- B-003 Tabela waitlist (depende de: B-002) | risco baixo | paralelo com B-004
-- B-004 API de cadastro (depende de: B-003) | risco médio
-- B-005 Página inicial (depende de: B-002) | risco baixo | paralelo com B-003
+- B-003 Waitlist table (depends on: B-002) | low risk | parallel with B-004
+- B-004 Signup API (depends on: B-003) | medium risk
+- B-005 Landing page (depends on: B-002) | low risk | parallel with B-003
 
 **Validate**
-- B-006 Testes da API (depende de: B-004) | risco baixo
-- B-007 Revisão visual da página (depende de: B-005) | risco baixo
+- B-006 API tests (depends on: B-004) | low risk
+- B-007 Visual review of the page (depends on: B-005) | low risk
 
-**Blocos:** 5 de implement e validate, dentro da faixa de 4 a 8 da classe S.
-**Caminho crítico:** B-002, B-003, B-004, B-006.
-**Risco alto:** nenhum.
+**Blocks:** 5 in implement and validate, within the 4 to 8 range of class S.
+**Critical path:** B-002, B-003, B-004, B-006.
+**High risk:** none.
 
-Responda "ok" para confirmar, ou diga o que mudar (blocos, ordem, divisão).
+Reply "ok" to confirm, or say what to change (blocks, order, split).
 ```

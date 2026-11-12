@@ -13,33 +13,35 @@ Structure:
 7. **Recommendation.** One of: ready for release; one more round, local; one more round, re-plan. One or two lines of reason.
 8. **Your next step.** What to press or type, in order, ending with the line that starts the next phase.
 
-## Worked example (Portuguese)
+## Worked example (English)
+
+The user wrote `/driver:discover "waitlist page for an app"`. Language: English.
 
 ```
-# Revisão do ciclo
+# Cycle review
 
-**Em números.** 12 blocos concluídos, 1 rodada de retrabalho, 2 blocos e 1 requisito depois do baseline 1, 3 itens no backlog.
+**In numbers.** 12 blocks done, 1 rework round, 2 blocks and 1 requirement after baseline 1, 3 backlog items.
 
-**Decisões do piloto automático.**
-- D-007 Autopilot: calculadora compacta entra neste ciclo (cabe em um bloco e não invalida nenhum concluído).
+**Autopilot decisions.**
+- D-007 Autopilot: compact calculator enters this cycle (fits in one block and invalidates no completed one).
 
-**Depois do baseline.**
-- B-021 Calculadora compacta (D-007)
-- B-022 Teste da calculadora (D-007)
-- R-009 Calcular o valor da dose
+**After the baseline.**
+- B-021 Compact calculator (D-007)
+- B-022 Calculator test (D-007)
+- R-009 Calculate the dose amount
 
-**Cobertura.** Todos os requisitos têm teste passando ou foram retirados com decisão.
+**Coverage.** Every requirement has a passing test or was retired with a decision.
 
-| Requisito | Evidência | Estado |
+| Requirement | Evidence | Status |
 |---|---|---|
-| R-001 | B-006 teste de cadastro, passou | ok |
-| R-009 | B-022 teste unitário, passou | ok |
+| R-001 | B-006 signup test, passed | ok |
+| R-009 | B-022 unit test, passed | ok |
 
-**Backlog.** Modo escuro; exportar CSV; convite por link.
+**Backlog.** Dark mode; export CSV; invite by link.
 
-**Riscos que sobram.** Nenhum bloco de risco alto sem verificação.
+**Remaining risks.** No high-risk block without verification.
 
-**Recomendação.** Pronto para o release: o critério foi cumprido e nada está aberto atrás.
+**Recommendation.** Ready for release: the criterion was met and nothing is left open behind.
 
-**Seu próximo passo.** Clique em Confirm baseline 2 no painel (ou digite /driver baseline), depois em Approve release gate (ou /driver approve release). Aprovar inicia o release.
+**Your next step.** Click Confirm baseline 2 in the pane (or type /driver baseline), then Approve release gate (or /driver approve release). Approving starts the release.
 ```
