@@ -25,6 +25,7 @@ If none is a clear yes, treat it as level 3. A wrong level 2 is visible later (t
    - `in_progress`: add the dependency if it is missing, then `blocked`.
    - `in_review`: `needs_rework` (reason: the finding), then `in_progress`, then add the dependency if it is missing, then `blocked`.
    - `done`: the same path as `in_review`: `needs_rework` (reason: the finding), `in_progress`, dependency if missing, `blocked`.
+   - already `blocked` for another reason (for example `needs user: approve the four guides`): it now has two holds, and the plan must show both. Add the dependency with `block.set` if it is missing, then restate the reason with `in_progress` and `blocked`, keeping the first hold in front: `needs user: approve the four guides; also waiting on B-nnn`. Because the reason does not start with `waiting on`, the block never shows as resumable while the user's part is open, and the dependency keeps the rework visible in the diagram. When the user's part is settled and the rework is still open, restate it as `waiting on B-nnn`.
 3. Do not create a block. Do not ask. Tell the user in one line and go on.
 
 Only the main session triages. A subagent that finds a failure reports it and stops; it never moves a block it does not own.
@@ -35,7 +36,7 @@ Rework is ordinary work: `needs_rework` to `in_progress`, fix, verify again from
 
 1. One batch with `mcp__driver__plan_ops`: `decision.add` saying what and why, then `block.add` for the new work, linked to the requirement it serves and depending on the blocks it builds on.
    New work must be validated too. Pick the validate block that covers the same requirement:
-   - not `done` yet: add the new block to its `dependsOn` with `block.set`. The link alone does not hold back a validate block that is `in_progress` (`in_progress` to `in_review` or `done` does not check dependencies): if it is `in_progress`, also move it to `blocked` with reason `waiting on <new id>`. If it is `in_review`, take the path of level 1 (`needs_rework`, `in_progress`, `blocked`).
+   - not `done` yet: add the new block to its `dependsOn` with `block.set`. The link alone does not hold back a validate block that is `in_progress` (`in_progress` to `in_review` or `done` does not check dependencies): if it is `in_progress`, also move it to `blocked` with reason `waiting on <new id>`. If it is `in_review`, take the path of level 1 (`needs_rework`, `in_progress`, `blocked`). If it is already `blocked` for another reason, add the dependency and restate the reason as level 1 says for that case (`<first hold>; also waiting on <new id>`).
    - already `done`: never give a `done` block a new dependency. Add a new validate block in the same batch (`block.add`, phase validate, depending on the new work).
 2. Fill the block document with `mcp__driver__block_doc` (spec and acceptance criteria) before starting it.
 3. Tell the user in one line: `Added B-024 (compact calculator) for R-006; it shows as added after the baseline.` Do not ask. Go on.

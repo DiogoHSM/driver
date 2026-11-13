@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { baselineText, project, shapeCheck, sinceBaseline, summarize } from '../src/shared/view.js';
+import { baselineText, isResumable, project, shapeCheck, sinceBaseline, summarize } from '../src/shared/view.js';
 import { clonePlan, loadExamplePlan, loadFixture, shuffleKeys } from './helpers.js';
 import { docBlock, docPlan, loopedDoc } from './shared-helpers.js';
 
@@ -210,6 +210,13 @@ describe('ADR-016 derived fields', () => {
     expect(s.rework).toEqual(['B-002']);
     expect(s.resumable).toEqual(['B-005']);
     expect(s.ready).toEqual(['B-008']);
+  });
+
+  it('a block held by the user and by rework is not resumable until the reason is a plain wait', () => {
+    const byId = new Map([['B-004', { status: 'done' as const }]]);
+    const held = { status: 'blocked' as const, deps: ['B-004'] };
+    expect(isResumable({ ...held, reason: 'needs user: approve the four guides; also waiting on B-004' }, byId)).toBe(false);
+    expect(isResumable({ ...held, reason: 'waiting on B-004' }, byId)).toBe(true);
   });
 });
 
